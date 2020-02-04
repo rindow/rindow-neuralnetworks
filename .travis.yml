@@ -1,0 +1,15 @@
+language: php
+
+php:
+    - '7.2'
+    - '7.3'
+    - '7.4'
+
+before_install:
+  - phpenv config-add tests/travis/php$TRAVIS_PHP_VERSION.ini
+
+install:
+  - export TRAVIS_PHP_VERSION; sh tests/travis/install-script.sh
+
+script:
+  - sh tests/travis/run-test.sh
