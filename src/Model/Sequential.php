@@ -9,7 +9,10 @@ use Rindow\NeuralNetworks\Optimizer\Optimizer;
 use Rindow\NeuralNetworks\Layer\Layer;
 use Rindow\NeuralNetworks\Layer\Softmax;
 use Rindow\NeuralNetworks\Layer\Sigmoid;
-use Rindow\NeuralNetworks\Loss\LossLayer;
+use Rindow\NeuralNetworks\Loss\Loss;
+use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
+use Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy;
+use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
 use Interop\Polite\Math\Matrix\NDArray;
 
 class Sequential
@@ -21,7 +24,7 @@ class Sequential
     protected $optimizer;
     protected $metrics;
     protected $layers = [];
-    protected $lossLayer;
+    protected $lossFunction;
     protected $params = [];
     protected $grads = [];
     protected $built = false;
@@ -80,17 +83,29 @@ class Sequential
             throw new InvalidArgumentException('no layer');
         }
         if($loss=='SparseCategoricalCrossEntropy') {
+            $loss = $this->builder->losses()->SparseCategoricalCrossEntropy();
+        }
+        if($loss instanceof SparseCategoricalCrossEntropy) {
             if($lastLayer instanceof Softmax) {
-                $loss = $lastLayer = $this->builder->losses()->SoftmaxWithSparseCategoricalCrossEntropy();
-            } elseif($lastLayer instanceof Sigmoid) {
-                $loss = $lastLayer = $this->builder->losses()->SigmoidWithSparseCategoricalCrossEntropy();
+                $lastLayer->setIncorporatedLoss(true);
+                $loss->setFromLogits(true);
+            }
+        } elseif($loss instanceof CategoricalCrossEntropy) {
+            if($lastLayer instanceof Softmax) {
+                $lastLayer->setIncorporatedLoss(true);
+                $loss->setFromLogits(true);
+            }
+        } elseif($loss instanceof BinaryCrossEntropy) {
+            if($lastLayer instanceof Sigmoid) {
+                $lastLayer->setIncorporatedLoss(true);
+                $loss->setFromLogits(true);
             }
         }
-        if(!($loss instanceof LossLayer)) {
+        if(!($loss instanceof Loss)) {
             throw new InvalidArgumentException('invalid loss function');
         }
         array_push($this->layers,$lastLayer);
-        $this->lossLayer = $loss;
+        $this->lossFunction = $loss;
 
         // resolve metrics
         if(empty($metrics)) {
@@ -132,9 +147,9 @@ class Sequential
         return $this->layers;
     }
 
-    public function lossLayer()
+    public function lossFunction()
     {
-        return $this->lossLayer;
+        return $this->lossFunction;
     }
 
     public function optimizer()
@@ -175,7 +190,7 @@ class Sequential
         $history = ['loss'=>[], 'accuracy'=>[]];
         if($val_inputs) {
             $history['val_loss'] = [];
-            $history['val_acc'] = [];
+            $history['val_accuracy'] = [];
         }
         if($verbose>=1) {
             $this->console('Train on '.$inputCount.' samples');
@@ -227,7 +242,7 @@ class Sequential
                 [$loss, $accuracy] = $this->evaluate($val_inputs, $val_test,
                     ['batch_size'=>$batch_size,'verbose'=>$verbose]);
                 $history['val_loss'][] = $loss;
-                $history['val_acc'][] = $accuracy;
+                $history['val_accuracy'][] = $accuracy;
             }
 
             if($verbose>=1) {
@@ -276,14 +291,15 @@ class Sequential
         }
 
         $preds = $this->forwardStep($inputs, $training=true);
-        $loss  = $this->lossLayer->loss($trues,$preds);
+        $loss  = $this->lossFunction->loss($trues,$preds);
         if(is_nan($loss)) {
             throw new UnexpectedValueException("loss is unexpected value");
         }
-        $this->backwardStep($this->lossLayer->differentiateLoss());
+        $this->backwardStep($this->lossFunction->differentiateLoss());
 
         if(in_array('accuracy',$metrics)) {
-            $accuracy = $this->lossLayer->accuracy($trues,$preds);
+            $preds = $this->forwardLastlayer($preds);
+            $accuracy = $this->lossFunction->accuracy($trues,$preds);
         } else {
             $accuracy = 0;
         }
@@ -336,8 +352,9 @@ class Sequential
             $inputs = $x[[$batchStart,$batchEnd]];
             $trues  = $t[[$batchStart,$batchEnd]];
             $preds = $this->forwardStep($inputs,$training=false);
-            $totalLoss += $this->lossLayer->loss($trues,$preds);
-            $totalAccuracy += $this->lossLayer->accuracy($trues,$preds);
+            $totalLoss += $this->lossFunction->loss($trues,$preds);
+            $preds = $this->forwardLastlayer($preds);
+            $totalAccuracy += $this->lossFunction->accuracy($trues,$preds);
         }
         $totalLoss = $totalLoss / $batchIndexCount;
         $totalAccuracy = $totalAccuracy / $batchIndexCount;
@@ -352,7 +369,21 @@ class Sequential
             'steps'=>null,
         ],$options));
 
-        return $this->forwardStep($inputs, $training=false);
+        $outputs = $this->forwardStep($inputs, $training=false);
+        return $this->forwardLastlayer($outputs);
+    }
+
+    protected function forwardLastlayer($x)
+    {
+        $layers = $this->layers;
+        $lastLayer = array_pop($layers);
+        if(method_exists($lastLayer,'incorporatedLoss') &&
+            $lastLayer->incorporatedLoss()) {
+                $lastLayer->setIncorporatedLoss(false);
+                $x = $lastLayer->forward($x,false);
+                $lastLayer->setIncorporatedLoss(true);
+        }
+        return $x;
     }
 
     public function toJson()
@@ -376,8 +407,8 @@ class Sequential
                 'layers' => $layers,
             ],
             'loss' => [
-                'class' => get_class($this->lossLayer),
-                'config' => $this->lossLayer->getConfig(),
+                'class' => get_class($this->lossFunction),
+                'config' => $this->lossFunction->getConfig(),
             ],
             'optimizer' => [
                 'class' => get_class($this->optimizer),

@@ -6,7 +6,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 /**
  *
  */
-interface LossLayer
+interface Loss
 {
     public function loss(NDArray $true, NDArray $x) : float;
     public function differentiateLoss() : NDArray;

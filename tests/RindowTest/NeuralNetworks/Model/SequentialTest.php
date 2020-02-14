@@ -48,7 +48,7 @@ class Test extends TestCase
 
         $model->compile();
         $layers = $model->layers();
-        $lossLayer = $model->lossLayer();
+        $lossFunction = $model->lossFunction();
         $weights = $model->weights();
         $grads = $model->grads();
 
@@ -60,9 +60,12 @@ class Test extends TestCase
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Layer\Dense',$layers[2]);
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Loss\SoftmaxWithSparseCategoricalCrossEntropy',$layers[3]);
+            'Rindow\NeuralNetworks\Layer\Softmax',$layers[3]);
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Loss\SoftmaxWithSparseCategoricalCrossEntropy',$lossLayer);
+            'Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy',$lossFunction);
+        $this->assertFalse($layers[1]->incorporatedLoss());
+        $this->assertTrue($layers[3]->incorporatedLoss());
+        $this->assertTrue($lossFunction->fromLogits());
 
         $this->assertCount(4,$weights);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$weights[0]);
@@ -117,6 +120,9 @@ class Test extends TestCase
         ]);
 
         $model->compile();
+        $this->assertFalse($model->layers()[1]->incorporatedLoss());
+        $this->assertTrue($model->layers()[3]->incorporatedLoss());
+        $this->assertTrue($model->lossFunction()->fromLogits());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -130,81 +136,6 @@ class Test extends TestCase
         //$plt->plot($mo->array($history['accuracy']));
         //$plt->title('fit and predict');
         //$plt->show();
-    }
-
-    public function testFitAndPredictWithReluAndAdam()
-    {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
-        $plt = new Plot($this->getPlotConfig(),$mo);
-
-        $model = $nn->models()->Sequential([
-            $nn->layers()->Dense($units=128,[
-                'input_shape'=>[2],'kernel_initializer'=>'relu_normal']),
-            $nn->layers()->Relu(),
-            $nn->layers()->Dense($units=2),
-            $nn->layers()->Softmax(),
-        ]);
-
-        $model->compile([
-            'optimizer'=>$nn->optimizers()->Adam()
-        ]);
-
-        // training greater or less
-        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
-        $history = $model->fit($x,$t,['epochs'=>100,'verbose'=>0]);
-
-        $y = $model->predict($x);
-        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
-
-        if($this->plot) {
-            $axes = [];
-            $axes[] = $plt->plot($mo->array($history['loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['accuracy']))[0];
-            $plt->legend($axes,['loss','accuracy']);
-            $plt->title('Relu & Adam');
-            $plt->show();
-        }
-    }
-
-    public function testFitAndPredictWithMeanSquareError()
-    {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
-        $plt = new Plot($this->getPlotConfig(),$mo);
-
-        $model = $nn->models()->Sequential([
-            $nn->layers()->Dense($units=128,[
-                'input_shape'=>[2],'kernel_initializer'=>'relu_normal']),
-            $nn->layers()->Relu(),
-            $nn->layers()->Dense($units=2),
-            $nn->layers()->Softmax(),
-        ]);
-
-        $model->compile([
-            'loss'=>$nn->losses()->MeanSquaredError()
-        ]);
-
-        // training greater or less
-        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([[1, 0], [1, 0], [1, 0], [0, 1], [0, 1], [0, 1]]);
-        $history = $model->fit($x,$t,['epochs'=>100,'verbose'=>0]);
-
-        $y = $model->predict($x);
-        $this->assertEquals($mo->argMax($t,$axis=1)->toArray(),
-                            $mo->argMax($y,$axis=1)->toArray());
-
-        if($this->plot) {
-            $axes = [];
-            $axes[] = $plt->plot($mo->array($history['loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['accuracy']))[0];
-            $plt->legend($axes,['loss','accuracy']);
-            $plt->title('Mean Square Error');
-            $plt->show();
-        }
     }
 
     public function testEvaluate()
@@ -256,16 +187,103 @@ class Test extends TestCase
         $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
         $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
 
-        $this->assertEquals(['loss','accuracy','val_loss','val_acc'],array_keys($history));
+        $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
 
         if($this->plot) {
-            $axes = [];
-            $axes[] = $plt->plot($mo->array($history['loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['val_loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['accuracy']))[0];
-            $axes[] = $plt->plot($mo->array($history['val_acc']))[0];
-            $plt->legend($axes,['loss','val_loss','accuracy','val_acc']);
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
             $plt->title('Normal with evaluate');
+            $plt->show();
+        }
+    }
+
+    public function testFitAndPredictWithReluAndAdam()
+    {
+        $mo = new MatrixOperator();
+        $backend = new Backend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,[
+                'input_shape'=>[2],'kernel_initializer'=>'relu_normal']),
+            $nn->layers()->Relu(),
+            $nn->layers()->Dense($units=2),
+            $nn->layers()->Softmax(),
+        ]);
+
+        $model->compile([
+            'optimizer'=>$nn->optimizers()->Adam()
+        ]);
+        $this->assertTrue($model->layers()[3]->incorporatedLoss());
+        $this->assertTrue($model->lossFunction()->fromLogits());
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
+
+        $y = $model->predict($x);
+        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+
+        if($this->plot) {
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
+            $plt->title('Relu & Adam');
+            $plt->show();
+        }
+    }
+
+    public function testFitWithMeanSquareError()
+    {
+        $mo = new MatrixOperator();
+        $backend = new Backend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,[
+                'input_shape'=>[2]]),
+            $nn->layers()->Sigmoid(),
+            $nn->layers()->Dense($units=2),
+            $nn->layers()->Softmax(),
+        ]);
+
+        $model->compile([
+            'loss'=>$nn->losses()->MeanSquaredError()
+        ]);
+
+        // training greater or less
+        $this->assertFalse( $model->layers()[3]->incorporatedLoss());
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([[1, 0], [1, 0], [1, 0], [0, 1], [0, 1], [0, 1]]);
+        $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
+        $v_t = $mo->array([[0, 1], [1, 0], [1, 0], [0, 1], [1, 0], [0, 1]]);
+        $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
+
+        $y = $model->predict($x);
+        $this->assertEquals($mo->argMax($t,$axis=1)->toArray(),
+                            $mo->argMax($y,$axis=1)->toArray());
+
+        $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
+
+        if($this->plot) {
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
+            $plt->title('MeanSquareError');
             $plt->show();
         }
     }
@@ -294,15 +312,14 @@ class Test extends TestCase
         $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
         $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
 
-        $this->assertEquals(['loss','accuracy','val_loss','val_acc'],array_keys($history));
+        $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
 
         if($this->plot) {
-            $axes = [];
-            $axes[] = $plt->plot($mo->array($history['loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['val_loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['accuracy']))[0];
-            $axes[] = $plt->plot($mo->array($history['val_acc']))[0];
-            $plt->legend($axes,['loss','val_loss','accuracy','val_acc']);
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
             $plt->title('Dropout');
             $plt->show();
         }
@@ -332,16 +349,97 @@ class Test extends TestCase
         $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
         $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
 
-        $this->assertEquals(['loss','accuracy','val_loss','val_acc'],array_keys($history));
+        $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
 
         if($this->plot) {
-            $axes = [];
-            $axes[] = $plt->plot($mo->array($history['loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['val_loss']))[0];
-            $axes[] = $plt->plot($mo->array($history['accuracy']))[0];
-            $axes[] = $plt->plot($mo->array($history['val_acc']))[0];
-            $plt->legend($axes,['loss','val_loss','accuracy','val_acc']);
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
             $plt->title('BatchNormalization');
+            $plt->show();
+        }
+    }
+
+    public function testFitBinaryClassification()
+    {
+        $mo = new MatrixOperator();
+        $backend = new Backend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
+            $nn->layers()->Sigmoid(),
+            $nn->layers()->Dense($units=1),
+            $nn->layers()->Sigmoid(),
+        ]);
+
+        $model->compile([
+            'loss'=>$nn->losses()->BinaryCrossEntropy(),
+        ]);
+        $this->assertFalse($model->layers()[1]->incorporatedLoss());
+        $this->assertTrue( $model->layers()[3]->incorporatedLoss());
+        $this->assertTrue( $model->lossFunction()->fromLogits());
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
+
+        $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
+
+        if($this->plot) {
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
+            $plt->title('BinaryClassification');
+            $plt->show();
+        }
+    }
+
+    public function testFitOnehotCategoricalClassification()
+    {
+        $mo = new MatrixOperator();
+        $backend = new Backend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
+            $nn->layers()->Sigmoid(),
+            $nn->layers()->Dense($units=2),
+            $nn->layers()->Softmax(),
+        ]);
+
+        $model->compile([
+            'loss'=>$nn->losses()->CategoricalCrossEntropy(),
+        ]);
+        $this->assertFalse($model->layers()[1]->incorporatedLoss());
+        $this->assertTrue( $model->layers()[3]->incorporatedLoss());
+        $this->assertTrue( $model->lossFunction()->fromLogits());
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([[1, 0], [1, 0], [1, 0], [0, 1], [0, 1], [0, 1]]);
+        $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
+        $v_t = $mo->array([[0, 1], [1, 0], [1, 0], [0, 1], [1, 0], [0, 1]]);
+        $history = $model->fit($x,$t,['epochs'=>100,'validation_data'=>[$v_x,$v_t],'verbose'=>0]);
+
+        $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
+
+        if($this->plot) {
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+            $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+            $plt->legend();
+            $plt->title('CategoricalCrossEntropy');
             $plt->show();
         }
     }

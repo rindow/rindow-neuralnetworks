@@ -14,6 +14,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
         $layer = new Sigmoid($backend);
+        $layer->build([]);
 
         $x = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
         $y = $layer->forward($x, $training=true);

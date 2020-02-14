@@ -106,8 +106,7 @@ class Backend
 
     public function copy(NDArray $from,NDArray $to=null)
     {
-        $this->la->copy($from, $to);
-        return $to;
+        return $this->la->copy($from, $to);
     }
 
     public function cast(NDArray $x,$dtype)
@@ -124,63 +123,67 @@ class Backend
 
     public function add(NDArray $x, NDArray $y)
     {
+        $la = $this->la;
         $ndimX = $x->ndim();
         $ndimY = $y->ndim();
         if($ndimX == $ndimY) {
-            $x = $this->la->copy($x,$this->la->alloc($y->shape(),$x->dtype()));
-            $this->la->axpy($y,$x);
+            $x = $la->copy($x,$la->alloc($y->shape(),$x->dtype()));
+            $la->axpy($y,$x);
             return $x;
         } elseif($ndimX < $ndimY) {
-            $x = $this->la->duplicate($x,null,null,$this->la->alloc($y->shape(),$x->dtype()));
-            $this->la->axpy($y,$x);
+            $x = $la->duplicate($x,null,null,$la->alloc($y->shape(),$x->dtype()));
+            $la->axpy($y,$x);
             return $x;
         } else {
-            $y = $this->la->duplicate($y,null,null,$this->la->alloc($x->shape(),$y->dtype()));
-            $this->la->axpy($x,$y);
+            $y = $la->duplicate($y,null,null,$la->alloc($x->shape(),$y->dtype()));
+            $la->axpy($x,$y);
             return $y;
         }
     }
 
     public function sub(NDArray $x, NDArray $y)
     {
+        $la = $this->la;
         $ndimX = $x->ndim();
         $ndimY = $y->ndim();
         if($ndimX == $ndimY) {
-            $x = $this->la->copy($x,$this->la->alloc($y->shape(),$x->dtype()));
-            $this->la->axpy($y,$x,-1.0);
+            $x = $la->copy($x,$la->alloc($y->shape(),$x->dtype()));
+            $la->axpy($y,$x,-1.0);
             return $x;
         } elseif($ndimX < $ndimY) {
-            $x = $this->la->duplicate($x,null,null,$this->la->alloc($y->shape(),$x->dtype()));
-            $this->la->axpy($y,$x,-1.0);
+            $x = $la->duplicate($x,null,null,$la->alloc($y->shape(),$x->dtype()));
+            $la->axpy($y,$x,-1.0);
             return $x;
         } else {
-            $y = $this->la->duplicate($y,null,null,$this->la->alloc($x->shape(),$y->dtype()));
-            $this->la->increment($y,0,-1);
-            $this->la->axpy($x,$y);
+            $y = $la->duplicate($y,null,null,$la->alloc($x->shape(),$y->dtype()));
+            $la->increment($y,0,-1);
+            $la->axpy($x,$y);
             return $y;
         }
     }
 
     public function mul(NDArray $x, NDArray $y)
     {
+        $la = $this->la;
         if($x->ndim() < $y->ndim()) {
-            $y = $this->la->copy($y);
-            return $this->la->multiply($x,$y);
+            $y = $la->copy($y);
+            return $la->multiply($x,$y);
         } else {
-            $x = $this->la->copy($x);
-            return $this->la->multiply($y,$x);
+            $x = $la->copy($x);
+            return $la->multiply($y,$x);
         }
     }
 
     public function div(NDArray $x, NDArray $y)
     {
-        $y = $this->la->copy($y);
-        $this->la->reciprocal($y);
+        $la = $this->la;
+        $y = $la->copy($y);
+        $la->reciprocal($y);
         if($x->ndim() < $y->ndim()) {
-            return $this->la->multiply($x,$y);
+            return $la->multiply($x,$y);
         } else {
-            $m = $this->la->copy($x);
-            return $this->la->multiply($y,$x);
+            $m = $la->copy($x);
+            return $la->multiply($y,$x);
         }
     }
 
@@ -241,6 +244,11 @@ class Backend
     {
         $x = $this->la->copy($x);
         return $this->la->rsqrt($x,$beta,$alpha);
+    }
+
+    public function abs(NDArray $x)
+    {
+        return $this->matrixOperator->f('abs',$x);
     }
 
     public function maximum(NDArray $x, float $a)
@@ -372,15 +380,12 @@ class Backend
         return $this->la->gemm($a, $b, $alpha, $beta, $outputs);
     }
 
-    public function oneHot(NDArray $indices, int $num_classes) : NDArray
+    public function oneHot(NDArray $indices, int $numClass) : NDArray
     {
-        $mo = $this->matrixOperator;
         if($indices->ndim()!=1) {
             throw new InvalidArgumentException('indices must be 1-D NDarray');
         }
-        $batchSize = $indices->shape()[0];
-        $oneHot = $this->zeros([$batchSize,$num_classes]);
-        return $mo->update($oneHot,'=',1.0,$mo->arange($batchSize),$indices);
+        return $this->la->onehot($indices,$numClass);
     }
 
     public function relu($x) : NDArray
@@ -390,21 +395,24 @@ class Backend
 
     public function sigmoid(NDArray $inputs) : NDArray
     {
+        $la = $this->la;
         //  1 / (1.0+exp(-$x))
-        $X = $this->la->copy($inputs);
-        return $this->la->reciprocal(
-                $this->la->exp($this->la->scal(-1.0,$X)),1.0);
+        $X = $la->copy($inputs);
+        return $la->reciprocal(
+                $la->exp($la->scal(-1.0,$X)),1.0);
     }
 
     public function dSigmoid(NDArray $dOutputs, NDArray $outputs) : NDArray
     {
+        $la = $this->la;
         // dx = dy * ( 1 - y ) * y
-        $this->la->multiply($dOutputs,$this->la->multiply($outputs,
-            $this->la->increment($this->la->copy($outputs),1.0,-1.0)));
+        return $la->multiply($dOutputs,$la->multiply($outputs,
+            $la->increment($la->copy($outputs),1.0,-1.0)));
     }
 
     public function softmax(NDArray $X) : NDArray
     {
+        $la = $this->la;
         // Yk = exp(Ak + C') / sum(exp(Ai + C'))
         $ndim = $X->ndim();
 
@@ -414,7 +422,7 @@ class Backend
             //return $this->la->scal(1/$this->la->sum($expX),$expX);
 
             // Native softmax function !!!
-            return $this->la->softmax($this->la->copy($X)->reshape([1,$X->size()]))
+            return $la->softmax($la->copy($X)->reshape([1,$X->size()]))
                 ->reshape([$X->size()]);
         } elseif($ndim == 2) {
 
@@ -427,7 +435,7 @@ class Backend
             //return $Y;
 
             // Native softmax function !!!
-            return $this->la->softmax($this->la->copy($X));
+            return $la->softmax($la->copy($X));
 
         } else {
             throw new InvalidArgumentException('Array must be 1-D or 2-D.');
@@ -436,63 +444,198 @@ class Backend
 
     public function dSoftmax(NDArray $dOutputs, NDArray $outputs) : NDArray
     {
+        $la = $this->la;
+        if($dOutputs->shape()!=$outputs->shape()){
+            throw new InvalidArgumentException('unmatch predicts shape: ['.implode(',',$predicts->shape()).']');
+        }
+
+        // softmax:  yk      = exp(ak) / sumj(exp(aj))
+        // dsoftmax: dyk/daj =  yk * (1 - yj): j=k , -yk * yj : j!=k
+        //                   =  yk * (I(kj) - yj)  ; I(kj) -> 1:k=j, 0:k!=j
+        //                   =
+
         // dx = (y * dy) - sum(y * dy) * y
-        $dx = $this->la->multiply($outputs, $this->la->copy($dOutputs));
-        $dInputs = $this->la->axpy(
-            $this->la->multiply($this->sum($dx, $axis=1),
-                                $this->la->copy($outputs),$trans=true),$dx);
+        $dx = $la->multiply($outputs, $la->copy($dOutputs));
+        $dInputs = $la->axpy(
+            $la->multiply($la->reduceSum($dx, $axis=1),
+                                $la->copy($outputs),$trans=true),$dx,-1.0);
+        //$dInputs = $this->la->scal(1/$dOutputs->shape()[0],$dInputs);
         return $dInputs;
     }
+    //def backward(self, dout):
+    //    dx = self.out * dout
+    //    sumdx = np.sum(dx, axis=1, keepdims=True)
+    //    dx -= self.out * sumdx
+    //    return dx
 
+    // MSE
     public function meanSquaredError(NDArray $trues, NDArray $predicts) : float
     {
+        $la = $this->la;
         //  E = (1/N) * sum((Yk-Tk)**2)
         $N = $predicts->size();
-        return $this->la->sum($this->la->square(
-            $this->la->axpy($trues,$this->la->copy($predicts),-1.0))) / $N;
+        return $la->sum($la->square(
+            $la->axpy($trues,$la->copy($predicts),-1.0))) / $N;
     }
 
     public function dMeanSquaredError(NDArray $trues,NDArray $predicts) : NDarray
     {
+        $la = $this->la;
         // dx = 2/N * (Yk-Tk)
-        return $this->la->scal(2/$predicts->size(),
-            $this->la->axpy($trues,$this->la->copy($predicts),-1.0));
+        return $la->scal(2/$predicts->size(),
+            $la->axpy($trues,$la->copy($predicts),-1.0));
     }
 
-    public function sparseCrossEntropyError(NDArray $trues, NDArray $predicts) : float
+    // MAE
+    //def mean_absolute_error(y_true, y_pred):
+    //    if not K.is_tensor(y_pred):
+    //        y_pred = K.constant(y_pred)
+    //    y_true = K.cast(y_true, y_pred.dtype)
+    //    return K.mean(K.abs(y_pred - y_true), axis=-1)
+
+
+    public function sparseCategoricalCrossEntropy(
+        NDArray $trues, NDArray $predicts) : float
     {
+        $la = $this->la;
+        if($trues->ndim()!=1) {
+            throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
+        }
+        $shape = $predicts->shape();
+        $batchSize = array_shift($shape);
+        if($trues->shape()!=[$batchSize]){
+            $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
+            throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
+        }
+
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
-        $batchSize = $trues->shape()[0];
-        return -1.0 * $this->la->sum($this->log($this->increment(
-                $this->la->selectAxis1($predicts,$trues),
+        return -1.0 * $la->sum($la->log($la->increment(
+                $la->selectAxis1($predicts,$trues),
                 $this->epsilon))) / $batchSize;
     }
 
-    public function dSoftmaxSparseCrossEntropyError(NDArray $trues,NDArray $outputs) : NDArray
+    public function dSparseCategoricalCrossEntropy(
+        NDArray $trues, NDArray $predicts, bool $fromLogits=null) : NDArray
     {
-        // dx = (y - t) / batch_size     #  t=onehot(trues) y=outputs-of-softmax
-        $batchSize = $outputs->shape()[0];
-        $numClass = $outputs->shape()[1];
-        $dInputs = $this->la->copy($outputs);
-        $this->la->onehot($trues,$numClass,-1,$dInputs);
-        $dInputs = $this->scale(1/$batchSize, $dInputs);
-        return $dInputs;
+        $la = $this->la;
+        if($trues->ndim()!=1) {
+            throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
+        }
+        if($trues->size()!=$predicts->shape()[0]){
+            $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
+            throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
+        }
+        $numClass = $predicts->shape()[1];
+        if($fromLogits) {
+            // dx = (y - t)      #  t=onehot(trues), y=softmax(x)
+            $dInputs = $la->copy($predicts);
+            $la->onehot($trues,$numClass,-1,$dInputs);
+            return $dInputs;
+        } else {
+            // dx = - trues / predicts
+            $trues = $la->onehot($trues,$numClass);
+            $dInputs = $la->scal(-1.0,$la->multiply($trues,
+                $la->reciprocal($la->copy($predicts))));
+            return $dInputs;
+        }
     }
 
-    public function crossEntropyError(NDArray $trues, NDArray $predicts) : float
+    public function categoricalCrossEntropy(
+        NDArray $trues, NDArray $predicts) : float
     {
-        $trues = $this->la->reduceArgMax($trues,$axis=1);
-        return $this->sparseCrossEntropyError($trues, $predicts);
+        $la = $this->la;
+        if($trues->shape()!=$predicts->shape()){
+            $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
+            throw new InvalidArgumentException('must be same shape of dimensions:'.$msg);
+        }
+        //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
+        $batchSize = $predicts->shape()[0];
+        return -1.0 * $la->sum($la->multiply($trues,
+            $la->log($la->increment($la->copy($predicts),$this->epsilon)))) / $batchSize;
+
+        // way for clip
+        //$predicts = $this->la->maximum($this->epsilon,
+        //    $this->la->minimum(1-$this->epsilon,$this->la->copy($predicts)));
+        //return -1.0 * $this->la->sum($this->la->multiply($trues,
+        //    $this->la->log($predicts))) / $batchSize;
     }
 
-    public function dSoftmaxCrossEntropyError(NDArray $outputs,NDArray $trues) : NDArray
+    public function dCategoricalCrossEntropy(
+        NDArray $trues, NDArray $predicts, bool $fromLogits=null) : NDArray
     {
-        //  dx = (softmaxOutputs - trues) / batch_size
-        $batchSize = $outputs->shape()[0];
-        $dInput = $this->la->scal(1/$batchSize,
-            $this->la->axpy($trues, $this->la->copy($outputs), -1));
-        return $dInput;
+        $la = $this->la;
+        if($trues->shape()!=$predicts->shape()){
+            $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
+            throw new InvalidArgumentException('must be same shape of dimensions:'.$msg);
+        }
+        if($fromLogits) {
+            //  dx = y - t   :  y = softmax(x)
+            $dInput = $la->axpy($trues, $la->copy($predicts), -1);
+            return $dInput;
+        } else {
+            // dx = - trues / predicts
+            return $la->scal(-1.0,$la->multiply($trues,
+                $la->reciprocal($la->copy($predicts),$this->epsilon)));
+        }
     }
+/*
+    public function binaryCrossEntropy(
+        NDArray $trues, NDArray $predicts, bool $fromLogits=null) : float
+    {
+        if($trues->shape()!=$predicts->shape()){
+            throw new InvalidArgumentException('must be same shape of dimensions');
+        }
+        $la = $this->la;
+        if(!$fromLogits) {
+            //$predicts = $this->la->maximum($this->epsilon,
+            //    $this->la->minimum(1-$this->epsilon,$this->la->copy($predicts)));
+            // z = log( x / (1-x) )
+            $predicts = $la->log($la->multiply($predicts,
+                                            $la->reciprocal($predicts,1,-1)));
+            // sigmoid(z) = 1 / (1 + exp(-z))
+            //            = 1 / (1 + exp(-log(x/(1-x))))
+            //            = x
+        }
+        $batchSize = $predicts->shape()[0];
+        // E = t * -log(sigmoid(x)) + (1 - t) * -log(1 - sigmoid(x))
+        //   = x - x * t + log(1 + exp(-x))
+        return $la->sum($la->axpy($predicts,$la->axpy(
+            $la->multiply($predicts,$la->copy($trues)),
+            $la->log($la->increment($la->exp(
+                $la->scal(-1,$la->copy($predicts)))))))) / $batchSize;
+        // python
+        //if not from_logits:
+        //    output = np.clip(output, 1e-7, 1 - 1e-7)
+        //    output = np.log(output / (1 - output))
+        //output = sigmoid(output)
+        //  E = -target * log(output) + -(1 - target) * log(1 - output))
+        //return (-target * np.log(output)) +
+        //        (-(1 - target) * np.log(1 - output))
+
+        // part2
+        //self.loss = cross_entropy_error(self.t, np.c_[1 - self.y, self.y])
+        //  cross_entropy_error = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
+    }
+
+    public function dBinaryCrossEntropy(
+        NDArray $trues, NDArray $predicts, bool $fromLogits=null) : NDArray
+    {
+        $la = $this->la;
+        if($trues->shape()!=$predicts->shape()){
+            throw new InvalidArgumentException('must be same shape of dimensions');
+        }
+        if($fromLogits) {
+            // dx = y - t    :  y = sigmoid(x)
+            return $la->axpy($trues,$la->copy($predicts),-1);
+        } else {
+            // dx = - trues / predicts
+            return $la->scal(-1.0,$la->multiply($trues,
+                $la->reciprocal($la->copy($predicts),$this->epsilon)));
+        }
+        // part2
+        //dx = (self.y - self.t) * dout / batch_size
+    }
+*/
 
     public function equalTest($a,$b)
     {

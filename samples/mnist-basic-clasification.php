@@ -65,7 +65,7 @@ $model->save(__DIR__.'/mnist_model.model',$portable=true);
 $model = $nn->models()->loadModel(__DIR__.'/mnist_model.model');
 
 $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
-$plt->plot($mo->array($history['val_acc']),null,null,'val_acc');
+$plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
 $plt->plot($mo->array($history['loss']),null,null,'loss');
 $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
 $plt->legend();

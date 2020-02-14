@@ -370,6 +370,17 @@ class Test extends TestCase
         $this->assertEquals($single,$y[2]->toArray());
         $this->assertEquals($single,$y[3]->toArray());
         $this->assertEquals($single,$y[4]->toArray());
+
+        $x = $mo->array([
+            [10,-10,2,8,-5],
+            [10,-10,2,8,-5],
+        ]);
+        $softmax = $backend->softmax($x);
+        $this->assertLessThanOrEqual(1,$mo->max($softmax));
+        $this->assertGreaterThanOrEqual(0,$mo->max($softmax));
+        $sum = $mo->sum($softmax,$axis=1)->toArray();
+        $this->assertLessThan(0.0001,abs($sum[0]-1));
+        $this->assertLessThan(0.0001,abs($sum[1]-1));
     }
 
     public function testMeanSquaredError()
@@ -391,7 +402,7 @@ class Test extends TestCase
         $this->assertTrue(1.0>$backend->meanSquaredError($y,$t));
     }
 
-    public function testSparseCrossEntropyErrorWithClassifiedLabel()
+    public function testSparseCategoricalCrossEntropy()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -403,14 +414,41 @@ class Test extends TestCase
         ]);
         $t = $mo->array([2,2]);
         $this->assertTrue($fn->equalTest(
-            0.0,$backend->sparseCrossEntropyError($t,$y)));
+            0.0,$backend->sparseCategoricalCrossEntropy($t,$y)));
 
         $y = $mo->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
         $t = $mo->array([2]);
         $this->assertTrue($fn->equalTest(
-            0.0,$backend->sparseCrossEntropyError($t,$y)));
+            0.0,$backend->sparseCategoricalCrossEntropy($t,$y)));
+    }
+
+    public function testCategoricalCrossEntropy()
+    {
+        $mo = new MatrixOperator();
+        $backend = new Backend($mo);
+        $fn = $backend;
+        // if test is label
+        $y = $mo->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $t = $mo->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $this->assertTrue($fn->equalTest(
+            0.0,$backend->categoricalCrossEntropy($t,$y)));
+
+        $y = $mo->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $t = $mo->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $this->assertTrue($fn->equalTest(
+            0.0,$backend->categoricalCrossEntropy($t,$y)));
     }
 
 /*

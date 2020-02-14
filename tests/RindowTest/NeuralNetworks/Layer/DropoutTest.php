@@ -15,6 +15,7 @@ class Test extends TestCase
         $backend = new Backend($mo);
         $fn = $backend;
         $layer = new Dropout($backend,0.5);
+        $layer->build([]);
 
         $x = $mo->array([-1.0,-0.5,0.1,0.5,1.0]);
         $y = $layer->forward($x,$training=true);

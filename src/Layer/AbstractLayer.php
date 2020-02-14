@@ -17,7 +17,7 @@ abstract class AbstractLayer
 
     public function build(array $inputShape=null, array $options=null)
     {
-        if($inputShape)
+        if($inputShape!==null)
             $this->inputShape = $inputShape;
         $this->outputShape = $inputShape;
     }
@@ -57,11 +57,14 @@ abstract class AbstractLayer
 
     protected function assertInputShape(NDArray $inputs)
     {
+        if($this->inputShape===null) {
+            throw new InvalidArgumentException('Uninitialized');
+        }
         $shape = $inputs->shape();
         $batchNum = array_shift($shape);
         if($shape!=$this->inputShape) {
-            throw new InvalidArgumentException('unmatch input shape: ['.
-                implode(',',$shape).'], must be ['.implode(',',$this->inputShape).']');
+            $shape = $shape ? implode(',',$shape) : '';
+            throw new InvalidArgumentException('unmatch input shape: ['.$shape.'], must be ['.implode(',',$this->inputShape).']');
         }
     }
 

@@ -2,8 +2,10 @@
 namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Loss\SoftmaxWithSparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Loss\MeanSquaredError;
+use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
+use Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy;
+use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
 
 class Losses
 {
@@ -19,13 +21,18 @@ class Losses
         return new MeanSquaredError($this->backend,$options);
     }
 
-    public function SoftmaxWithSparseCategoricalCrossEntropy(array $options=null)
+    public function SparseCategoricalCrossEntropy(array $options=null)
     {
-        return new SoftmaxWithSparseCategoricalCrossEntropy($this->backend,$options);
+        return new SparseCategoricalCrossEntropy($this->backend,$options);
     }
 
-    public function SigmoidWithCrossEntropyError(array $options=null)
+    public function CategoricalCrossEntropy(array $options=null)
     {
-        return new SigmoidWithCrossEntropyError($this->backend,$options);
+        return new CategoricalCrossEntropy($this->backend,$options);
+    }
+
+    public function BinaryCrossEntropy(array $options=null)
+    {
+        return new BinaryCrossEntropy($this->backend,$options);
     }
 }

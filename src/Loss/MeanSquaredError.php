@@ -5,7 +5,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 use DomainException;
 
-class MeanSquaredError implements LossLayer
+class MeanSquaredError implements Loss
 {
     protected $backend;
     protected $outputs;
@@ -52,7 +52,14 @@ class MeanSquaredError implements LossLayer
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
         // calc accuracy
-        $accuracy = $K->sum($K->mul($trues, $predicts))
+        if($predicts->shape()[1]>2147483648) {
+            $dtype = NDArray::int64;
+        } else {
+            $dtype = NDArray::int32;
+        }
+        $predicts = $K->argmax($predicts, $axis=1,$dtype);
+        $trues = $K->argmax($trues, $axis=1,$dtype);
+        $accuracy = $K->sum($K->equal($trues, $predicts))
                             / (float)$trues->shape()[0];
         return $accuracy;
     }

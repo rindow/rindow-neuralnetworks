@@ -68,7 +68,9 @@ Execute as follows.
 ```shell
 $ RINDOW_MATH_PLOT_VIEWER=/some/bin/dir/png-file-viewer
 $ export RINDOW_MATH_PLOT_VIEWER
+$ mkdir samples
 $ cd samples
+$ cp ../vendor/rindow/rindow-neuralnetworks/samples/mnist-basic-clasification.php .
 $ php mnist-basic-clasification.php
 ```
 
