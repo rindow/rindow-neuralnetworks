@@ -27,7 +27,7 @@ class Relu extends AbstractLayer implements Layer
     {
         $K = $this->backend;
         //$mask = $K->cast($K->greater($this->inputs, 0.0),NDArray::float32);
-        $mask = $K->dmaximum($this->inputs,0.0);
+        $mask = $K->greater($this->inputs,0.0);
         $dInputs = $K->mul($dOutputs,$mask);
         return $dInputs;
     }

@@ -263,16 +263,16 @@ class Backend
         return $this->la->minimum($a,$x);
     }
 
-    public function dmaximum(NDArray $x, float $a)
+    public function greater(NDArray $x, float $a)
     {
         $x = $this->la->copy($x);
-        return $this->la->dmaximum($a,$x);
+        return $this->la->greater($a,$x);
     }
 
-    public function dminimum(NDArray $x, float $a)
+    public function less(NDArray $x, float $a)
     {
         $x = $this->la->copy($x);
-        return $this->la->dminimum($a,$x);
+        return $this->la->less($a,$x);
     }
 
     public function exp(NDArray $x)
@@ -285,12 +285,6 @@ class Backend
     {
         $x = $this->la->copy($x);
         return $this->la->log($x);
-    }
-
-    public function greater($x,$y)
-    {
-        $mo = $this->matrixOperator;
-        return $mo->op($x,'>',$y);
     }
 
     public function equal($x,$y)

@@ -60,11 +60,10 @@ class Test extends TestCase
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Layer\Dense',$layers[2]);
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Layer\Softmax',$layers[3]);
+            'Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy',$layers[3]);
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy',$lossFunction);
-        $this->assertFalse($layers[1]->incorporatedLoss());
-        $this->assertTrue($layers[3]->incorporatedLoss());
+        $this->assertTrue($layers[3]->fromLogits());
         $this->assertTrue($lossFunction->fromLogits());
 
         $this->assertCount(4,$weights);
@@ -120,8 +119,7 @@ class Test extends TestCase
         ]);
 
         $model->compile();
-        $this->assertFalse($model->layers()[1]->incorporatedLoss());
-        $this->assertTrue($model->layers()[3]->incorporatedLoss());
+        $this->assertTrue($model->layers()[3]->fromLogits());
         $this->assertTrue($model->lossFunction()->fromLogits());
 
         // training greater or less
@@ -218,7 +216,7 @@ class Test extends TestCase
         $model->compile([
             'optimizer'=>$nn->optimizers()->Adam()
         ]);
-        $this->assertTrue($model->layers()[3]->incorporatedLoss());
+        $this->assertTrue($model->layers()[3]->fromLogits());
         $this->assertTrue($model->lossFunction()->fromLogits());
 
         // training greater or less
@@ -262,7 +260,6 @@ class Test extends TestCase
         ]);
 
         // training greater or less
-        $this->assertFalse( $model->layers()[3]->incorporatedLoss());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -379,8 +376,7 @@ class Test extends TestCase
         $model->compile([
             'loss'=>$nn->losses()->BinaryCrossEntropy(),
         ]);
-        $this->assertFalse($model->layers()[1]->incorporatedLoss());
-        $this->assertTrue( $model->layers()[3]->incorporatedLoss());
+        $this->assertTrue( $model->layers()[3]->fromLogits());
         $this->assertTrue( $model->lossFunction()->fromLogits());
 
         // training greater or less
@@ -420,8 +416,7 @@ class Test extends TestCase
         $model->compile([
             'loss'=>$nn->losses()->CategoricalCrossEntropy(),
         ]);
-        $this->assertFalse($model->layers()[1]->incorporatedLoss());
-        $this->assertTrue( $model->layers()[3]->incorporatedLoss());
+        $this->assertTrue( $model->layers()[3]->fromLogits());
         $this->assertTrue( $model->lossFunction()->fromLogits());
 
         // training greater or less

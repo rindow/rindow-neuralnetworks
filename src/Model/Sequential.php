@@ -87,18 +87,18 @@ class Sequential
         }
         if($loss instanceof SparseCategoricalCrossEntropy) {
             if($lastLayer instanceof Softmax) {
-                $lastLayer->setIncorporatedLoss(true);
                 $loss->setFromLogits(true);
+                $lastLayer = $loss;
             }
         } elseif($loss instanceof CategoricalCrossEntropy) {
             if($lastLayer instanceof Softmax) {
-                $lastLayer->setIncorporatedLoss(true);
                 $loss->setFromLogits(true);
+                $lastLayer = $loss;
             }
         } elseif($loss instanceof BinaryCrossEntropy) {
             if($lastLayer instanceof Sigmoid) {
-                $lastLayer->setIncorporatedLoss(true);
                 $loss->setFromLogits(true);
+                $lastLayer = $loss;
             }
         }
         if(!($loss instanceof Loss)) {
@@ -298,7 +298,7 @@ class Sequential
         $this->backwardStep($this->lossFunction->differentiateLoss());
 
         if(in_array('accuracy',$metrics)) {
-            $preds = $this->forwardLastlayer($preds);
+            //$preds = $this->forwardLastlayer($preds);
             $accuracy = $this->lossFunction->accuracy($trues,$preds);
         } else {
             $accuracy = 0;
@@ -353,7 +353,7 @@ class Sequential
             $trues  = $t[[$batchStart,$batchEnd]];
             $preds = $this->forwardStep($inputs,$training=false);
             $totalLoss += $this->lossFunction->loss($trues,$preds);
-            $preds = $this->forwardLastlayer($preds);
+            //$preds = $this->forwardLastlayer($preds);
             $totalAccuracy += $this->lossFunction->accuracy($trues,$preds);
         }
         $totalLoss = $totalLoss / $batchIndexCount;
@@ -370,9 +370,10 @@ class Sequential
         ],$options));
 
         $outputs = $this->forwardStep($inputs, $training=false);
-        return $this->forwardLastlayer($outputs);
+        return $outputs;
+        //return $this->forwardLastlayer($outputs);
     }
-
+/*
     protected function forwardLastlayer($x)
     {
         $layers = $this->layers;
@@ -385,7 +386,7 @@ class Sequential
         }
         return $x;
     }
-
+*/
     public function toJson()
     {
         $layerNames = [];

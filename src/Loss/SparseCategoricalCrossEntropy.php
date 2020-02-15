@@ -6,9 +6,14 @@ use InvalidArgumentException;
 
 class SparseCategoricalCrossEntropy extends AbstractCrossEntropy
 {
-    protected function activationFunction(NDArray $predicts) : NDArray
+    protected function activationFunction(NDArray $inputs) : NDArray
     {
-        return $this->backend->softmax($predicts);
+        return $this->backend->softmax($inputs);
+    }
+
+    protected function diffActivationFunction(NDArray $dOutputs, NDArray $outputs) : NDArray
+    {
+        return $this->backend->dSoftmax($dOutputs, $outputs);
     }
 
     protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : float
@@ -16,7 +21,7 @@ class SparseCategoricalCrossEntropy extends AbstractCrossEntropy
         return $this->backend->sparseCategoricalCrossEntropy($trues, $predicts);
     }
 
-    protected function deltaLossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray
+    protected function diffLossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray
     {
         return $this->backend->dSparseCategoricalCrossEntropy(
                                             $trues, $predicts, $fromLogits);

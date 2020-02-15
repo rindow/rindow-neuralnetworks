@@ -7,7 +7,6 @@ class Softmax extends AbstractLayer implements Layer
 {
     protected $backend;
     protected $outputs;
-    protected $incorporatedLoss = false;
 
     public function __construct($backend,array $options=null)
     {
@@ -16,22 +15,9 @@ class Softmax extends AbstractLayer implements Layer
         $this->backend = $K = $backend;
     }
 
-    public function setIncorporatedLoss(bool $incorporatedLoss) : void
-    {
-        $this->incorporatedLoss = $incorporatedLoss;
-    }
-
-    public function incorporatedLoss() : bool
-    {
-        return $this->incorporatedLoss;
-    }
-
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
-        if($this->incorporatedLoss) {
-            return $inputs;
-        }
         $this->outputs = $K->softmax($inputs);
         return $this->outputs;
     }
@@ -39,9 +25,6 @@ class Softmax extends AbstractLayer implements Layer
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        if($this->incorporatedLoss) {
-            return $dOutputs;
-        }
         return $K->dSoftmax($dOutputs, $this->outputs);
     }
 }

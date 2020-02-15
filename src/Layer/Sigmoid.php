@@ -16,22 +16,9 @@ class Sigmoid extends AbstractLayer implements Layer
         $this->backend = $K = $backend;
     }
 
-    public function setIncorporatedLoss(bool $incorporatedLoss) : void
-    {
-        $this->incorporatedLoss = $incorporatedLoss;
-    }
-
-    public function incorporatedLoss() : bool
-    {
-        return $this->incorporatedLoss;
-    }
-
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
-        if($this->incorporatedLoss) {
-            return $inputs;
-        }
         $this->outputs = $K->sigmoid($inputs);
         return $this->outputs;
     }
@@ -39,9 +26,6 @@ class Sigmoid extends AbstractLayer implements Layer
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        if($this->incorporatedLoss) {
-            return $dOutputs;
-        }
         $dx = $K->onesLike($this->outputs);
         $K->update_sub($dx,$this->outputs);
         $K->update_mul($dx,$this->outputs);

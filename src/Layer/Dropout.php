@@ -28,7 +28,7 @@ class Dropout extends AbstractLayer implements Layer
     {
         $K = $this->backend;
         if($training) {
-            $this->mask = $K->cast($K->greater($K->rand($inputs->shape()), $this->rate),NDArray::float32);
+            $this->mask = $K->greater($K->rand($inputs->shape()), $this->rate);
             $outputs = $K->mul($inputs,$this->mask);
             return $outputs;
         } else {

@@ -25,6 +25,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
         $layer = new CategoricalCrossEntropy($backend);
+        $layer->build([3]);
 
         $x = $mo->array([
             [0.0, 0.0 , 6.0],
@@ -66,6 +67,7 @@ class Test extends TestCase
         $backend = new Backend($mo);
         $layer = new CategoricalCrossEntropy($backend);
         $layer->setFromLogits(true);
+        $layer->build([3]);
 
         $x = $mo->array([
             [0.0, 0.0 , 6.0],
@@ -75,11 +77,12 @@ class Test extends TestCase
             [0.0, 0.0 , 1.0],
             [0.0, 0.0 , 1.0],
         ]);
-        $loss = $layer->loss($t,$x);
+        $y = $layer->forward($x,true);
+        $loss = $layer->loss($t,$y);
         $this->assertLessThan(0.01,abs(0.0-$loss));
 
         $dx = $layer->differentiateLoss();
-        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($backend->softmax($x),'-',$dx),'-',$t)));
+        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',$t)));
 
         $x = $mo->array([
             [0.0, 0.0 , 6.0],
@@ -89,10 +92,11 @@ class Test extends TestCase
             [0.0, 1.0 , 0.0],
             [0.0, 1.0 , 0.0],
         ]);
-        $loss = $layer->loss($t,$x);
+        $y = $layer->forward($x,true);
+        $loss = $layer->loss($t,$y);
         $this->assertLessThan(0.01,abs(6.0-$loss));
 
         $dx = $layer->differentiateLoss();
-        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($backend->softmax($x),'-',$dx),'-',$t)));
+        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',$t)));
     }
 }

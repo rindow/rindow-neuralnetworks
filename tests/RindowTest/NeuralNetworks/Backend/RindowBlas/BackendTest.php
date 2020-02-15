@@ -225,8 +225,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $K = new Backend($mo);
         $x = $mo->array([4,9]);
-        $y = $mo->array([9,4]);
-        $this->assertEquals([false,true],$K->greater($x,$y)->toArray());
+        $this->assertEquals([0,1],$K->greater($x,5)->toArray());
     }
 
     public function testEqual()

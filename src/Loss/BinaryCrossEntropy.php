@@ -6,9 +6,14 @@ use InvalidArgumentException;
 
 class BinaryCrossEntropy extends AbstractCrossEntropy
 {
-    protected function activationFunction(NDArray $predicts) : NDArray
+    protected function activationFunction(NDArray $inputs) : NDArray
     {
-        return $this->backend->sigmoid($predicts);
+        return $this->backend->sigmoid($inputs);
+    }
+
+    protected function diffActivationFunction(NDArray $dOutputs, NDArray $outputs) : NDArray
+    {
+        return $this->backend->dSigmoid($dOutputs, $outputs);
     }
 
     protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : float
@@ -20,7 +25,7 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
         return $this->backend->categoricalCrossEntropy($trues, $predicts);
     }
 
-    protected function deltaLossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray
+    protected function diffLossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray
     {
         $newPredicts = $predicts->reshape([$predicts->shape()[0]]);
         $dx = $this->backend->dCategoricalCrossEntropy(
@@ -39,7 +44,7 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
         // calc accuracy
-        $predicts = $K->dmaximum($K->copy($predicts),0.5);
+        $predicts = $K->greater($K->copy($predicts),0.5);
         if($trues->dtype()!=$predicts->dtype()) {
             $predicts = $K->cast($predicts,$trues->dtype());
         }
