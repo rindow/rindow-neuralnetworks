@@ -47,7 +47,7 @@ fwrite(STDERR,"creating model ...\n");
 $model = $nn->models()->Sequential([
     $nn->layers()->Dense($units=128,
         ['input_shape'=>[784],'kernel_initializer'=>'relu_normal']),
-    $nn->layers()->Relu(),
+    $nn->layers()->ReLU(),
     $nn->layers()->Dense($units=10),
     $nn->layers()->Softmax(),
 ]);

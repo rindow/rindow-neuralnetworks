@@ -48,7 +48,7 @@ class Sequential
         }
     }
 
-    public function add($layer)
+    public function add($layer) : void
     {
         if(!($layer instanceof Layer)) {
             throw new InvalidArgumentException('invalid Layer');
@@ -60,7 +60,7 @@ class Sequential
         //}
     }
 
-    public function compile(array $options=null)
+    public function compile(array $options=null) : void
     {
         extract($this->extractArgs([
             'optimizer'=>'SGD',
@@ -240,7 +240,7 @@ class Sequential
             }
             if($val_inputs) {
                 [$loss, $accuracy] = $this->evaluate($val_inputs, $val_test,
-                    ['batch_size'=>$batch_size,'verbose'=>$verbose]);
+                    ['batch_size'=>$batch_size,'verbose'=>0]);
                 $history['val_loss'][] = $loss;
                 $history['val_accuracy'][] = $accuracy;
             }
@@ -326,25 +326,23 @@ class Sequential
         return $dout;
     }
 
-    //protected function sparse(NDArray $inputs,int $size) : NDArray
-    //{
-    //    $count = $inputs->shape()[0];
-    //    return $mo->random()->choice($inputs,$size, $replace=false);
-    //}
-
-    public function evaluate(NDArray $x, NDArray $t, array $options=null)
+    public function evaluate(NDArray $x, NDArray $t, array $options=null) : array
     {
         extract($this->extractArgs([
             'batch_size'=>32,
-            'verbose'=>1,
-            'sample_weights'=>null,
-            'steps'=>null,
+            'verbose'=>0,
         ],$options));
         $totalLoss = 0.0;
         $totalAccuracy = 0.0;
         $inputCount = $x->shape()[0];
         $batchIndexCount = (int)ceil($inputCount / $batch_size);
+        if($verbose>=1) {
+            $startTime = time();
+        }
         for($batchIndex=0;$batchIndex<$batchIndexCount;$batchIndex++) {
+            if($verbose>=1) {
+                    $this->console('.');
+            }
             $batchStart = $batchIndex*$batch_size;
             $batchEnd = ($batchIndex+1)*$batch_size-1;
             if($batchEnd>=$inputCount)
@@ -358,16 +356,20 @@ class Sequential
         }
         $totalLoss = $totalLoss / $batchIndexCount;
         $totalAccuracy = $totalAccuracy / $batchIndexCount;
+        if($verbose>=1) {
+            $sec = time() - $startTime;
+            $this->console(' - '.$sec." sec.\n");
+            $this->console(' loss:'.sprintf('%2.4f',$totalLoss));
+            $this->console(' accuracy:'.sprintf('%2.4f',$totalAccuracy));
+            $this->console("\n");
+        }
         return [$totalLoss,$totalAccuracy];
     }
 
-    public function predict($inputs, array $options=null)
+    public function predict($inputs, array $options=null) : NDArray
     {
-        extract($this->extractArgs([
-            'batch_size'=>32,
-            'verbose'=>1,
-            'steps'=>null,
-        ],$options));
+        //extract($this->extractArgs([
+        //],$options));
 
         $outputs = $this->forwardStep($inputs, $training=false);
         return $outputs;
@@ -387,7 +389,7 @@ class Sequential
         return $x;
     }
 */
-    public function toJson()
+    public function toJson() : string
     {
         $layerNames = [];
         $layers = [];
@@ -420,7 +422,7 @@ class Sequential
         return $configJson;
     }
 
-    public function saveWeights(&$modelWeights,$portable=null)
+    public function saveWeights(&$modelWeights,$portable=null) : void
     {
         $K = $this->backend;
         if(!isset($modelWeights['layers']))
@@ -451,7 +453,7 @@ class Sequential
         return $ndarray;
     }
 
-    public function loadWeights($modelWeights)
+    public function loadWeights($modelWeights) : void
     {
         $K = $this->backend;
         foreach($this->layers() as $layer) {
@@ -467,7 +469,7 @@ class Sequential
         }
     }
 
-    public function save($filepath,$portable=null)
+    public function save($filepath,$portable=null) : void
     {
         $f = $this->hda->open($filepath);
         $f['modelConfig'] = $this->toJson();

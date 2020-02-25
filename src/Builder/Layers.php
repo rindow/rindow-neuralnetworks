@@ -2,7 +2,7 @@
 namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Layer\Relu;
+use Rindow\NeuralNetworks\Layer\ReLU;
 use Rindow\NeuralNetworks\Layer\Sigmoid;
 use Rindow\NeuralNetworks\Layer\Softmax;
 use Rindow\NeuralNetworks\Layer\Dropout;
@@ -18,9 +18,9 @@ class Layers
         $this->backend = $backend;
     }
 
-    public function Relu(array $options=null)
+    public function ReLU(array $options=null)
     {
-        return new Relu($this->backend,$options);
+        return new ReLU($this->backend,$options);
     }
 
     public function Sigmoid(array $options=null)

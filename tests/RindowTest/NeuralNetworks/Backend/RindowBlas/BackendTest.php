@@ -311,7 +311,7 @@ class Test extends TestCase
         ]);
     }
 
-    public function testRelu()
+    public function testReLU()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -450,40 +450,6 @@ class Test extends TestCase
             0.0,$backend->categoricalCrossEntropy($t,$y)));
     }
 
-/*
-    public function testPlotSigmoid()
-    {
-        $mo = new MatrixOperator();
-        $nn = new NeuralNetworks($mo);
-        $plt = new Plot();
-        $x = $mo->arange(100,-5.0,0.1);
-        $y = $nn->fn()->sigmoid($x);
-        $plt->plot($x,$y);
-        $plt->show();
-    }
-
-    public function testPlotRelu()
-    {
-        $mo = new MatrixOperator();
-        $nn = new NeuralNetworks($mo);
-        $plt = new Plot();
-        $x = $mo->arange(100,-5.0,0.1);
-        $y = $nn->fn()->relu($x);
-        $plt->plot($x,$y);
-        $plt->show();
-    }
-
-    public function testPlotSoftmax()
-    {
-        $mo = new MatrixOperator();
-        $nn = new NeuralNetworks($mo);
-        $plt = new Plot();
-        $x = $mo->arange(100,-5.0,0.1);
-        $y = $nn->fn()->softmax($x);
-        $plt->plot($x,$y);
-        $plt->show();
-    }
-*/
     public function testEqualArray()
     {
         $mo = new MatrixOperator();

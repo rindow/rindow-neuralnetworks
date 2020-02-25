@@ -171,7 +171,7 @@ class Test extends TestCase
 
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
-            $nn->layers()->Relu(),
+            $nn->layers()->ReLU(),
             $nn->layers()->Dense($units=2),
             $nn->layers()->Softmax(),
         ]);
@@ -198,7 +198,7 @@ class Test extends TestCase
         }
     }
 
-    public function testFitAndPredictWithReluAndAdam()
+    public function testFitAndPredictWithReLUAndAdam()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -208,7 +208,7 @@ class Test extends TestCase
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,[
                 'input_shape'=>[2],'kernel_initializer'=>'relu_normal']),
-            $nn->layers()->Relu(),
+            $nn->layers()->ReLU(),
             $nn->layers()->Dense($units=2),
             $nn->layers()->Softmax(),
         ]);
@@ -235,7 +235,7 @@ class Test extends TestCase
             $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
             $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
             $plt->legend();
-            $plt->title('Relu & Adam');
+            $plt->title('ReLU & Adam');
             $plt->show();
         }
     }
@@ -294,7 +294,7 @@ class Test extends TestCase
 
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
-            $nn->layers()->Relu(),
+            $nn->layers()->ReLU(),
             $nn->layers()->Dropout($rate=0.15),
             $nn->layers()->Dense($units=2),
             $nn->layers()->Softmax(),

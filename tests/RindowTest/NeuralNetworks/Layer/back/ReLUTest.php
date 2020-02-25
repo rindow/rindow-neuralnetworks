@@ -1,10 +1,10 @@
 <?php
-namespace RindowTest\NeuralNetworks\Layer\ReluTest;
+namespace RindowTest\NeuralNetworks\Layer\ReLUTest;
 
 use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
-use Rindow\NeuralNetworks\Layer\Relu;
+use Rindow\NeuralNetworks\Layer\ReLU;
 
 class Test extends TestCase
 {
@@ -12,7 +12,7 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
-        $layer = new Relu($backend);
+        $layer = new ReLU($backend);
 
         $layer->build($inputShape=[5]);
 

@@ -3,7 +3,7 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use Interop\Polite\Math\Matrix\NDArray;
 
-class Relu extends AbstractLayer implements Layer
+class ReLU extends AbstractLayer implements Layer
 {
     protected $backend;
     protected $mask;
