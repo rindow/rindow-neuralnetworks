@@ -2,14 +2,14 @@
     "name": "rindow/rindow-neuralnetworks",
     "type": "library",
     "description": "Neural networks library for deep learning",
-    "keywords": ["rindow","neural","networks","deep learning","deep","learning"],
+    "keywords": ["rindow","neural","networks","deep learning","deep","learning","machine learning"],
     "license": "BSD-3-Clause",
     "require": {
         "php": ">=7.2",
-        "rindow/rindow-math-matrix": "^1.0"
+        "rindow/rindow-math-matrix": ">=1.0.3"
     },
     "require-dev": {
-        "rindow/rindow-math-plot": "^1.0"
+        "rindow/rindow-math-plot": ">=1.0.2"
     },
     "suggest": {
         "rindow/rindow-math-plot": "when visualize machine learning results",

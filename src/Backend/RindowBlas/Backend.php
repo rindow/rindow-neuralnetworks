@@ -374,6 +374,11 @@ class Backend
         return $this->la->gemm($a, $b, $alpha, $beta, $outputs);
     }
 
+    public function select(NDArray $source,NDArray $selector,$axis=null)
+    {
+        return $this->la->select($source,$selector,$axis);
+    }
+
     public function oneHot(NDArray $indices, int $numClass) : NDArray
     {
         if($indices->ndim()!=1) {
@@ -504,7 +509,8 @@ class Backend
 
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
         return -1.0 * $la->sum($la->log($la->increment(
-                $la->selectAxis1($predicts,$trues),
+                //$la->selectAxis1($predicts,$trues),
+                $la->select($predicts,$trues,$axis=1),
                 $this->epsilon))) / $batchSize;
     }
 

@@ -275,19 +275,8 @@ class Sequential
             } else {
                 $choice = $K->zeros([1]);
             }
-            $truesShape = $trues->shape();
-            if($trues->ndim()==1) {
-                $trues = $trues->reshape([$trues->size(),1]);
-            }
-
-            $inputsNew = $K->zerosLike($inputs);
-            $truesNew = $K->zerosLike($trues);
-            for($i=0;$i<$size;$i++) {
-                $K->copy($inputs[$choice[$i]],$inputsNew[$i]);
-                $K->copy($trues[$choice[$i]],$truesNew[$i]);
-            }
-            $inputs = $inputsNew;
-            $trues = $truesNew->reshape($truesShape);
+            $inputs = $K->select($inputs,$choice);
+            $trues  = $K->select($trues,$choice);
         }
 
         $preds = $this->forwardStep($inputs, $training=true);

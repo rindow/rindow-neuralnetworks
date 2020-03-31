@@ -50,7 +50,7 @@ class Test extends TestCase
         if($this->plot) {
             [$figure, $axes] = $plot->subplots(5,7);
             for($i=0;$i<count($axes);$i++) {
-                $axes[$i]->axis('equal');
+                $axes[$i]->setAspect('equal');
                 $axes[$i]->setFrame(false);
                 $axes[$i]->imshow($train_img[$i][0]);
             }
@@ -65,6 +65,14 @@ class Test extends TestCase
 
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
+        //$config = [
+        //    'figure.bgColor' => 'white',
+        //    'figure.figsize' => [500,500],
+        //    'figure.leftMargin' => 0,
+        //    'figure.bottomMargin' => 0,
+        //    'figure.rightMargin' => 0,
+        //    'figure.topMargin' => 0,
+        //];
         $plot = new Plot(null,$mo);
 
         [[$train_img,$train_label],[$test_img,$test_label]] =
@@ -73,9 +81,9 @@ class Test extends TestCase
         if($this->plot) {
             [$figure, $axes] = $plot->subplots(5,7);
             for($i=0;$i<count($axes);$i++) {
-                $axes[$i]->axis('equal');
+                $axes[$i]->setAspect('equal');
                 $axes[$i]->setFrame(false);
-                $axes[$i]->imshow($train_img[$i][0]);
+                $axes[$i]->imshow($mo->op(255,'-',$train_img[$i][0]),'gray');
             }
             $plot->show();
         }
