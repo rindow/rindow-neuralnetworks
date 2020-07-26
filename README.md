@@ -7,6 +7,11 @@ The Rindow Neural networks is a high-level neural networks library for deep lear
 The goal is to be able to describe a network model in PHP as well as Python
 using a description method similar to Keras.
 
+To find out more please visit our website now!
+
+- [Rindow projects](https://rindow.github.io/)
+
+
 If you use the rindow_openblas php extension,
 you can calculate at speed close to CPU version of tensorflow.
 The trained model trained on your laptop is available on general web hosting.

@@ -22,6 +22,23 @@ abstract class AbstractLayer
         $this->outputShape = $inputShape;
     }
 
+    protected function normalizeInputShape(array $inputShape=null) : array
+    {
+        if($inputShape===null)
+            $inputShape = $this->inputShape;
+        if($this->inputShape===null)
+            $this->inputShape = $inputShape;
+        if($this->inputShape!==$inputShape) {
+            throw new InvalidArgumentException(
+                'Input shape is inconsistent: ['.implode(',',$this->inputShape).
+                '] and ['.implode(',',$inputShape).']');
+        } elseif($inputShape===null) {
+            throw new InvalidArgumentException('Input shape is not defined');
+        }
+        $this->inputShape = $inputShape;
+        return $inputShape;
+    }
+
     public function outputShape() : array
     {
         return $this->outputShape;

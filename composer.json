@@ -6,14 +6,14 @@
     "license": "BSD-3-Clause",
     "require": {
         "php": ">=7.2",
-        "rindow/rindow-math-matrix": ">=1.0.3"
+        "rindow/rindow-math-matrix": ">=1.0.4"
     },
     "require-dev": {
         "rindow/rindow-math-plot": ">=1.0.2"
     },
     "suggest": {
         "rindow/rindow-math-plot": "when visualize machine learning results",
-        "ext-rindow_openblas": "strongly recommended for speed"
+        "ext-rindow_openblas": "0.1.2 strongly recommended for speed"
     },
     "autoload": {
         "psr-4": {
