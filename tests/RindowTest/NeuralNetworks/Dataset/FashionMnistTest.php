@@ -1,5 +1,5 @@
 <?php
-namespace RindowTest\NeuralNetworks\Dataset\MnistTest;
+namespace RindowTest\NeuralNetworks\Dataset\FashionMnistTest;
 
 use PHPUnit\Framework\TestCase;
 use Interop\Polite\Math\Matrix\NDArray;
@@ -18,7 +18,7 @@ class Test extends TestCase
     public function setUp() : void
     {
         $this->plot = true;
-        $this->pickleFile = sys_get_temp_dir().'/rindow/nn/datasets/mnist/mnist.pkl';
+        $this->pickleFile = sys_get_temp_dir().'/rindow/nn/datasets/fashion-mnist/mnist.pkl';
     }
 
     public function testDownloadFiles()
@@ -26,7 +26,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
 
-        $nn->datasets()->mnist()->downloadFiles();
+        $nn->datasets()->fashionMnist()->downloadFiles();
         $this->assertTrue(true);
     }
 
@@ -43,7 +43,7 @@ class Test extends TestCase
         $plot = new Plot(null,$mo);
 
         [[$train_img,$train_label],[$test_img,$test_label]] =
-            $nn->datasets()->mnist()->loadData();
+            $nn->datasets()->fashionMnist()->loadData();
 
         sleep(1);
         $this->assertTrue(file_exists($pickleFile));
@@ -77,7 +77,7 @@ class Test extends TestCase
         $plot = new Plot(null,$mo);
 
         [[$train_img,$train_label],[$test_img,$test_label]] =
-            $nn->datasets()->mnist()->loadData();
+            $nn->datasets()->fashionMnist()->loadData();
 
         if($this->plot) {
             [$figure, $axes] = $plot->subplots(5,7);
@@ -97,7 +97,7 @@ class Test extends TestCase
 
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
-        $nn->datasets()->mnist()->cleanPickle();
+        $nn->datasets()->fashionMnist()->cleanPickle();
         $this->assertTrue(true);
     }
 }

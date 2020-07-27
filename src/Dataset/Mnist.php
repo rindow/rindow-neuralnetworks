@@ -24,11 +24,15 @@ class Mnist
     public function __construct($mo)
     {
         $this->matrixOperator = $mo;
-        $this->datasetDir = sys_get_temp_dir().'/rindow/nn/datasets';
+        $this->datasetDir = $this->getDatasetDir();
         if(!file_exists($this->datasetDir)) {
             @mkdir($this->datasetDir,0777,true);
         }
         $this->saveFile = $this->datasetDir . "/mnist.pkl";
+    }
+    protected function getDatasetDir()
+    {
+        return sys_get_temp_dir().'/rindow/nn/datasets/mnist';
     }
 
     protected function console($message)
