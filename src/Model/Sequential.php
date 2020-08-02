@@ -127,9 +127,10 @@ class Sequential
             $name = basename(str_replace('\\',DIRECTORY_SEPARATOR,get_class($layer)));
             if(isset($layerNames[$name])) {
                 $i = 1;
+                $base = $name;
                 while(true) {
-                    if(!isset($layers[$name.'_'.$i])) {
-                        $name = $name.'_'.$i;
+                    if(!isset($layerNames[$base.'_'.$i])) {
+                        $name = $base.'_'.$i;
                         break;
                     }
                     $i++;
@@ -207,7 +208,7 @@ class Sequential
             }
             if($batchIndexCount>1) {
                 if($shuffle) {
-                    $choice = $K->randomChoice($batchIndexCount,$batchIndexCount,false);
+                    $choice = $K->randomSequence($batchIndexCount);
                 } else {
                     $choice = $K->arange($batchIndexCount);
                 }
@@ -271,7 +272,7 @@ class Sequential
         if($shuffle) {
             $size = $inputs->shape()[0];
             if($size>1) {
-                $choice = $K->randomChoice($size,$size,false);
+                $choice = $K->randomSequence($size);
             } else {
                 $choice = $K->zeros([1]);
             }

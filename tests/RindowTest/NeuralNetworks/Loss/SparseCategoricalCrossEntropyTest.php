@@ -52,7 +52,7 @@ class Test extends TestCase
         $this->assertLessThan(0.01,abs(6.0-$loss));
 
         $dx = $backend->dsoftmax($layer->differentiateLoss(),$y);
-        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',
+        $this->assertLessThan(0.001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',
             $backend->onehot($t,$x->shape()[1]))));
     }
 

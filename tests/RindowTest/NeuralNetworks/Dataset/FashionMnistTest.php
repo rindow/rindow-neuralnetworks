@@ -53,7 +53,7 @@ class Test extends TestCase
             for($i=0;$i<count($axes);$i++) {
                 $axes[$i]->setAspect('equal');
                 $axes[$i]->setFrame(false);
-                $axes[$i]->imshow($train_img[$i][0]);
+                $axes[$i]->imshow($train_img[$i][0],null,null,null,$origin='upper');
             }
             $plot->show();
         }
@@ -84,7 +84,7 @@ class Test extends TestCase
             for($i=0;$i<count($axes);$i++) {
                 $axes[$i]->setAspect('equal');
                 $axes[$i]->setFrame(false);
-                $axes[$i]->imshow($mo->op(255,'-',$train_img[$i][0]),'gray');
+                $axes[$i]->imshow($mo->op(255,'-',$train_img[$i][0]),'gray',null,null,$origin='upper');
             }
             $plot->show();
         }

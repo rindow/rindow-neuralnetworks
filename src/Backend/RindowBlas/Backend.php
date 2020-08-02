@@ -56,21 +56,24 @@ class Backend
         return [$this,$this->initializers[$name]];
     }
 
-    public function initializer_relu(array $shape)
+    public function initializer_relu(array $shape,$nodeNum=null)
     {
         $mo = $this->matrixOperator;
-        $inputSize = $shape[0];
-        $scale = sqrt(2.0 / $inputSize);
-        $kernel = $this->la->scal($scale,$mo->random()->randn($shape));
+        if($nodeNum===null){
+            $nodeNum = array_product($shape);
+        }
+        $scale = sqrt(2.0 / $nodeNum);
+        $kernel = $this->la->randomNormal($shape,0.0,$scale);
         return $kernel;
     }
 
-    public function initializer_sigmoid(array $shape)
+    public function initializer_sigmoid(array $shape,$nodeNum=null)
     {
         $mo = $this->matrixOperator;
-        $inputSize = $shape[0];
-        $scale = sqrt(1.0 / $inputSize);
-        $kernel = $this->la->scal($scale,$mo->random()->randn($shape));
+        if($nodeNum===null)
+            $nodeNum = $shape[0];
+        $scale = sqrt(1.0 / $nodeNum);
+        $kernel = $this->la->randomNormal($shape,0.0,$scale);
         return $kernel;
     }
 
@@ -343,13 +346,19 @@ class Backend
     public function rand($shape)
     {
         $mo = $this->matrixOperator;
-        return $mo->random()->rand($shape);
+        return $this->randomUniformVariables($shape,0.0,1.0);
     }
 
     public function randomChoice($a,int $size=null, bool $replace=null)
     {
         $mo = $this->matrixOperator;
         return $mo->random()->choice($a, $size, $replace);
+    }
+
+    public function randomSequence(int $base, int $size=null, int  $seed=null)
+    {
+        $mo = $this->matrixOperator;
+        return $this->la->randomSequence($base, $size, $seed);
     }
 
     public function dot($x,$y)
@@ -385,6 +394,16 @@ class Backend
             throw new InvalidArgumentException('indices must be 1-D NDarray');
         }
         return $this->la->onehot($indices,$numClass);
+    }
+
+    public function randomUniformVariables(array $shape, $low, $high, $dtype=null, int $seed=null, NDArray $x=null) : NDArray
+    {
+        return $this->la->randomUniform($shape,$low,$high,$dtype,$seed,$x);
+    }
+
+    public function randomNormalVariables(array $shape, $mean, $scale, $dtype=null, int $seed=null, NDArray $x=null) : NDArray
+    {
+        return $this->la->randomNormal($shape,$mean,$scale,$dtype,$seed,$x);
     }
 
     public function relu($x) : NDArray
@@ -1055,7 +1074,7 @@ class Backend
             // dx = - trues / predicts
             $trues = $la->onehot($trues,$numClass);
             $dInputs = $la->scal(-1.0,$la->multiply($trues,
-                $la->reciprocal($la->copy($predicts))));
+                $la->reciprocal($la->copy($predicts),$this->epsilon)));
             return $dInputs;
         }
     }

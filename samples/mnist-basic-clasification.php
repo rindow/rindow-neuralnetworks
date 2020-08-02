@@ -16,12 +16,32 @@ if(!isset($argv[1])||!$argv[1]) {
 } else {
     $shrink = true;
 }
-if(!isset($argv[2])||!$argv[2]) {
-    [[$train_img,$train_label],[$test_img,$test_label]] =
-        $nn->datasets()->mnist()->loadData();
-} else {
+$dataset='mnist';
+if(isset($argv[2])) {
+    $dataset=$argv[2];
+}
+
+if($dataset=='fashion') {
     [[$train_img,$train_label],[$test_img,$test_label]] =
         $nn->datasets()->fashionMnist()->loadData();
+    $inputShape = [28*28];
+    $shrinkEpochs = 3;
+    $shrinkTrainSize = 5000;
+    $shrinkTestSize  = 100;
+} elseif($dataset=='cifar10') {
+    [[$train_img,$train_label],[$test_img,$test_label]] =
+        $nn->datasets()->cifar10()->loadData();
+    $inputShape = [32*32*3];
+    $shrinkEpochs = 3;
+    $shrinkTrainSize = 2000;
+    $shrinkTestSize  = 100;
+} else {
+    [[$train_img,$train_label],[$test_img,$test_label]] =
+        $nn->datasets()->mnist()->loadData();
+    $inputShape = [28*28];
+    $shrinkEpochs = 3;
+    $shrinkTrainSize = 5000;
+    $shrinkTestSize  = 100;
 }
 
 fwrite(STDERR,"train=[".implode(',',$train_img->shape())."]\n");
@@ -29,8 +49,9 @@ fwrite(STDERR,"test=[".implode(',',$test_img->shape())."]\n");
 
 if($shrink||!extension_loaded('rindow_openblas')) {
     // Shrink data
-    $trainSize = 6000;
-    $testSize  = 100;
+    $epochs = $shrinkEpochs;
+    $trainSize = $shrinkTrainSize;
+    $testSize  = $shrinkTestSize;
     fwrite(STDERR,"Shrink data ...\n");
     $train_img = $train_img[[0,$trainSize-1]];
     $train_label = $train_label[[0,$trainSize-1]];
@@ -57,7 +78,7 @@ $test_img  = formatingImage($mo,$test_img);
 fwrite(STDERR,"creating model ...\n");
 $model = $nn->models()->Sequential([
     $nn->layers()->Dense($units=128,
-        ['input_shape'=>[784],'kernel_initializer'=>'relu_normal']),
+        ['input_shape'=>$inputShape,'kernel_initializer'=>'relu_normal']),
     $nn->layers()->ReLU(),
     $nn->layers()->Dense($units=10),
     $nn->layers()->Softmax(),
@@ -71,14 +92,14 @@ fwrite(STDERR,"training model ...\n");
 $history = $model->fit($train_img,$train_label,
     ['epochs'=>5,'batch_size'=>256,'validation_data'=>[$test_img,$test_label]]);
 
-$model->save(__DIR__.'/mnist_model.model',$portable=true);
+$model->save(__DIR__.'/mnist-basic-model.model',$portable=true);
 
-$model = $nn->models()->loadModel(__DIR__.'/mnist_model.model');
+$model = $nn->models()->loadModel(__DIR__.'/mnist-basic-model.model');
 
 $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
 $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
 $plt->plot($mo->array($history['loss']),null,null,'loss');
 $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
 $plt->legend();
-$plt->title('mnist');
+$plt->title($dataset);
 $plt->show();

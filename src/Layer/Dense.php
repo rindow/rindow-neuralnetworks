@@ -52,17 +52,7 @@ class Dense extends AbstractLayer implements Layer
         $kernelInitializer = $this->kernelInitializer;
         $biasInitializer = $this->biasInitializer;
 
-        if($inputShape===null)
-            $inputShape = $this->inputShape;
-        if($this->inputShape===null)
-            $this->inputShape = $inputShape;
-        if($this->inputShape!==$inputShape) {
-            throw new InvalidArgumentException(
-                'Input shape is inconsistent: ['.implode(',',$this->inputShape).
-                '] and ['.implode(',',$inputShape).']');
-        } elseif($inputShape===null) {
-            throw new InvalidArgumentException('Input shape is not defined');
-        }
+        $inputShape = $this->normalizeInputShape($inputShape);
         if(count($inputShape)!=1) {
             throw new InvalidArgumentException(
                 'Unsuppored input shape: ['.implode(',',$inputShape).']');
@@ -71,12 +61,11 @@ class Dense extends AbstractLayer implements Layer
             $this->kernel = $sampleWeights[0];
             $this->bias = $sampleWeights[1];
         } else {
-            $this->kernel = $kernelInitializer(array_merge($inputShape,[$this->units]));
+            $this->kernel = $kernelInitializer(array_merge($inputShape,[$this->units]),array_product($inputShape));
             $this->bias = $biasInitializer([$this->units]);
         }
         $this->dKernel = $K->zerosLike($this->kernel);
         $this->dBias = $K->zerosLike($this->bias);
-        $this->inputShape = $inputShape;
         $this->outputShape = [$this->units];
     }
 

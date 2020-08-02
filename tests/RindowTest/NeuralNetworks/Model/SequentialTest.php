@@ -820,8 +820,8 @@ class Test extends TestCase
         $model->loadWeights($weights);
 
         [$loss2,$accuracy2] = $model->evaluate($x,$t);
-        $this->assertLessThan(0.3,abs($loss-$loss2));
-        $this->assertLessThan(0.3,abs($accuracy-$accuracy2));
+        $this->assertLessThan(0.5,abs($loss-$loss2));
+        $this->assertLessThan(0.5,abs($accuracy-$accuracy2));
         //$y = $model->predict($x);
         //$this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
 

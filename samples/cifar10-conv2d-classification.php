@@ -15,9 +15,22 @@ if(!isset($argv[1])||!$argv[1]) {
 } else {
     $shrink = true;
 }
-$dataset='mnist';
+$dataset='cifar10';
 if(isset($argv[2])) {
     $dataset=$argv[2];
+}
+$epochs = 5;
+$offset=null;
+$trainSize = null;
+$testSize = null;
+if(isset($argv[3])) {
+    $offset=$argv[3];
+    $epochs = 1;
+    $trainSize = 5000;
+    $testSize = 100;
+    if(isset($argv[4])) {
+        $trainSize = $argv[4];
+    }
 }
 
 if($dataset=='fashion') {
@@ -25,24 +38,23 @@ if($dataset=='fashion') {
         $nn->datasets()->fashionMnist()->loadData();
     $inputShape = [28,28,1];
     $shrinkEpochs = 3;
-    $shrinkTrainSize = 5000;
+    $shrinkTrainSize = 1000;
     $shrinkTestSize  = 100;
-} elseif($dataset=='cifar10') {
+} elseif($dataset=='mnist') {
+    [[$train_img,$train_label],[$test_img,$test_label]] =
+        $nn->datasets()->mnist()->loadData();
+    $inputShape = [28,28,1];
+    $shrinkEpochs = 5;
+    $shrinkTrainSize = 1000;
+    $shrinkTestSize  = 100;
+} else {
     [[$train_img,$train_label],[$test_img,$test_label]] =
         $nn->datasets()->cifar10()->loadData();
     $inputShape = [32,32,3];
     $shrinkEpochs = 3;
-    $shrinkTrainSize = 4000;
-    $shrinkTestSize  = 100;
-} else {
-    [[$train_img,$train_label],[$test_img,$test_label]] =
-        $nn->datasets()->mnist()->loadData();
-    $inputShape = [28,28,1];
-    $shrinkEpochs = 3;
-    $shrinkTrainSize = 5000;
+    $shrinkTrainSize = 1000;
     $shrinkTestSize  = 100;
 }
-$epochs = 5;
 
 fwrite(STDERR,"train=[".implode(',',$train_img->shape())."]\n");
 fwrite(STDERR,"test=[".implode(',',$test_img->shape())."]\n");
@@ -59,6 +71,15 @@ if($shrink||!extension_loaded('rindow_openblas')) {
     $test_label = $test_label[[0,$testSize-1]];
     fwrite(STDERR,"Shrink train=[".implode(',',$train_img->shape())."]\n");
     fwrite(STDERR,"Shrink test=[".implode(',',$test_img->shape())."]\n");
+} elseif(isset($offset)) {
+    fwrite(STDERR,"select data ...\n");
+    fwrite(STDERR,"Parts offset,size=[".$offset.','.$trainSize."]\n");
+    $train_img = $train_img[[$offset,$offset+$trainSize-1]];
+    $train_label = $train_label[[$offset,$offset+$trainSize-1]];
+    $test_img = $test_img[[0,$testSize-1]];
+    $test_label = $test_label[[0,$testSize-1]];
+    fwrite(STDERR,"Parts train=[".implode(',',$train_img->shape())."]\n");
+    fwrite(STDERR,"Parts test=[".implode(',',$test_img->shape())."]\n");
 }
 
 
@@ -80,35 +101,55 @@ $train_img = $train_img->reshape(array_merge([$dataSize],$inputShape));
 [$dataSize,$imageSize] = $test_img->shape();
 $test_img = $test_img->reshape(array_merge([$dataSize],$inputShape));
 
-fwrite(STDERR,"creating model ...\n");
-$model = $nn->models()->Sequential([
+if(file_exists(__DIR__.'/cifar10-conv2d-model.model')) {
+    fwrite(STDERR,"loading model ...\n");
+    $model = $nn->models()->loadModel(__DIR__.'/cifar10-conv2d-model.model');
+} else {
+    fwrite(STDERR,"creating model ...\n");
+    $model = $nn->models()->Sequential([
     $nn->layers()->Conv2D(
        $filters=32,
         $kernel_size=3,
         ['input_shape'=>$inputShape,
         'kernel_initializer'=>'relu_normal']),
     $nn->layers()->ReLU(),
-    #$nn->layers()->MaxPooling2D(),
-    $nn->layers()->AveragePooling2D(),
-    $nn->layers()->Flatten(),
-    $nn->layers()->Dense($units=128,
+    $nn->layers()->Conv2D(
+       $filters=32,
+        $kernel_size=3,
         ['kernel_initializer'=>'relu_normal']),
     $nn->layers()->ReLU(),
+    $nn->layers()->MaxPooling2D(),
+    $nn->layers()->Dropout(0.25),
+    $nn->layers()->Conv2D(
+       $filters=64,
+        $kernel_size=3,
+        ['kernel_initializer'=>'relu_normal']),
+    $nn->layers()->ReLU(),
+    $nn->layers()->Conv2D(
+       $filters=64,
+        $kernel_size=3,
+        ['kernel_initializer'=>'relu_normal']),
+    $nn->layers()->ReLU(),
+    $nn->layers()->MaxPooling2D(),
+    $nn->layers()->Dropout(0.25),
+    $nn->layers()->Flatten(),
+    $nn->layers()->Dense($units=512,
+        ['kernel_initializer'=>'relu_normal']),
+    $nn->layers()->ReLU(),
+    $nn->layers()->Dropout(0.25),
     $nn->layers()->Dense($units=10),
     $nn->layers()->Softmax(),
-]);
-
-$model->compile([
-    'optimizer'=>$nn->optimizers()->Adam()
-]);
+    ]);
+    $model->compile([
+        'optimizer'=>$nn->optimizers()->Adam()
+    ]);
+}
 
 fwrite(STDERR,"training model ...\n");
 $history = $model->fit($train_img,$train_label,
     ['epochs'=>$epochs,'batch_size'=>256,'validation_data'=>[$test_img,$test_label]]);
 
-$model->save(__DIR__.'/mnist-conv2d-model.model',$portable=true);
-
-$model = $nn->models()->loadModel(__DIR__.'/mnist-conv2d-model.model');
+$model->save(__DIR__.'/cifar10-conv2d-model.model',$portable=true);
 
 $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
 $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
