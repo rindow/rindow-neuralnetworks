@@ -18,16 +18,14 @@ class Flatten extends AbstractLayer implements Layer
         $this->inputShape = $input_shape;
     }
 
-    public function build(array $inputShape=null, array $options=null) : void
+    public function build(array $inputShape=null, array $options=null) : array
     {
         $K = $this->backend;
 
         $inputShape = $this->normalizeInputShape($inputShape);
-        $outputShape = 1;
-        foreach($inputShape as $n) {
-            $outputShape *= $n;
-        }
+        $outputShape = (int)array_product($inputShape);
         $this->outputShape = [$outputShape];
+        return $this->outputShape;
     }
 
     public function getParams() : array
@@ -42,13 +40,13 @@ class Flatten extends AbstractLayer implements Layer
 
     public function getConfig() : array
     {
-        return array_merge(parent::getConfig(),[
+        return [
             'options' => [
                 'input_shape'=>$this->inputShape,
             ]
-        ]);
+        ];
     }
-    
+
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;

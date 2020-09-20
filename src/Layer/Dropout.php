@@ -19,9 +19,9 @@ class Dropout extends AbstractLayer implements Layer
 
     public function getConfig() : array
     {
-        return array_merge(parent::getConfig(),[
-            'rate' => $this->rate,
-        ]);
+        return [
+            'rate' => $this->rate
+        ];
     }
 
     protected function call(NDArray $inputs, bool $training) : NDArray

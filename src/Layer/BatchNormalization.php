@@ -44,7 +44,7 @@ class BatchNormalization extends AbstractLayer implements Layer
         $this->movingVarianceInitializer = $K->getInitializer($moving_variance_initializer);
     }
 
-    public function build(array $inputShape=null, array $options=null) : void
+    public function build(array $inputShape=null, array $options=null) : array
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
@@ -85,6 +85,7 @@ class BatchNormalization extends AbstractLayer implements Layer
 
         $this->inputShape = $inputShape;
         $this->outputShape = $inputShape;
+        return $this->outputShape;
     }
 
     public function getParams() : array
@@ -99,7 +100,7 @@ class BatchNormalization extends AbstractLayer implements Layer
 
     public function getConfig() : array
     {
-        return array_merge(parent::getConfig(),[
+        return [
             'options' => [
                 'momentum'=>0.99,
                 'epsilon'=>0.001,
@@ -108,7 +109,7 @@ class BatchNormalization extends AbstractLayer implements Layer
                 'moving_mean_initializer'=>'zeros',
                 'moving_variance_initializer'=>'ones',
             ]
-        ]);
+        ];
     }
 
     protected function call(NDArray $inputs, bool $training) : NDArray

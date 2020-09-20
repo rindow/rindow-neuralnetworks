@@ -2,11 +2,12 @@
 namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Layer\ReLU;
-use Rindow\NeuralNetworks\Layer\Sigmoid;
-use Rindow\NeuralNetworks\Layer\Softmax;
+use Rindow\NeuralNetworks\Layer\Activation;
+use Rindow\NeuralNetworks\Layer\Embedding;
 use Rindow\NeuralNetworks\Layer\Dense;
+use Rindow\NeuralNetworks\Layer\Input;
 use Rindow\NeuralNetworks\Layer\Flatten;
+use Rindow\NeuralNetworks\Layer\RepeatVector;
 use Rindow\NeuralNetworks\Layer\Conv1D;
 use Rindow\NeuralNetworks\Layer\Conv2D;
 use Rindow\NeuralNetworks\Layer\Conv3D;
@@ -18,6 +19,9 @@ use Rindow\NeuralNetworks\Layer\AveragePooling2D;
 use Rindow\NeuralNetworks\Layer\AveragePooling3D;
 use Rindow\NeuralNetworks\Layer\Dropout;
 use Rindow\NeuralNetworks\Layer\BatchNormalization;
+use Rindow\NeuralNetworks\Layer\SimpleRNN;
+use Rindow\NeuralNetworks\Layer\LSTM;
+use Rindow\NeuralNetworks\Layer\GRU;
 
 class Layers
 {
@@ -28,19 +32,10 @@ class Layers
         $this->backend = $backend;
     }
 
-    public function ReLU(array $options=null)
+    public function Activation(
+        $activation,array $options=null)
     {
-        return new ReLU($this->backend,$options);
-    }
-
-    public function Sigmoid(array $options=null)
-    {
-        return new Sigmoid($this->backend,$options);
-    }
-
-    public function Softmax(array $options=null)
-    {
-        return new Softmax($this->backend,$options);
+        return new Activation($this->backend,$activation,$options);
     }
 
     public function Dense(int $units, array $options=null)
@@ -48,10 +43,23 @@ class Layers
         return new Dense($this->backend, $units, $options);
     }
 
+    public function Input(
+        array $options=null)
+    {
+        return new Input($this->backend, $options);
+    }
+
     public function Flatten(
         array $options=null)
     {
         return new Flatten($this->backend, $options);
+    }
+
+    public function RepeatVector(
+        int $repeats,
+        array $options=null)
+    {
+        return new RepeatVector($this->backend, $repeats, $options);
     }
 
     public function Conv1D(
@@ -63,7 +71,7 @@ class Layers
             $kernel_size,
             $options);
     }
-    
+
     public function Conv2D(
         int $filters, $kernel_size, array $options=null)
     {
@@ -73,7 +81,7 @@ class Layers
             $kernel_size,
             $options);
     }
-    
+
     public function Conv3D(
         int $filters, $kernel_size, array $options=null)
     {
@@ -83,7 +91,7 @@ class Layers
             $kernel_size,
             $options);
     }
-    
+
     public function MaxPooling1D(
         array $options=null)
     {
@@ -140,5 +148,25 @@ class Layers
     public function BatchNormalization(array $options=null)
     {
         return new BatchNormalization($this->backend,$options);
+    }
+
+    public function Embedding(int $inputDim,int $outputDim, array $options=null)
+    {
+        return new Embedding($this->backend, $inputDim, $outputDim, $options);
+    }
+
+    public function SimpleRNN(int $units, array $options=null)
+    {
+        return new SimpleRNN($this->backend, $units, $options);
+    }
+
+    public function LSTM(int $units, array $options=null)
+    {
+        return new LSTM($this->backend, $units, $options);
+    }
+
+    public function GRU(int $units, array $options=null)
+    {
+        return new GRU($this->backend, $units, $options);
     }
 }

@@ -29,6 +29,11 @@ class NeuralNetworks
         $this->matrixOperator = $matrixOperator;
     }
 
+    public function backend()
+    {
+        return $this->backend;
+    }
+
     public function models()
     {
         if($this->models==null) {

@@ -7,8 +7,13 @@ use InvalidArgumentException;
 class Backend
 {
     protected $initializers = [
-        'relu_normal'       => 'initializer_relu',
-        'sigmoid_normal'    => 'initializer_sigmoid',
+        'glorot_uniform'    => 'glorot_uniform',
+        'glorot_normal'     => 'glorot_normal',
+        'he_uniform'        => 'he_uniform',
+        'he_normal'         => 'he_normal',
+        'random_uniform'    => 'random_uniform',
+        'random_normal'     => 'random_normal',
+        'orthogonal'        => 'orthogonal',
         'zeros'             => 'zeros',
         'ones'              => 'ones',
     ];
@@ -49,6 +54,12 @@ class Backend
         return $this->la->alloc($x->shape(),$x->dtype());
     }
 
+    public function array($value, $dtype=null)
+    {
+        return $this->matrixOperator->array(
+            $value,$dtype);
+    }
+
     public function getInitializer($name)
     {
         if(!array_key_exists($name,$this->initializers))
@@ -56,37 +67,128 @@ class Backend
         return [$this,$this->initializers[$name]];
     }
 
-    public function initializer_relu(array $shape,$nodeNum=null)
+    public function glorot_normal(array $shape,$nodeNum=null)
     {
         $mo = $this->matrixOperator;
         if($nodeNum===null){
-            $nodeNum = array_product($shape);
+            $tmpShape = $shape;
+            $nodeNum = [array_shift($tmpShape)];
+            $nodeNum[] = array_product($tmpShape);
         }
-        $scale = sqrt(2.0 / $nodeNum);
+        [$fanIn,$fanOut]=$nodeNum;
+        $scale = 1/max(($fanIn+$fanOut)/2.0, 1.0);
+        # 0.879... = scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
+        $scale = sqrt($scale) / 0.87962566103423978;
         $kernel = $this->la->randomNormal($shape,0.0,$scale);
         return $kernel;
     }
 
-    public function initializer_sigmoid(array $shape,$nodeNum=null)
+    public function glorot_uniform(array $shape,$nodeNum=null)
     {
         $mo = $this->matrixOperator;
-        if($nodeNum===null)
-            $nodeNum = $shape[0];
-        $scale = sqrt(1.0 / $nodeNum);
+        if($nodeNum===null){
+            $tmpShape = $shape;
+            $nodeNum = [array_shift($tmpShape)];
+            $nodeNum[] = array_product($tmpShape);
+        }
+        [$fanIn,$fanOut]=$nodeNum;
+        $scale = 1/max(($fanIn+$fanOut)/2.0, 1.0);
+        $limit = sqrt(3*$scale);
+        $kernel = $this->la->randomUniform($shape,-$limit,$limit);
+        return $kernel;
+    }
+
+    public function random_normal(array $shape,$nodeNum=null)
+    {
+        $mo = $this->matrixOperator;
+        $mean=0.0;
+        $stddev=0.05;
+        if(is_array($nodeNum)) {
+            if(array_key_exists('mean',$nodeNum)){
+                $mean = $nodeNum['mean'];
+            }
+            if(array_key_exists('stddev',$nodeNum)){
+                $stddev = $nodeNum['stddev'];
+            }
+        }
+        $kernel = $this->la->randomNormal($shape,$mean,$stddev);
+        return $kernel;
+    }
+
+    public function random_uniform(array $shape,$nodeNum=null)
+    {
+        $mo = $this->matrixOperator;
+        $minval=-0.05;
+        $maxval=0.05;
+        if(is_array($nodeNum)) {
+            if(array_key_exists('minval',$nodeNum)){
+                $minval = $nodeNum['minval'];
+            }
+            if(array_key_exists('maxval',$nodeNum)){
+                $maxval = $nodeNum['maxval'];
+            }
+        }
+        $kernel = $this->la->randomUniform($shape,$minval,$maxval);
+        return $kernel;
+    }
+
+    public function orthogonal(array $shape,$nodeNum=null)
+    {
+        $tmpShape = $shape;
+        $num_cols = array_pop($tmpShape);
+        $num_rows = (int)array_product($tmpShape);
+        $flat_shape = [$num_rows,$num_cols];
+        $a = $this->la->randomNormal(
+            $flat_shape,0.0,1.0);
+        [$u,$s,$vt] = $this->la->svd($a,$full_matrices=false);
+
+        # Pick the one with the correct shape.
+        $q = ($u->shape()==$flat_shape)? $u : $vt;
+        $q = $q->reshape($shape);
+        $kernel = $this->la->slice($q,[0,0], [$shape[0],$shape[1]]);
+        return $kernel;
+    }
+
+
+    public function he_normal(array $shape,$nodeNum=null)
+    {
+        $mo = $this->matrixOperator;
+        if($nodeNum===null){
+            $tmpShape = $shape;
+            $nodeNum = [array_shift($tmpShape),0.05];
+        }
+        [$fanIn,$fanOut]=$nodeNum;
+        $scale = 2/max($fanIn, 1.0);
+        # 0.879... = scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
+        $scale = sqrt($scale) / 0.87962566103423978;
         $kernel = $this->la->randomNormal($shape,0.0,$scale);
         return $kernel;
     }
 
-    public function zeros(array $shape)
+    public function he_uniform(array $shape,$nodeNum=null)
     {
-        $x = $this->la->alloc($shape);
+        $mo = $this->matrixOperator;
+        if($nodeNum===null){
+            $tmpShape = $shape;
+            $nodeNum = [array_shift($tmpShape),0.05];
+        }
+        [$fanIn,$fanOut]=$nodeNum;
+        $scale = 2/max($fanIn, 1.0);
+        $limit = sqrt(3*$scale);
+        $kernel = $this->la->randomUniform($shape,-$limit,$limit);
+        return $kernel;
+    }
+
+    public function zeros(array $shape,$dtype=null)
+    {
+        $x = $this->la->alloc($shape,$dtype);
         $this->la->zeros($x);
         return $x;
     }
 
-    public function ones(array $shape)
+    public function ones(array $shape,$dtype=null)
     {
-        $x = $this->la->alloc($shape);
+        $x = $this->la->alloc($shape,$dtype);
         $this->la->zeros($x);
         $this->la->increment($x,1.0);
         return $x;
@@ -105,6 +207,12 @@ class Backend
         $this->la->zeros($y);
         $this->la->increment($y,1.0);
         return $y;
+    }
+
+    public function clear(NDArray $x)
+    {
+        $this->la->zeros($x);
+        return $x;
     }
 
     public function copy(NDArray $from,NDArray $to=null)
@@ -196,15 +304,18 @@ class Backend
         return $x;
     }
 
-    public function update_add(NDArray $x, NDArray $increment) : NDArray
+    public function update_add(NDArray $x, NDArray $increment, float $alpha=null) : NDArray
     {
-        $this->la->axpy($increment,$x);
+        $this->la->axpy($increment,$x,$alpha);
         return $x;
     }
 
-    public function update_sub(NDArray $x, NDArray $decrement) : NDArray
+    public function update_sub(NDArray $x, NDArray $decrement, float $alpha=null) : NDArray
     {
-        $this->la->axpy($decrement,$x,-1.0);
+        if($alpha===null) {
+            $alpha = 1.0;
+        }
+        $this->la->axpy($decrement,$x,-1.0*$alpha);
         return $x;
     }
 
@@ -219,10 +330,10 @@ class Backend
         return $this->la->scal($a, $x);
     }
 
-    public function increment(NDArray $x, float $a)
+    public function increment(NDArray $x, float $b, float $a=null)
     {
         $x = $this->la->copy($x);
-        return $this->la->increment($x, $a);
+        return $this->la->increment($x, $b, $a);
     }
 
     public function pow(NDArray $x, float $y)
@@ -295,7 +406,17 @@ class Backend
         return $this->la->equal($x,$y);
     }
 
-    public function sum(NDArray $x,$axis=null)
+    public function tanh($x)
+    {
+        return $this->la->tanh($this->la->copy($x));
+    }
+
+    public function asum(NDArray $x)
+    {
+        return $this->la->asum($x);
+    }
+
+    public function sum(NDArray $x, int $axis=null)
     {
         if($axis===null) {
             return $this->la->sum($x);
@@ -328,10 +449,20 @@ class Backend
         return $mo->min($x,$axis);
     }
 
+    public function amax(NDArray $x)
+    {
+        return $this->la->amax($x);
+    }
+
+    public function amin(NDArray $x)
+    {
+        return $this->la->amin($x);
+    }
+
     public function argMax(NDArray $x,int $axis=null,$dtype=null)
     {
         if($axis===null) {
-            return $this->la->argMax($x);
+            return $this->la->imax($x);
         } else {
             return $this->la->reduceArgMax($x,$axis,null,$dtype);
         }
@@ -388,6 +519,72 @@ class Backend
         return $this->la->select($source,$selector,$axis);
     }
 
+    public function scatter(NDArray $indices,NDArray $values,int  $numClass,$axis=null,NDArray $target=null)
+    {
+        return $this->la->scatter($indices,$values,$numClass,$axis,$target);
+    }
+
+    public function scatterAdd(NDArray $target,NDArray $indices,NDArray $values,$axis=null)
+    {
+        return $this->la->scatterAdd($indices,$values,$target,$axis);
+    }
+
+    public function slice(
+        NDArray $input,
+        array $begin, array $size,
+        NDArray $output=null) {
+        return $this->la->slice(
+            $input,
+            $begin,$size,
+            $output);
+    }
+
+    public function stick(
+        NDArray $input,
+        NDArray $output,
+        array $begin, array $size
+        ) {
+        return $this->la->stick(
+            $input,
+            $output,
+            $begin,$size
+            );
+    }
+
+    public function stack(
+        array $inputs,
+        int $axis=null
+        ) {
+        return $this->la->stack(
+            $inputs,
+            $axis
+            );
+    }
+
+    public function repeat(
+        NDArray $inputs,
+        int $repeats
+        ) {
+        if($inputs->ndim()!=2) {
+            throw new InvalidArgumentException('inputs dimension must be 2D');
+        }
+        return $this->la->repeat(
+            $inputs,
+            $repeats
+            );
+    }
+
+    public function reduceSumRepeated(
+        NDArray $inputs
+        ) {
+        if($inputs->ndim()!=3) {
+            throw new InvalidArgumentException('inputs dimension must be 3D');
+        }
+        return $this->la->reduceSumRepeated(
+            $inputs
+            );
+    }
+
     public function oneHot(NDArray $indices, int $numClass) : NDArray
     {
         if($indices->ndim()!=1) {
@@ -422,10 +619,15 @@ class Backend
 
     public function dSigmoid(NDArray $dOutputs, NDArray $outputs) : NDArray
     {
-        $la = $this->la;
         // dx = dy * ( 1 - y ) * y
-        return $la->multiply($dOutputs,$la->multiply($outputs,
-            $la->increment($la->copy($outputs),1.0,-1.0)));
+        $dx = $this->onesLike($outputs);
+        $this->update_sub($dx,$outputs);
+        $this->update_mul($dx,$outputs);
+        $this->update_mul($dx,$dOutputs);
+        return $dx;
+
+        //return $la->multiply($dOutputs,$la->multiply($outputs,
+        //    $la->increment($la->copy($outputs),1.0,-1.0)));
     }
 
     public function softmax(NDArray $X) : NDArray
@@ -442,7 +644,15 @@ class Backend
             // Native softmax function !!!
             return $la->softmax($la->copy($X)->reshape([1,$X->size()]))
                 ->reshape([$X->size()]);
-        } elseif($ndim == 2) {
+        } else {
+            $orig = $shape = $X->shape();
+            $inputDim = array_pop($shape);
+            $X = $X->reshape([(int)array_product($shape),$inputDim]);
+            $y = $la->softmax($la->copy($X));
+            return $y->reshape($orig);
+        }
+        /*
+        if($ndim == 2) {
 
             //$X = $this->la->add($this->la->reduceMax($X, $axis=1),
             //                    $this->la->copy($X),-1,$trans=true);  # fix overflow
@@ -458,6 +668,7 @@ class Backend
         } else {
             throw new InvalidArgumentException('Array must be 1-D or 2-D.');
         }
+        */
     }
 
     public function dSoftmax(NDArray $dOutputs, NDArray $outputs) : NDArray
@@ -480,7 +691,7 @@ class Backend
         //$dInputs = $this->la->scal(1/$dOutputs->shape()[0],$dInputs);
         return $dInputs;
     }
-    
+
     public function conv1d(
         object $status,
         NDArray $inputs,
@@ -503,7 +714,7 @@ class Backend
             $data_format
         );
     }
-    
+
     public function dConv1d(
         object $status,
         NDArray $dOutputs,
@@ -556,7 +767,7 @@ class Backend
             $dOutputs
         );
     }
-    
+
     public function conv2d(
         object $status,
         NDArray $inputs,
@@ -579,7 +790,7 @@ class Backend
             $data_format
         );
     }
-    
+
     public function dConv2d(
         object $status,
         NDArray $dOutputs,
@@ -655,7 +866,7 @@ class Backend
             $data_format
         );
     }
-    
+
     public function dConv3d(
         object $status,
         NDArray $dOutputs,
@@ -727,7 +938,7 @@ class Backend
         $filters = array_pop($filterSize);
         $channels = array_pop($filterSize);
         $filterSize = array_values($filterSize);
-        if($data_format == null || 
+        if($data_format == null ||
            $data_format=='channels_last') {
             $channels_first = false;
         } elseif($data_format=='channels_first') {
@@ -756,20 +967,27 @@ class Backend
         for($i=0;$i<$rank;$i++){
             $outShape[] = array_shift($shape);
         }
-        $cols = 
+        $cols =
             $cols->reshape([$batches*array_product($outShape),
             array_product($filterSize)*$channels]);
         $kernel = $kernel->reshape(
             [array_product($filterSize)*$channels,
              $filters]);
-             
-        $outputs = $this->batch_gemm(
-            $cols,
-            $kernel,
-            1.0,1.0,
-            $bias
-        );
-            
+
+        if($bias){
+            $outputs = $this->batch_gemm(
+                $cols,
+                $kernel,
+                1.0,1.0,
+                $bias
+            );
+        } else {
+            $outputs = $this->gemm(
+                $cols,
+                $kernel
+            );
+        }
+
         $status->inputsShape = $inputs->shape();
         $status->kernel = $kernel;
         $status->cols = $cols;
@@ -779,12 +997,12 @@ class Backend
         $status->strides = $strides;
         $status->padding = $padding;
         $status->channels_first = $channels_first;
-        
+
         return $outputs->reshape(
             array_merge([$batches],$outShape,[$filters])
         );
     }
-    
+
     protected function doDConv(
         int $rank,
         object $status,
@@ -814,8 +1032,10 @@ class Backend
             1.0,0.0,
             $dKernel->reshape($status->kernel->shape()),
             true,false);
-        $this->copy($this->sum($dOutputs, $axis=0),$dBias);
-        
+        if($dBias){
+            $this->copy($this->sum($dOutputs, $axis=0),$dBias);
+        }
+
         $dInputs = $this->zeros($status->inputsShape);
         $this->la->col2im(
             $dCols,
@@ -827,7 +1047,7 @@ class Backend
         );
         return $dInputs;
     }
-    
+
     protected function doPool(
         int $rank,
         object $status,
@@ -847,7 +1067,7 @@ class Backend
         }
         $tmp = $inputs->shape();
         $batches = array_shift($tmp);
-        if($data_format == null || 
+        if($data_format == null ||
            $data_format=='channels_last') {
             $channels_first = false;
             $channels = array_pop($tmp);
@@ -884,10 +1104,10 @@ class Backend
         for($i=0;$i<$rank;$i++){
             $filterSize[] = array_shift($tmp);
         }
-        $cols = 
+        $cols =
             $cols->reshape([$batches*array_product($outShape)*$channels,
         array_product($filterSize)    ]);
-        
+
         if($pool_mode==null ||
             $pool_mode=='max') {
             $outputs = $this->la->reduceMax(
@@ -953,7 +1173,7 @@ class Backend
                 $axis=1
             );
         }
-        
+
         $dInputs = $this->zeros(
             $status->inputsShape);
         $this->la->col2im(
@@ -1036,16 +1256,33 @@ class Backend
         NDArray $trues, NDArray $predicts) : float
     {
         $la = $this->la;
-        if($trues->ndim()!=1) {
+        $ndim = $trues->ndim();
+        $orgTrues = $trues;
+        $orgPredicts = $predicts;
+        if($ndim==1){
+            if($predicts->ndim()!=2){
+                $msg = 'trues=['.implode(',',$orgTrues->shape()).'],predict=['.implode(',',$orgPredicts->shape()).']';
+                throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
+            }
+        } elseif($ndim==2) {
+            if($predicts->ndim()!=3){
+                $msg = 'trues=['.implode(',',$orgTrues->shape()).'],predict=['.implode(',',$orgPredicts->shape()).']';
+                throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
+            }
+            $trues = $trues->reshape([$trues->size()]);
+            $shape = $predicts->shape();
+            $batchSize = array_shift($shape);
+            $batchSize *= array_shift($shape);
+            array_unshift($shape,$batchSize);
+            $predicts = $predicts->reshape($shape);
+        } elseif($ndim>2) {
             throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
         }
-        $shape = $predicts->shape();
-        $batchSize = array_shift($shape);
+        $batchSize = $predicts->shape()[0];
         if($trues->shape()!=[$batchSize]){
-            $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
+            $msg = 'trues=['.implode(',',$orgTrues->shape()).'],predict=['.implode(',',$orgPredicts->shape()).']';
             throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
         }
-
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
         return -1.0 * $la->sum($la->log($la->increment(
                 //$la->selectAxis1($predicts,$trues),
@@ -1057,26 +1294,45 @@ class Backend
         NDArray $trues, NDArray $predicts, bool $fromLogits=null) : NDArray
     {
         $la = $this->la;
-        if($trues->ndim()!=1) {
+        $origPredictsShape = $predicts->shape();
+        $ndim = $trues->ndim();
+        if($ndim==1){
+            if($predicts->ndim()!=2){
+                $msg = 'trues=['.implode(',',$orgTrues->shape()).'],predict=['.implode(',',$orgPredicts->shape()).']';
+                throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
+            }
+        } elseif($ndim==2) {
+            if($predicts->ndim()!=3){
+                $msg = 'trues=['.implode(',',$orgTrues->shape()).'],predict=['.implode(',',$orgPredicts->shape()).']';
+                throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
+            }
+            $trues = $trues->reshape([$trues->size()]);
+            $predictsShape = $origPredictsShape;
+            $inputDim = array_pop($predictsShape);
+            $predicts = $predicts->reshape(
+                [array_product($predictsShape),$inputDim]
+                );
+        } elseif($ndim>2) {
             throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
         }
         if($trues->size()!=$predicts->shape()[0]){
             $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
             throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
         }
+        $batchSize = $predicts->shape()[0];
         $numClass = $predicts->shape()[1];
         if($fromLogits) {
             // dx = (y - t)      #  t=onehot(trues), y=softmax(x)
             $dInputs = $la->copy($predicts);
             $la->onehot($trues,$numClass,-1,$dInputs);
-            return $dInputs;
+            $la->scal(1.0/$batchSize,$dInputs);
         } else {
             // dx = - trues / predicts
             $trues = $la->onehot($trues,$numClass);
-            $dInputs = $la->scal(-1.0,$la->multiply($trues,
+            $dInputs = $la->scal(-1.0/$batchSize,$la->multiply($trues,
                 $la->reciprocal($la->copy($predicts),$this->epsilon)));
-            return $dInputs;
         }
+        return $dInputs->reshape($origPredictsShape);
     }
 
     public function categoricalCrossEntropy(
@@ -1089,8 +1345,9 @@ class Backend
         }
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
         $batchSize = $predicts->shape()[0];
+        $tmp = $la->log($la->increment($la->copy($predicts),$this->epsilon));
         return -1.0 * $la->sum($la->multiply($trues,
-            $la->log($la->increment($la->copy($predicts),$this->epsilon)))) / $batchSize;
+            $tmp)) / $batchSize;
 
         // way for clip
         //$predicts = $this->la->maximum($this->epsilon,
@@ -1117,43 +1374,33 @@ class Backend
                 $la->reciprocal($la->copy($predicts),$this->epsilon)));
         }
     }
-/*
+
     public function binaryCrossEntropy(
-        NDArray $trues, NDArray $predicts, bool $fromLogits=null) : float
+        NDArray $trues, NDArray $predicts) : float
     {
         if($trues->shape()!=$predicts->shape()){
             throw new InvalidArgumentException('must be same shape of dimensions');
         }
         $la = $this->la;
-        if(!$fromLogits) {
-            //$predicts = $this->la->maximum($this->epsilon,
-            //    $this->la->minimum(1-$this->epsilon,$this->la->copy($predicts)));
-            // z = log( x / (1-x) )
-            $predicts = $la->log($la->multiply($predicts,
-                                            $la->reciprocal($predicts,1,-1)));
-            // sigmoid(z) = 1 / (1 + exp(-z))
-            //            = 1 / (1 + exp(-log(x/(1-x))))
-            //            = x
-        }
+        #if($fromLogits) {
+            #$predicts = $this->sigmoid($predicts);
+            #// p = limit(p,epsilon,1-epsilon)
+            #// p = log( p / 1 - p )
+            #$predicts = $this->log($la->multiply($predicts,
+            #    $la->reciprocal($this->copy($predicts),1,-1)));
+        #} else {
+        $predicts = $la->minimum(1-$this->epsilon, $la->maximum($this->epsilon,
+                $la->copy($predicts)));
+        #}
+        // E =  t      * -log( p ) +
+        //     (1 - t) * -log( 1 - p )
         $batchSize = $predicts->shape()[0];
-        // E = t * -log(sigmoid(x)) + (1 - t) * -log(1 - sigmoid(x))
-        //   = x - x * t + log(1 + exp(-x))
-        return $la->sum($la->axpy($predicts,$la->axpy(
-            $la->multiply($predicts,$la->copy($trues)),
-            $la->log($la->increment($la->exp(
-                $la->scal(-1,$la->copy($predicts)))))))) / $batchSize;
-        // python
-        //if not from_logits:
-        //    output = np.clip(output, 1e-7, 1 - 1e-7)
-        //    output = np.log(output / (1 - output))
-        //output = sigmoid(output)
-        //  E = -target * log(output) + -(1 - target) * log(1 - output))
-        //return (-target * np.log(output)) +
-        //        (-(1 - target) * np.log(1 - output))
-
-        // part2
-        //self.loss = cross_entropy_error(self.t, np.c_[1 - self.y, self.y])
-        //  cross_entropy_error = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
+        return $la->sum($la->axpy($la->multiply($la->copy($trues),
+                                        $la->scal(-1,$la->log($la->copy($predicts)))),
+                        $la->multiply($la->increment($la->copy($trues),1,-1),
+                                        $la->scal(-1,$la->log(
+                                            $la->increment($la->copy($predicts),1,-1))))))
+                                            / $batchSize;
     }
 
     public function dBinaryCrossEntropy(
@@ -1163,18 +1410,131 @@ class Backend
         if($trues->shape()!=$predicts->shape()){
             throw new InvalidArgumentException('must be same shape of dimensions');
         }
+        $batchSize = $predicts->shape()[0];
         if($fromLogits) {
-            // dx = y - t    :  y = sigmoid(x)
-            return $la->axpy($trues,$la->copy($predicts),-1);
+            // dx = p - t    :  y = sigmoid(x)
+            return $la->scal(1/$batchSize, $la->axpy($trues,$la->copy($predicts),-1));
         } else {
-            // dx = - trues / predicts
-            return $la->scal(-1.0,$la->multiply($trues,
-                $la->reciprocal($la->copy($predicts),$this->epsilon)));
+            // dx = - t / p + (1-t)/(1-p)  : p = predicts
+            return $la->scal(1/$batchSize,$la->axpy(
+                $la->multiply($trues,
+                    $la->reciprocal($la->copy($predicts),$this->epsilon)),
+                $la->multiply($la->increment($la->copy($trues),1,-1),
+                    $la->reciprocal($la->increment($la->copy($predicts),1,-1))),
+            -1.0));
         }
-        // part2
-        //dx = (self.y - self.t) * dout / batch_size
     }
-*/
+
+
+    public function rnnGetTimestep(
+        NDArray $source,int $step) : NDArray
+    {
+        if($source->ndim()!=3){
+            throw new InvalidArgumentException('array must be 3D');
+        }
+        [$batch,$steps,$feature] = $source->shape();
+        $values = $this->la->slice(
+            $source,
+            [0,$step],[-1,1]
+        );
+
+        return $values->reshape([$batch,$feature]);
+    }
+
+    public function rnnSetTimestep(
+        NDArray $dest,int $step,NDArray $values) : NDArray
+    {
+        if($dest->ndim()!=3){
+            throw new InvalidArgumentException('array must be 3D');
+        }
+        [$batch,$steps,$feature] = $dest->shape();
+        $values = $values->reshape([$batch,1,$feature]);
+        $this->la->stick(
+            $values,
+            $dest,
+            [0,$step],[-1,1]
+        );
+        return $dest;
+    }
+
+    public function rnn(
+        $stepFunction,
+        NDArray $inputs,
+        array $initialStates,
+        bool $training,
+        NDArray $outputs=null,
+        bool $goBackwards=null
+    ) : array
+    {
+        $inputLength = $inputs->shape()[1];
+        $states_t = $initialStates;
+        $calcStates = [];
+        $tm = range(0,$inputLength-1);
+        if($goBackwards){
+            $tm = array_reverse($tm);
+        }
+        foreach($tm as $t){
+            $calcState = new \stdClass();
+            $calcStates[$t] = $calcState;
+            [$outputs_t, $states_t] = $stepFunction(
+                $this->rnnGetTimestep($inputs, $t),
+                $states_t,$training,$calcState);
+            if($outputs){
+                $this->rnnSetTimestep($outputs,$t,$outputs_t);
+            }
+        }
+        if($outputs===null){
+            $outputs=$outputs_t;
+        }
+        return [$outputs, $states_t, $calcStates];
+    }
+
+    public function rnnBackward(
+        $stepFunction,
+        NDArray $dOutputs,
+        array $dStates,
+        array $calcStates,
+        NDArray $dInputs,
+        bool $goBackwards=null
+    ) : array
+    {
+        $ndim = $dOutputs->ndim();
+        if($ndim == 2) {
+            $return_sequences = false;
+            $zero = $this->zerosLike($dOutputs);
+        } elseif($ndim == 3) {
+            $return_sequences = true;
+            $zero = null;
+        } else {
+            throw new InvalidArgumentException('invalid dOutputs shape');
+        }
+        if($dInputs->ndim()!=3){
+            throw new InvalidArgumentException('invalid dInputs shape');
+        }
+        $inputLength=$dInputs->shape()[1];
+        $tm = range(0,$inputLength-1);
+        if(!$goBackwards){
+            $tm = array_reverse($tm);
+        }
+        $doutputs_t = null;
+        $states_t = $dStates;
+        foreach($tm as $t){
+            if($return_sequences){
+                $doutputs_t = $this->rnnGetTimestep($dOutputs, $t);
+            }else{
+                if($doutputs_t==null){
+                    $doutputs_t = $dOutputs;
+                }else{
+                    $doutputs_t = $zero;
+                }
+            }
+            $calcState = $calcStates[$t];
+            [$inputs_t, $states_t] = $stepFunction($doutputs_t, $states_t,$calcState);
+            $this->rnnSetTimestep($dInputs,$t,$inputs_t);
+        }
+        return [$dInputs, $states_t];
+    }
+
 
     public function equalTest($a,$b)
     {

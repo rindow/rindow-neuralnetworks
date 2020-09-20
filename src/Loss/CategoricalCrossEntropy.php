@@ -33,6 +33,14 @@ class CategoricalCrossEntropy extends AbstractCrossEntropy
         $K = $this->backend;
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
+        $ndim = $trues->ndim();
+        if($ndim>2){
+            $shape = $trues->shape();
+            $inputDim = array_pop($shape);
+            $batch = array_product($shape);
+            $trues = $trues->reshape([$batch,$inputDim]);
+            $predicts = $predicts->reshape([$batch,$inputDim]);
+        }
         // calc accuracy
         if($predicts->shape()[1]>2147483648) {
             $dtype = NDArray::int64;

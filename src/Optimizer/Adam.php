@@ -73,10 +73,11 @@ class Adam implements Optimizer
 
         $this->iter++;
 
-        //t = K.cast(self.iterations, K.floatx()) + 1
-        //lr_t = lr * (K.sqrt(1. - K.pow(self.beta_2, t)) /
-        //             (1. - K.pow(self.beta_1, t)))
-        $lr_t = $this->lr * sqrt(1.0 - ($this->beta2**$this->iter) ) / ( 1.0 - ($this->beta1**$this->iter));
+        // t = K.cast(self.iterations, K.floatx()) + 1
+        // lr_t = lr * sqrt( 1 - beta_2**t ) /
+        //                 ( 1 - beta_1**t )
+        $lr_t = $this->lr * sqrt(1.0 - ($this->beta2**$this->iter)) /
+                                (1.0 - ($this->beta1**$this->iter)) ;
 
         foreach (array_keys($params) as $key) {
             $p = $params[$key];
@@ -84,12 +85,22 @@ class Adam implements Optimizer
             $m = $this->m[$key];
             $v = $this->v[$key];
 
-            // m_t = (self.beta_1 * m) + (1. - self.beta_1) * g
-            // v_t = (self.beta_2 * v) + (1. - self.beta_2) * K.square(g)
-            // p_t = p - lr_t * m_t / (K.sqrt(v_t) + self.epsilon)
-            $K->update($m,$K->add($K->scale($this->beta1,$m),$K->scale(1.0-$this->beta1,$g)));
-            $K->update($v,$K->add($K->scale($this->beta2,$v),$K->scale(1.0-$this->beta2,$K->square($g))));
-            $K->update($p,$K->sub($p,$K->mul($K->scale($lr_t,$m),$K->rsqrt($v,$this->epsilon))));
+            // m = ( beta_1 * m ) + ( 1 - beta_1 ) * g
+            // v = ( beta_2 * v ) + ( 1 - beta_2 ) * g**2
+            // p = p - lr_t * m / ( sqrt(v) + epsilon )
+            #$K->update($m,$K->add($K->scale($this->beta1,$m),
+            #                      $K->scale(1.0-$this->beta1,$g)));
+            #$K->update($v,$K->add($K->scale($this->beta2,$v),
+            #                      $K->scale(1.0-$this->beta2,$K->square($g))));
+            #$K->update($p,$K->sub($p,$K->mul($K->scale($lr_t,$m),
+            #                                 $K->rsqrt($v,$this->epsilon))));
+
+            // m += ( 1 - beta_1 ) * ( g - m )
+            // v += ( 1 - beta_2 ) * ( g**2 - v )
+            // p -= lr_t * m / ( sqrt(v) + epsilon )
+            $K->update_add($m, $K->sub($g, $m), (1 - $this->beta1));
+            $K->update_add($v, $K->sub($K->square($g),$v), (1 - $this->beta2));
+            $K->update_sub($p, $K->mul($m, $K->rsqrt($v,$this->epsilon)), $lr_t);
         }
     }
 }

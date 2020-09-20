@@ -16,12 +16,12 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
 
-        $initializer = $backend->getInitializer('relu_normal');
+        $initializer = $backend->getInitializer('he_normal');
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Backend\RindowBlas\Backend',
             $initializer[0]
         );
-        $this->assertEquals('initializer_relu',$initializer[1]);
+        $this->assertEquals('he_normal',$initializer[1]);
         $this->assertTrue(is_callable($initializer));
         $kernel = $initializer([2,3]);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$kernel);
@@ -29,12 +29,12 @@ class Test extends TestCase
         $this->assertEquals(NDArray::float32,$kernel->dtype());
 
 
-        $initializer = $backend->getInitializer('sigmoid_normal');
+        $initializer = $backend->getInitializer('glorot_normal');
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Backend\RindowBlas\Backend',
             $initializer[0]
         );
-        $this->assertEquals('initializer_sigmoid',$initializer[1]);
+        $this->assertEquals('glorot_normal',$initializer[1]);
         $this->assertTrue(is_callable($initializer));
         $kernel = $initializer([2,3]);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$kernel);
@@ -491,7 +491,7 @@ class Test extends TestCase
         $this->assertFalse($fn->equalTest(1, 1+9e-06));
         $this->assertFalse($fn->equalTest(1, 1-9e-06));
     }
-    
+
     public function testConv1d()
     {
         $mo = new MatrixOperator();
@@ -528,7 +528,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->conv1d(
             $status,
             $inputs,
@@ -544,7 +544,7 @@ class Test extends TestCase
              $filters],
             $outputs->shape()
         );
-        
+
         $dOutputs = $mo->ones($outputs->shape());
         $dKernel = $mo->zerosLike($kernel);
         $dBias = $mo->zerosLike($bias);
@@ -554,7 +554,7 @@ class Test extends TestCase
             $dKernel,
             $dBias
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -577,7 +577,7 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $K = new Backend($mo);
-        
+
         $batches = 1;
         $im_w = 4;
         $channels = 3;
@@ -601,7 +601,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->pool1d(
             $status,
             $inputs,
@@ -625,7 +625,7 @@ class Test extends TestCase
             $status,
             $dOutputs
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -640,7 +640,7 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $K = new Backend($mo);
-        
+
         $batches = 1;
         $im_w = 4;
         $channels = 3;
@@ -664,7 +664,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->pool1d(
             $status,
             $inputs,
@@ -688,7 +688,7 @@ class Test extends TestCase
             $status,
             $dOutputs
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -740,7 +740,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->conv2d(
             $status,
             $inputs,
@@ -757,7 +757,7 @@ class Test extends TestCase
              $filters],
             $outputs->shape()
         );
-        
+
         $dOutputs = $mo->ones($outputs->shape());
         $dKernel = $mo->zerosLike($kernel);
         $dBias = $mo->zerosLike($bias);
@@ -767,7 +767,7 @@ class Test extends TestCase
             $dKernel,
             $dBias
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -790,7 +790,7 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $K = new Backend($mo);
-        
+
         $batches = 1;
         $im_h = 4;
         $im_w = 4;
@@ -817,7 +817,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->pool2d(
             $status,
             $inputs,
@@ -843,7 +843,7 @@ class Test extends TestCase
             $status,
             $dOutputs
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -900,7 +900,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->conv3d(
             $status,
             $inputs,
@@ -918,7 +918,7 @@ class Test extends TestCase
              $filters],
             $outputs->shape()
         );
-        
+
         $dOutputs = $mo->ones($outputs->shape());
         $dKernel = $mo->zerosLike($kernel);
         $dBias = $mo->zerosLike($bias);
@@ -928,7 +928,7 @@ class Test extends TestCase
             $dKernel,
             $dBias
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -951,7 +951,7 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $K = new Backend($mo);
-        
+
         $batches = 1;
         $im_d = 4;
         $im_h = 4;
@@ -981,7 +981,7 @@ class Test extends TestCase
         ]);
 
         $status = new \stdClass();
-        
+
         $outputs = $K->pool3d(
             $status,
             $inputs,
@@ -1010,7 +1010,7 @@ class Test extends TestCase
             $status,
             $dOutputs
         );
-        
+
         $this->assertEquals(
             $inputs->shape(),
             $dInputs->shape()
@@ -1019,5 +1019,41 @@ class Test extends TestCase
             $dInputs->toArray(),
             $mo->zerosLike($dInputs)->toArray()
             );
+    }
+
+    public function testGlorotNormal()
+    {
+        $mo = new MatrixOperator();
+        $K = new Backend($mo);
+        $w = $K->glorot_normal([16,4],[16,4]);
+        #echo "--------\n";
+        #foreach($w->toArray() as $array)
+        #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
+        $this->assertLessThan(1.0/0.87962566103423978,abs($K->amax($w)));
+        $this->assertGreaterThan(1e-6,abs($K->amin($w)));
+    }
+
+    public function testGlorotUniform()
+    {
+        $mo = new MatrixOperator();
+        $K = new Backend($mo);
+        $w = $K->glorot_uniform([16,4],[16,4]);
+        #echo "--------\n";
+        #foreach($w->toArray() as $array)
+        #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
+        $this->assertLessThan(1.0,abs($K->amax($w)));
+        $this->assertGreaterThan(1e-6,abs($K->amin($w)));
+    }
+
+    public function testOrthogonal()
+    {
+        $mo = new MatrixOperator();
+        $K = new Backend($mo);
+        $w = $K->orthogonal([16,4]);
+        #echo "--------\n";
+        #foreach($w->toArray() as $array)
+        #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
+        $this->assertLessThan(1.0,abs($K->amax($w)));
+        $this->assertGreaterThan(1e-6,abs($K->amin($w)));
     }
 }

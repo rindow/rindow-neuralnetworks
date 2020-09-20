@@ -51,9 +51,8 @@ class Test extends TestCase
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
             $nn->layers()->BatchNormalization(),
-            $nn->layers()->Sigmoid(),
-            $nn->layers()->Dense($units=2),
-            $nn->layers()->Softmax(),
+            $nn->layers()->Activation('sigmoid'),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
         ]);
         $model->compile();
         $json = $model->toJson();
@@ -81,9 +80,8 @@ class Test extends TestCase
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
             $nn->layers()->BatchNormalization(),
-            $nn->layers()->Sigmoid(),
-            $nn->layers()->Dense($units=2),
-            $nn->layers()->Softmax(),
+            $nn->layers()->Activation('sigmoid'),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
         ]);
         $model->compile();
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -113,9 +111,8 @@ class Test extends TestCase
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
             $nn->layers()->BatchNormalization(),
-            $nn->layers()->Sigmoid(),
-            $nn->layers()->Dense($units=2),
-            $nn->layers()->Softmax(),
+            $nn->layers()->Activation('sigmoid'),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
         ]);
         $model->compile();
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);

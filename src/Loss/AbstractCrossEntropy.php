@@ -2,12 +2,11 @@
 namespace Rindow\NeuralNetworks\Loss;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Layer\Layer;
-use Rindow\NeuralNetworks\Layer\AbstractLayer;
+use Rindow\NeuralNetworks\Activation\Activation;
 use InvalidArgumentException;
 use DomainException;
 
-abstract class AbstractCrossEntropy extends AbstractLayer implements Loss,Layer
+abstract class AbstractCrossEntropy  implements Loss,Activation
 {
     protected $backend;
     protected $outputs;
@@ -42,14 +41,14 @@ abstract class AbstractCrossEntropy extends AbstractLayer implements Loss,Layer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    public function forward(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
         $this->outputs = $this->activationFunction($inputs);
         return $this->outputs;
     }
 
-    protected function differentiate(NDArray $dOutputs) : NDArray
+    public function backward(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
         if($this->fromLogits) {

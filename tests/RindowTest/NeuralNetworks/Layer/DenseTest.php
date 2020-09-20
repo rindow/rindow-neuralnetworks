@@ -120,4 +120,31 @@ class Test extends TestCase
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
     }
 
+    public function testNdInput()
+    {
+        $mo = new MatrixOperator();
+        $backend = new Backend($mo);
+        $layer = new Dense($backend,$units=4,['input_shape'=>[2,3]]);
+
+        $layer->build();
+        $params = $layer->getParams();
+        $this->assertCount(2,$params);
+        $this->assertEquals([3,4],$params[0]->shape());
+        $this->assertEquals([4],$params[1]->shape());
+        $this->assertNotEquals($mo->zeros([2,4])->toArray(),$params[0]->toArray());
+        $this->assertEquals($mo->zeros([4])->toArray(),$params[1]->toArray());
+
+        $grads = $layer->getGrads();
+        $this->assertCount(2,$grads);
+        $this->assertEquals([3,4],$grads[0]->shape());
+        $this->assertEquals([4],$grads[1]->shape());
+        $this->assertEquals($mo->zeros([3,4])->toArray(),$grads[0]->toArray());
+        $this->assertEquals($mo->zeros([4])->toArray(),$grads[1]->toArray());
+
+        $this->assertEquals([2,4],$layer->outputShape());
+        
+        $inputs = $mo->zeros([10,2,3]);
+        $outputs = $layer->forward($inputs,true);
+        $this->assertEquals([10,2,4],$outputs->shape());
+    }
 }

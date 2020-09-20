@@ -10,6 +10,14 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
+    public function getPlotConfig()
+    {
+        return [
+            'renderer.skipCleaning' => true,
+            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+        ];
+    }
+
     public function testBuilder()
     {
         $mo = new MatrixOperator();

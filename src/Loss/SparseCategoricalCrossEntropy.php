@@ -32,6 +32,13 @@ class SparseCategoricalCrossEntropy extends AbstractCrossEntropy
     {
         $K = $this->backend;
         // transrate one hot to categorical labels
+        $ndim = $c_true->ndim();
+        if($ndim>1){
+            $c_true = $c_true->reshape([$c_true->size()]);
+            $predShape = $y_pred->shape();
+            $inputDim = array_pop($predShape);
+            $y_pred = $y_pred->reshape([array_product($predShape),$inputDim]);
+        }
         $c_pred = $K->argmax($y_pred, $axis=1,$c_true->dtype());
         if($c_true->shape()!=$c_pred->shape())
             throw new InvalidArgumentException('unmatch categorical true and predict results');

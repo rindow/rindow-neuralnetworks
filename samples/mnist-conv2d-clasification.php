@@ -86,16 +86,16 @@ $model = $nn->models()->Sequential([
        $filters=32,
         $kernel_size=3,
         ['input_shape'=>$inputShape,
-        'kernel_initializer'=>'relu_normal']),
-    $nn->layers()->ReLU(),
+        'kernel_initializer'=>'he_normal',
+        'activation'=>'relu']),
     #$nn->layers()->MaxPooling2D(),
     $nn->layers()->AveragePooling2D(),
     $nn->layers()->Flatten(),
     $nn->layers()->Dense($units=128,
-        ['kernel_initializer'=>'relu_normal']),
-    $nn->layers()->ReLU(),
-    $nn->layers()->Dense($units=10),
-    $nn->layers()->Softmax(),
+        ['kernel_initializer'=>'he_normal',
+        'activation'=>'relu']),
+    $nn->layers()->Dense($units=10,
+         ['activation'=>'softmax']),
 ]);
 
 $model->compile([

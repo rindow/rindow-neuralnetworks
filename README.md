@@ -4,8 +4,7 @@ Master: [![Build Status](https://travis-ci.com/rindow/rindow-neuralnetworks.png?
 
 The Rindow Neural networks is a high-level neural networks library for deep learning.
 
-The goal is to be able to describe a network model in PHP as well as Python
-using a description method similar to Keras.
+The goal is to make it easy to write network models in PHP, just like Keras on Python.
 
 To find out more please visit our website now!
 
