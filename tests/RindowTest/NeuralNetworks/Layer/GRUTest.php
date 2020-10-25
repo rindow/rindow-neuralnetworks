@@ -140,7 +140,7 @@ class Test extends TestCase
         $this->assertEquals([5,4],$layer->outputShape());
     }
 
-    public function testDefaultForwardAndBackwordWithInitialStates()
+    public function testDefaultForwardAndBackwardWithInitialStates()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -173,7 +173,7 @@ class Test extends TestCase
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
 
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =
@@ -202,7 +202,7 @@ class Test extends TestCase
         $this->assertEquals($copydStates[0]->toArray(),$dStates[0]->toArray());
     }
 
-    public function testDefaultForwardAndBackwordWithoutInitialStatesAnddStates()
+    public function testDefaultForwardAndBackwardWithoutInitialStatesAnddStates()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -233,7 +233,7 @@ class Test extends TestCase
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
 
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =
@@ -258,7 +258,7 @@ class Test extends TestCase
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
     }
 
-    public function testForwardAndBackwordWithReturnSeqquence()
+    public function testForwardAndBackwardWithReturnSeqquence()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -297,7 +297,7 @@ class Test extends TestCase
         $this->assertEquals($copyStates[0]->toArray(),$initialStates[0]->toArray());
 
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =
@@ -328,7 +328,7 @@ class Test extends TestCase
         $this->assertEquals($copydStates[0]->toArray(),$dStates[0]->toArray());
     }
 
-    public function testForwardAndBackwordWithReturnSeqquenceWithoutInitialStates()
+    public function testForwardAndBackwardWithReturnSeqquenceWithoutInitialStates()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -365,7 +365,7 @@ class Test extends TestCase
         //$this->assertEquals($copyStates[0]->toArray(),$initialStates[0]->toArray());
 
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =
@@ -439,7 +439,7 @@ class Test extends TestCase
             [2,4],
             $nextStates[0]->shape());
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =

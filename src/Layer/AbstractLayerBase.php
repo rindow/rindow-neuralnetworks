@@ -73,9 +73,13 @@ abstract class AbstractLayerBase implements LayerBase
         if($this->inputShape===null)
             $this->inputShape = $inputShape;
         if($this->inputShape!==$inputShape) {
-            throw new InvalidArgumentException(
-                'Input shape is inconsistent: ['.implode(',',$this->inputShape).
-                '] and ['.implode(',',$inputShape).']');
+            if(is_array($this->inputShape)&&is_int($this->inputShape[0])) {
+                $msg = 'Input shape is inconsistent: ['.implode(',',$this->inputShape).
+                '] and ['.implode(',',$inputShape).']';
+            } else {
+                $msg = 'Input shape is inconsistent';
+            }
+            throw new InvalidArgumentException($msg);
         } elseif($inputShape===null) {
             throw new InvalidArgumentException('Input shape is not defined');
         }
@@ -143,6 +147,22 @@ abstract class AbstractLayerBase implements LayerBase
         }
     }
 
+    protected function shapeToString($shape)
+    {
+        if(!is_array($shape)) {
+            return strval($shape);
+        }
+        $string = '[';
+        foreach($shape as $value) {
+            if($string!='[') {
+                $string .= ',';
+            }
+            $string .= $this->shapeToString($value);
+        }
+        $string .= ']';
+        return $string;
+    }
+
     protected function assertInputShape(NDArray $inputs,$direction)
     {
         if(!$this->shapeInspection)
@@ -153,8 +173,9 @@ abstract class AbstractLayerBase implements LayerBase
         $shape = $inputs->shape();
         $batchNum = array_shift($shape);
         if($shape!=$this->inputShape) {
-            $shape = $shape ? implode(',',$shape) : '';
-            throw new InvalidArgumentException('unmatch input shape: ['.$shape.'], must be ['.implode(',',$this->inputShape).'] in '.$this->name.':'.$direction);
+            $shape = $this->shapeToString($shape);
+            $inputShape = $this->shapeToString($this->inputShape);
+            throw new InvalidArgumentException('unmatch input shape: '.$shape.', must be '.$inputShape.' in '.$this->name.':'.$direction);
         }
     }
 
@@ -168,8 +189,9 @@ abstract class AbstractLayerBase implements LayerBase
         $shape = $outputs->shape();
         $batchNum = array_shift($shape);
         if($shape!=$this->outputShape) {
-            throw new InvalidArgumentException('unmatch output shape: ['.
-                implode(',',$shape).'], must be ['.implode(',',$this->outputShape).'] in '.$this->name.':'.$direction);
+            $shape = $this->shapeToString($shape);
+            $outputShape = $this->shapeToString($this->outputShape);
+            throw new InvalidArgumentException('unmatch output shape: '.$shape.', must be '.$outputShape.' in '.$this->name.':'.$direction);
         }
     }
 
@@ -190,8 +212,9 @@ abstract class AbstractLayerBase implements LayerBase
             $shape = $state->shape();
             $batchNum = array_shift($shape);
             if($shape!=$stateShape) {
-                $shape = $shape ? implode(',',$shape) : '';
-                throw new InvalidArgumentException('unmatch shape of state '.$idx.': ['.$shape.'], must be ['.implode(',',$stateShape).'] in '.$this->name.':'.$direction);
+                $shape = $this->shapeToString($shape);
+                $stateShape = $this->shapeToString($stateShape);
+                throw new InvalidArgumentException('unmatch shape of state: '.$shape.', must be '.$outputShape.' in '.$this->name.':'.$direction);
             }
         }
     }
@@ -200,6 +223,8 @@ abstract class AbstractLayerBase implements LayerBase
     {
         $this->layers[] = $layer;
         $outputShape = $layer->build($inputShape);
+        $name = basename(str_replace('\\',DIRECTORY_SEPARATOR,get_class($layer)));
+        $layer->setName($name);
         $this->addWeights($layer);
         return $outputShape;
     }

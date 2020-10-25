@@ -9,6 +9,7 @@ class RepeatVector extends AbstractLayer implements Layer
 {
     use GenericUtils;
     protected $backend;
+    protected $repeats;
 
     public function __construct(
         $backend,

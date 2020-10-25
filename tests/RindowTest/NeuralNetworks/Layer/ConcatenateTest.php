@@ -1,12 +1,12 @@
 <?php
-namespace RindowTest\NeuralNetworks\Layer\RepeatVectorTest;
+namespace RindowTest\NeuralNetworks\Layer\ConcatenateTest;
 
 use PHPUnit\Framework\TestCase;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
-use Rindow\NeuralNetworks\Layer\RepeatVector;
+use Rindow\NeuralNetworks\Layer\Concatenate;
 use InvalidArgumentException;
 
 class Test extends TestCase
@@ -15,11 +15,11 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
-        $layer = new RepeatVector(
+        $layer = new Concatenate(
             $backend,
-            $repeats=2,
             [
-                'input_shape'=>[3]
+                #'axis'=>-1,
+                'input_shapes'=>[[4,3],[4,2]],
             ]);
 
         $layer->build();
@@ -29,16 +29,15 @@ class Test extends TestCase
         $grads = $layer->getGrads();
         $this->assertCount(0,$grads);
 
-        $this->assertEquals([2,3],$layer->outputShape());
+        $this->assertEquals([4,5],$layer->outputShape());
     }
 
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
-        $layer = new RepeatVector(
+        $layer = new Concatenate(
             $backend,
-            $repeats=2,
             [
             ]);
 
@@ -51,14 +50,15 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
-        $layer = new RepeatVector(
+        $layer = new Concatenate(
             $backend,
-            $repeats=2,
             [
+                'axis'=>1,
             ]);
-        $layer->build($inputShape=[3]);
-
-        $this->assertEquals([2,3],$layer->outputShape());
+        // [batch,2,4],[batch,3,4]
+        $layer->build($inputShape=[[2,4],[3,4]]);
+        // [batch,5,4]
+        $this->assertEquals([5,4],$layer->outputShape());
     }
 
     public function testNormalForwardAndBackward()
@@ -67,45 +67,52 @@ class Test extends TestCase
         $backend = new Backend($mo);
         $fn = $backend;
 
-        $layer = new RepeatVector(
+        $layer = new Concatenate(
             $backend,
-            $repeats=2,
-            ['input_shape'=>[3]]);
+            [
+                #'axis'=>-1,
+            ]);
 
-        $layer->build();
+        $layer->build($inputShape=[[2,2],[2,3]]);
 
         //
         // forward
         //
         //  batch size 2
-        $inputs = $mo->arange(2*3,null,null,NDArray::float32)->reshape([2,3]);
-        $copyInputs = $mo->copy($inputs);
+        $i1 = $mo->arange(2*2*2,null,null,NDArray::float32)->reshape([2,2,2]);
+        $i2 = $mo->arange(2*2*3,100,null,NDArray::float32)->reshape([2,2,3]);
+        $inputs = [$i1,$i2];
+        $copyInputs = [$mo->copy($i1),$mo->copy($i2)];
         $outputs = $layer->forward($inputs, $training=true);
         //
-        $this->assertEquals([2,2,3],$outputs->shape());
-        $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
+        $this->assertEquals([2,2,5],$outputs->shape());
+        $this->assertEquals($copyInputs[0]->toArray(),$inputs[0]->toArray());
+        $this->assertEquals($copyInputs[1]->toArray(),$inputs[1]->toArray());
         $this->assertEquals([
-            [[0,1,2],[0,1,2]],
-            [[3,4,5],[3,4,5]],
+            [[0,1,100,101,102],[2,3,103,104,105]],
+            [[4,5,106,107,108],[6,7,109,110,111]],
         ],$outputs->toArray());
         //
         // backward
         //
         // 2 batch
-        $dOutputs = $mo->array([
-            [[0,1,2],[0,1,2]],
-            [[3,4,5],[3,4,5]],
-        ],NDArray::float32)->reshape([2,2,3]);
+        $dOutputs = $mo->copy($outputs);
 
         $copydOutputs = $mo->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch
-        $this->assertEquals([2,3],$dInputs->shape());
+        $this->assertCount(2,$dInputs);
+        $this->assertEquals([2,2,2],$dInputs[0]->shape());
+        $this->assertEquals([2,2,3],$dInputs[1]->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
         $this->assertEquals([
-            [0,2,4],
-            [6,8,10],
-        ],$dInputs->toArray());
+            [[0,1],[2,3]],
+            [[4,5],[6,7]],
+        ],$dInputs[0]->toArray());
+        $this->assertEquals([
+            [[100,101,102],[103,104,105]],
+            [[106,107,108],[109,110,111]],
+        ],$dInputs[1]->toArray());
     }
 }

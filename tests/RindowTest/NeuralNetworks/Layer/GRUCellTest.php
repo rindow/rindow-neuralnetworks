@@ -116,7 +116,7 @@ class Test extends TestCase
         $this->assertEquals([4],$layer->outputShape());
     }
 
-    public function testNormalForwardAndBackword()
+    public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
         $backend = new Backend($mo);
@@ -152,7 +152,7 @@ class Test extends TestCase
         $this->assertEquals($copyStates[0]->toArray(),$states[0]->toArray());
 
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =
@@ -226,7 +226,7 @@ class Test extends TestCase
             [-383,-383,-383,-383],
             ],$nextStates[0]->toArray());
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =
@@ -323,7 +323,7 @@ class Test extends TestCase
             [-244,-244,-244,-244],
             ],$nextStates[0]->toArray());
         //
-        // backword
+        // backward
         //
         // 2 batch
         $dOutputs =

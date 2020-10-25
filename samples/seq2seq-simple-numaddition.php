@@ -10,7 +10,7 @@ use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
 $TRAINING_SIZE = 5000;
-$DIGITS = 2;
+$DIGITS = 3;
 $REVERSE = True;
 
 

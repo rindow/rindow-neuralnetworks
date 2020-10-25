@@ -8,6 +8,7 @@ use Rindow\NeuralNetworks\Layer\Dense;
 use Rindow\NeuralNetworks\Layer\Input;
 use Rindow\NeuralNetworks\Layer\Flatten;
 use Rindow\NeuralNetworks\Layer\RepeatVector;
+use Rindow\NeuralNetworks\Layer\Concatenate;
 use Rindow\NeuralNetworks\Layer\Conv1D;
 use Rindow\NeuralNetworks\Layer\Conv2D;
 use Rindow\NeuralNetworks\Layer\Conv3D;
@@ -22,6 +23,7 @@ use Rindow\NeuralNetworks\Layer\BatchNormalization;
 use Rindow\NeuralNetworks\Layer\SimpleRNN;
 use Rindow\NeuralNetworks\Layer\LSTM;
 use Rindow\NeuralNetworks\Layer\GRU;
+use Rindow\NeuralNetworks\Layer\Attention;
 
 class Layers
 {
@@ -60,6 +62,12 @@ class Layers
         array $options=null)
     {
         return new RepeatVector($this->backend, $repeats, $options);
+    }
+
+    public function Concatenate(
+        array $options=null)
+    {
+        return new Concatenate($this->backend, $options);
     }
 
     public function Conv1D(
@@ -168,5 +176,10 @@ class Layers
     public function GRU(int $units, array $options=null)
     {
         return new GRU($this->backend, $units, $options);
+    }
+
+    public function Attention(array $options=null)
+    {
+        return new Attention($this->backend, $options);
     }
 }

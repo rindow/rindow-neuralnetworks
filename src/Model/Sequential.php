@@ -67,27 +67,4 @@ class Sequential extends AbstractModel
         }
         return $dout;
     }
-
-    public function summary()
-    {
-        echo str_pad('Layer(type)',29).
-            str_pad('Output Shape',27).
-            str_pad('Param #',10)."\n";
-        echo str_repeat('=',29+27+10)."\n";
-        $totalParams = 0;
-        foreach ($this->layers as $layer) {
-            $type = basename(str_replace('\\',DIRECTORY_SEPARATOR,get_class($layer)));
-            echo str_pad($layer->getName().'('.$type.')',29);
-            echo str_pad('('.implode(',',$layer->outputShape()).')',27);
-            $nump = 0;
-            foreach($layer->getParams() as $p) {
-                $nump += $p->size();
-            }
-            echo str_pad($nump,10);
-            echo "\n";
-            $totalParams += $nump;
-        }
-        echo str_repeat('=',29+27+10)."\n";
-        echo 'Total params: '.$totalParams."\n";
-    }
 }

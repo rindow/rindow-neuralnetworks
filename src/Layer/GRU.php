@@ -104,7 +104,11 @@ class GRU extends AbstractRNNLayer
         }else{
             $this->outputShape = [$this->units];
         }
-        return $this->outputShape;
+        if($this->returnState) {
+            return [$this->outputShape,$this->statesShapes];
+        } else {
+            return $this->outputShape;
+        }
     }
 
     public function setShapeInspection(bool $enable)

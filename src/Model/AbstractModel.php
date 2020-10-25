@@ -36,11 +36,15 @@ abstract class AbstractModel implements Model
     protected $built = false;
     protected $shapeInspection=true;
 
-    public function __construct($backend,$builder,$hda)
+    public function __construct($backend,$builder,$hda=null)
     {
         $this->backend = $backend;
         $this->builder = $builder;
-        $this->hda = $hda;
+        if($hda===null) {
+            $this->hda = $builder->utils()->HDA();
+        } else {
+            $this->hda = $hda;
+        }
     }
 
     protected function console($message)
@@ -319,7 +323,7 @@ abstract class AbstractModel implements Model
         }
 
         $preds = $this->forwardStep($inputs, $trues, $training=true);
-        $loss  = $this->lossFunction->loss($trues,$preds);
+        $loss  = $this->loss($trues,$preds);
         if(is_nan($loss)) {
             throw new UnexpectedValueException("loss is unexpected value");
         }
@@ -327,13 +331,23 @@ abstract class AbstractModel implements Model
 
         if(in_array('accuracy',$metrics)) {
             //$preds = $this->forwardLastlayer($preds);
-            $accuracy = $this->lossFunction->accuracy($trues,$preds);
+            $accuracy = $this->accuracy($trues,$preds);
         } else {
             $accuracy = 0;
         }
 
         $this->optimizer->update($this->params, $this->grads);
         return [$loss,$accuracy];
+    }
+
+    protected function loss(NDArray $trues,NDArray $preds) : float
+    {
+        return $this->lossFunction->loss($trues,$preds);
+    }
+
+    protected function accuracy(NDArray $trues,NDArray $preds) : float
+    {
+        return $this->lossFunction->accuracy($trues,$preds);
     }
 
     public function evaluate(NDArray $x, NDArray $t, array $options=null) : array
@@ -366,9 +380,9 @@ abstract class AbstractModel implements Model
             $inputs = $x[[$batchStart,$batchEnd]];
             $trues  = $t[[$batchStart,$batchEnd]];
             $preds = $this->forwardStep($inputs,$trues,$training=false);
-            $loss = $this->lossFunction->loss($trues,$preds);
+            $loss  = $this->loss($trues,$preds);
             //$preds = $this->forwardLastlayer($preds);
-            $accuracy = $this->lossFunction->accuracy($trues,$preds);
+            $accuracy = $this->accuracy($trues,$preds);
             $callbacks->onTestBatchEnd($batchIndex,['val_loss'=>$loss,'val_accuracy'=>$accuracy]);
             $totalLoss += $loss;
             $totalAccuracy += $accuracy;
@@ -386,7 +400,7 @@ abstract class AbstractModel implements Model
         return [$totalLoss,$totalAccuracy];
     }
 
-    public function predict($inputs, array $options=null) : NDArray
+    public function predict(NDArray $inputs, array $options=null) : NDArray
     {
         extract($this->extractArgs([
             'callbacks'=>null,
@@ -415,6 +429,29 @@ abstract class AbstractModel implements Model
         return $x;
     }
 */
+    public function summary()
+    {
+        echo str_pad('Layer(type)',29).
+            str_pad('Output Shape',27).
+            str_pad('Param #',10)."\n";
+        echo str_repeat('=',29+27+10)."\n";
+        $totalParams = 0;
+        foreach ($this->layers as $layer) {
+            $type = basename(str_replace('\\',DIRECTORY_SEPARATOR,get_class($layer)));
+            echo str_pad($layer->getName().'('.$type.')',29);
+            echo str_pad('('.implode(',',$layer->outputShape()).')',27);
+            $nump = 0;
+            foreach($layer->getParams() as $p) {
+                $nump += $p->size();
+            }
+            echo str_pad($nump,10);
+            echo "\n";
+            $totalParams += $nump;
+        }
+        echo str_repeat('=',29+27+10)."\n";
+        echo 'Total params: '.$totalParams."\n";
+    }
+
     protected function generateLayersConfig() : array
     {
         $layerNames = [];
