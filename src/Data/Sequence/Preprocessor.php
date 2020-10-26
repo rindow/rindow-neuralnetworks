@@ -15,7 +15,7 @@ class Preprocessor
         $this->mo = $mo;
     }
 
-    public function padSequences($sequences, array $options=null) : NDArray
+    public function padSequences(iterable $sequences, array $options=null) : NDArray
     {
         extract($this->extractArgs([
             'maxlen'=>null,

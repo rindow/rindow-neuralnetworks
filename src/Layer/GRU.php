@@ -19,7 +19,7 @@ class GRU extends AbstractRNNLayer
     protected $returnSequences;
     protected $returnState;
     protected $goBackwards;
-    protected $statefull;
+    protected $stateful;
     protected $resetAfter;
     protected $cell;
     protected $timesteps;

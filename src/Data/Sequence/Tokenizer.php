@@ -29,7 +29,7 @@ class Tokenizer
         $this->mo = $mo;
         extract($this->extractArgs([
             'num_words'=>null,
-            'filters'=>"!\"#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n",
+            'filters'=>"!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n",
             'specials'=>null,
             'lower'=>true,
             'split'=>" ",
@@ -84,7 +84,7 @@ class Tokenizer
         return $seq;
     }
 
-    public function fitOnTexts($texts) : void
+    public function fitOnTexts(iterable $texts) : void
     {
         foreach ($texts as $text) {
             $this->documentCount++;
@@ -116,7 +116,7 @@ class Tokenizer
     //public function fitOnSequences($sequences) : void
     //{
     //}
-    public function textsToSequences($texts)
+    public function textsToSequences(iterable $texts) : iterable
     {
         $sequences = new ArrayObject();
         foreach($this->textsToSequencesGenerator($texts) as $seq) {
@@ -125,7 +125,7 @@ class Tokenizer
         return $sequences;
     }
 
-    public function textsToSequencesGenerator($texts)
+    public function textsToSequencesGenerator(iterable $texts) : iterable
     {
         $numWords = $this->numWords;
         $oovTokenIndex = ($this->oovToken) ?
@@ -158,7 +158,7 @@ class Tokenizer
         }
     }
 
-    public function sequencesToTexts($sequences)
+    public function sequencesToTexts(iterable $sequences) : iterable
     {
         $texts = new ArrayObject();
         foreach($this->sequencesToTextsGenerator($sequences) as $text) {
@@ -167,7 +167,7 @@ class Tokenizer
         return $texts;
     }
 
-    public function sequencesToTextsGenerator($sequences)
+    public function sequencesToTextsGenerator(iterable $sequences) : iterable
     {
         if(!is_iterable($sequences)) {
             throw new InvalidArgumentException('sequences must be list of sequence.');
@@ -219,7 +219,7 @@ class Tokenizer
         return $this->indexToWord;
     }
 
-    public function numWords($internal=null) : int
+    public function numWords(bool $internal=null) : int
     {
         if($internal||$this->numWords===null) {
             return count($this->indexToWord)+1;
