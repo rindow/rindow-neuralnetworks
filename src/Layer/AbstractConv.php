@@ -17,6 +17,7 @@ abstract class AbstractConv extends AbstractImage implements Layer
     protected $strides;
     protected $padding;
     protected $data_format;
+    protected $dilation_rate;
     protected $activation;
     protected $useBias;
     protected $kernelInitializer;
@@ -35,7 +36,7 @@ abstract class AbstractConv extends AbstractImage implements Layer
             'strides'=>1,
             'padding'=>"valid",
             'data_format'=>null,
-            # 'dilation_rate'=>[1, 1],
+            'dilation_rate'=>1,
             'groups'=>1,
             'activation'=>null,
             'use_bias'=>true,
@@ -56,11 +57,13 @@ abstract class AbstractConv extends AbstractImage implements Layer
         $kernel_size=$this->normalizeFilterSize($kernel_size,'kernel_size',
             null,true);
         $strides=$this->normalizeFilterSize($strides,'strides',1);
+        $dilation_rate=$this->normalizeFilterSize($dilation_rate,'dilation_rate',1);
         $this->kernel_size = $kernel_size;
         $this->filters = $filters;
         $this->strides = $strides;
         $this->padding = $padding;
         $this->data_format = $data_format;
+        $this->dilation_rate = $dilation_rate;
         $this->inputShape = $input_shape;
         $this->activation = $activation;
         $this->kernelInitializer = $K->getInitializer($kernel_initializer);
@@ -90,7 +93,8 @@ abstract class AbstractConv extends AbstractImage implements Layer
                 $this->kernel_size,
                 $this->strides,
                 $this->padding,
-                $this->data_format
+                $this->data_format,
+                $this->dilation_rate
             );
         array_push($outputShape,$this->filters);
 

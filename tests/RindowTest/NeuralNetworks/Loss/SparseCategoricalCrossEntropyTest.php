@@ -3,7 +3,6 @@ namespace RindowTest\NeuralNetworks\Loss\SparseCategoricalCrossEntropyTest;
 
 use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
-use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
@@ -11,9 +10,22 @@ use Rindow\Math\Plot\Plot;
 
 class Test extends TestCase
 {
-    public function verifyGradient($mo, $function, NDArray $t, NDArray $x,$fromLogits=null)
+    public function newMatrixOperator()
     {
-        $f = function($x) use ($mo,$function,$t,$fromLogits){
+        return new MatrixOperator();
+    }
+
+    public function newNN($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return [$builder,$builder->backend()];
+    }
+
+    public function verifyGradient($mo, $K, $function, NDArray $t, NDArray $x,$fromLogits=null)
+    {
+        $f = function($x) use ($mo,$K,$function,$t,$fromLogits){
+            $x = $K->array($x);
+            $t = $K->array($t);
             if($fromLogits) {
                 $x = $function->forward($x,true);
             }
@@ -21,12 +33,12 @@ class Test extends TestCase
             return $mo->array([$l]);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
-        $outputs = $function->loss($t,$x);
-        $dInputs = $function->differentiateLoss();
-#echo "\n";
-#echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
-#echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
-#echo $mo->asum($mo->op($grads[0],'-',$dInputs))."\n";
+        $outputs = $function->loss($K->array($t),$K->array($x));
+        $dInputs = $K->ndarray($function->differentiateLoss());
+//echo "\n";
+//echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
+//echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
+//echo $mo->asum($mo->op($grads[0],'-',$dInputs))."\n";
         return $mo->la()->isclose($grads[0],$dInputs,null,1e-4);
     }
 
@@ -40,9 +52,8 @@ class Test extends TestCase
 
     public function testGraph()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
+        $mo = $this->newMatrixOperator();
+        [$nn,$K] = $this->newNN($mo);
         $plt = new Plot($this->getPlotConfig(),$mo);
         $loss = $nn->losses()->SparseCategoricalCrossEntropy();
         $x = [[0.1,0.9],[0.3,0.7],[0.5,0.5],[0.7,0.3],[0.9,0.1]];
@@ -50,7 +61,7 @@ class Test extends TestCase
         $y = [];
         foreach($x as $k => $xx) {
             $tt = $t[$k];
-            $y[] = $loss->loss($mo->array([$tt]),$mo->array([$xx]));
+            $y[] = $loss->loss($K->array([$tt]),$K->array([$xx]));
         }
         #$plt->plot($mo->array($y));
         $plt->show();
@@ -59,9 +70,8 @@ class Test extends TestCase
 
     public function testBuilder()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
+        $mo = $this->newMatrixOperator();
+        [$nn,$K] = $this->newNN($mo);
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy',
             $nn->losses()->SparseCategoricalCrossEntropy());
@@ -69,26 +79,31 @@ class Test extends TestCase
 
     public function testDefault()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $func = new SparseCategoricalCrossEntropy($backend);
+        $mo = $this->newMatrixOperator();
+        [$nn,$K] = $this->newNN($mo);
+        $func = $nn->losses()->SparseCategoricalCrossEntropy();
 
         $x = $mo->array([
             [0.00001, 0.00001 , 0.99998],
             [0.99998, 0.00001 , 0.00001],
         ]);
-        $t = $mo->array([2, 0],NDArray::int64);
+        $t = $mo->array([2, 0],NDArray::int32);
         $copyx = $mo->copy($x);
         $copyt = $mo->copy($t);
+        $t = $K->array($t);
+        $x = $K->array($x);
         $loss = $func->loss($t,$x);
+        $tt = $K->ndarray($t);
+        $tx = $K->ndarray($x);
         $this->assertLessThan(0.001,abs($loss));
-        $this->assertEquals($copyx->toArray(),$x->toArray());
-        $this->assertEquals($copyt->toArray(),$t->toArray());
+        $this->assertEquals($copyx->toArray(),$tx->toArray());
+        $this->assertEquals($copyt->toArray(),$tt->toArray());
         $dx = $func->differentiateLoss();
+        $dx = $K->ndarray($dx);
         //$this->assertLessThan(0.00001,abs($mo->sum($dx)));
         //$this->assertLessThan(0.001,abs(1-$dx[0][0])/6);
-        $this->assertEquals($copyx->toArray(),$x->toArray());
-        $this->assertEquals($copyt->toArray(),$t->toArray());
+        $this->assertEquals($copyx->toArray(),$tx->toArray());
+        $this->assertEquals($copyt->toArray(),$tt->toArray());
 
         $accuracy = $func->accuracy($t,$x);
 
@@ -97,9 +112,12 @@ class Test extends TestCase
             [0.99998, 0.00001 , 0.00001],
         ]);
         $t = $mo->array([1, 1]);
+        $t = $K->array($t);
+        $x = $K->array($x);
         $loss = $func->loss($t,$x);
         $this->assertGreaterThan(10,abs($loss));
         $dx = $func->differentiateLoss();
+        $dx = $K->ndarray($dx);
 
         $x = $mo->array([
             [0.00001, 0.20000 , 0.79998],
@@ -107,33 +125,39 @@ class Test extends TestCase
         ]);
         $t = $mo->array([2, 2]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$func,$t,$x));
+            $this->verifyGradient($mo,$K,$func,$t,$x));
     }
 
     public function testFromLogits()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $func = new SparseCategoricalCrossEntropy($backend);
+        $mo = $this->newMatrixOperator();
+        [$nn,$K] = $this->newNN($mo);
+        $func = $nn->losses()->SparseCategoricalCrossEntropy();
         $func->setFromLogits(true);
 
         $x = $mo->array([
             [-10.0, -10.0 , 10.0],
             [ 10.0, -10.0 ,-10.0],
         ]);
-        $t = $mo->array([2, 0],NDArray::int64);
-        $y = $func->forward($x,true);
+        $t = $mo->array([2, 0],NDArray::int32);
         $copyx = $mo->copy($x);
         $copyt = $mo->copy($t);
+        $t = $K->array($t);
+        $x = $K->array($x);
+        $y = $func->forward($x,true);
         $loss = $func->loss($t,$y);
+        $tt = $K->ndarray($t);
+        $tx = $K->ndarray($x);
         $this->assertLessThan(0.00001,abs($loss));
-        $this->assertEquals($copyx->toArray(),$x->toArray());
-        $this->assertEquals($copyt->toArray(),$t->toArray());
+        $this->assertEquals($copyx->toArray(),$tx->toArray());
+        $this->assertEquals($copyt->toArray(),$tt->toArray());
 
         $dx = $func->differentiateLoss();
+        $tt = $K->ndarray($t);
+        $tx = $K->ndarray($x);
         #$this->assertLessThan(0.00001,abs($mo->sum($dx)));
-        $this->assertEquals($copyx->toArray(),$x->toArray());
-        $this->assertEquals($copyt->toArray(),$t->toArray());
+        $this->assertEquals($copyx->toArray(),$tx->toArray());
+        $this->assertEquals($copyt->toArray(),$tt->toArray());
 
         $accuracy = $func->accuracy($t,$x);
 
@@ -142,11 +166,14 @@ class Test extends TestCase
             [ 10.0, -10.0 ,-10.0],
         ]);
         $t = $mo->array([1, 1]);
+        $t = $K->array($t);
+        $x = $K->array($x);
         $y = $func->forward($x,true);
         $loss = $func->loss($t,$y);
         $this->assertGreaterThan(10.0,abs($loss));
 
         $dx = $func->differentiateLoss();
+        $dx = $K->ndarray($dx);
         $this->assertLessThan(0.00001,abs($mo->sum($dx)));
 
         $x = $mo->array([
@@ -155,6 +182,6 @@ class Test extends TestCase
         ]);
         $t = $mo->array([2, 2]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$func,$t,$x,true));
+            $this->verifyGradient($mo,$K,$func,$t,$x,true));
     }
 }

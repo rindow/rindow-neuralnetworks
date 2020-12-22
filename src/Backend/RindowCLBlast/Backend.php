@@ -1,7 +1,9 @@
 <?php
-namespace Rindow\NeuralNetworks\Backend\RindowBlas;
+namespace Rindow\NeuralNetworks\Backend\RindowCLBlast;
 
 use Interop\Polite\Math\Matrix\NDArray;
+use Interop\Polite\Math\Matrix\OpenCL;
+use Rindow\Math\Matrix\NDArrayOpenCL;
 use InvalidArgumentException;
 
 class Backend
@@ -22,10 +24,24 @@ class Backend
     protected $matrixOperator;
     protected $la;
 
-    public function __construct($matrixOperator)
+    public function __construct($matrixOperator,$options=null)
     {
         $this->matrixOperator = $matrixOperator;
-        $this->la = $matrixOperator->laRawMode();
+        if($options) {
+            $options = explode('::',$options);
+            array_shift($options);
+            $options = implode('::',$options);
+            $options = strtoupper($options);
+            if($options=='GPU') {
+                $options = ['deviceType' => OpenCL::CL_DEVICE_TYPE_GPU];
+            } elseif($options=='CPU') {
+                $options = ['deviceType' => OpenCL::CL_DEVICE_TYPE_CPU];
+            } else {
+                $options = null;
+            }
+        }
+        $this->la = $matrixOperator->laAccelerated('clblast',$options);
+        $this->la->blocking(true);
     }
 
     public function localMatrixOperator()
@@ -35,11 +51,12 @@ class Backend
 
     public function localLA()
     {
-        return $this->la;
+        return $this->matrixOperator->laRawMode();
     }
 
     public function finish()
     {
+        $this->la->finish();
     }
 
     public function fp64()
@@ -75,22 +92,27 @@ class Backend
 
     public function array($value, $dtype=null)
     {
-        if($value instanceof NDArray) {
-            return $value;
-        }
-        return $this->matrixOperator->array(
-            $value,$dtype);
+        return $this->la->array($value, $dtype);
     }
 
-    public function ndarray(NDArray $ndarray)
+    public function variable($value, int $dtype=null, string $name=null, bool $constraint=null)
     {
-        return $ndarray;
+        return $this->la->array($value, $dtype);
     }
 
     public function fill(array $shape, $value, $dtype=null)
     {
-        return $this->matrixOperator->full(
-            $shape,$value,$dtype);
+        $la = $this->la;
+        $array = $la->alloc($shape,$dtype);
+        //$events = $la->newEventList();
+        $la->fill($value,$array);
+        //$events->wait();
+        return $array;
+    }
+
+    public function ndarray(NDArray $ndarray)
+    {
+        return $ndarray->toNDArray();
     }
 
     public function scalar($array)
@@ -110,7 +132,6 @@ class Backend
 
     public function glorot_normal(array $shape,$nodeNum=null)
     {
-        $mo = $this->matrixOperator;
         if($nodeNum===null){
             $tmpShape = $shape;
             $nodeNum = [array_shift($tmpShape)];
@@ -126,7 +147,6 @@ class Backend
 
     public function glorot_uniform(array $shape,$nodeNum=null)
     {
-        $mo = $this->matrixOperator;
         if($nodeNum===null){
             $tmpShape = $shape;
             $nodeNum = [array_shift($tmpShape)];
@@ -141,7 +161,6 @@ class Backend
 
     public function random_normal(array $shape,$nodeNum=null)
     {
-        $mo = $this->matrixOperator;
         $mean=0.0;
         $stddev=0.05;
         if(is_array($nodeNum)) {
@@ -158,7 +177,6 @@ class Backend
 
     public function random_uniform(array $shape,$nodeNum=null)
     {
-        $mo = $this->matrixOperator;
         $minval=-0.05;
         $maxval=0.05;
         if(is_array($nodeNum)) {
@@ -179,21 +197,21 @@ class Backend
         $num_cols = array_pop($tmpShape);
         $num_rows = (int)array_product($tmpShape);
         $flat_shape = [$num_rows,$num_cols];
-        $a = $this->la->randomNormal(
-            $flat_shape,0.0,1.0);
+        $a = $this->la->randomNormal($flat_shape,0.0,1.0);
         [$u,$s,$vt] = $this->la->svd($a,$full_matrices=false);
 
         # Pick the one with the correct shape.
         $q = ($u->shape()==$flat_shape)? $u : $vt;
         $q = $q->reshape($shape);
+        //$events = $this->la->newEventList();
         $kernel = $this->la->slice($q,[0,0], [$shape[0],$shape[1]]);
+        //$events->wait();
         return $kernel;
     }
 
 
     public function he_normal(array $shape,$nodeNum=null)
     {
-        $mo = $this->matrixOperator;
         if($nodeNum===null){
             $tmpShape = $shape;
             $nodeNum = [array_shift($tmpShape),0.05];
@@ -208,7 +226,6 @@ class Backend
 
     public function he_uniform(array $shape,$nodeNum=null)
     {
-        $mo = $this->matrixOperator;
         if($nodeNum===null){
             $tmpShape = $shape;
             $nodeNum = [array_shift($tmpShape),0.05];
@@ -216,37 +233,40 @@ class Backend
         [$fanIn,$fanOut]=$nodeNum;
         $scale = 2/max($fanIn, 1.0);
         $limit = sqrt(3*$scale);
-        $kernel = $this->la->randomUniform($shape,-$limit,$limit);
+        //$events = $this->la->newEventList();
+        $kernel = $this->la->randomUniform($shape,-$limit,$limit,null,null,null,$events);
+        //$events->wait();
         return $kernel;
     }
 
     public function zeros(array $shape,$dtype=null)
     {
-        $x = $this->la->alloc($shape,$dtype);
-        $this->la->zeros($x);
+        $la = $this->la;
+        $x = $la->alloc($shape,$dtype);
+        //$events = $la->newEventList();
+        $la->zeros($x);
+        //$events->wait();
         return $x;
     }
 
     public function ones(array $shape,$dtype=null)
     {
-        $x = $this->la->alloc($shape,$dtype);
-        $this->la->fill(1.0,$x);
-        return $x;
+        return $this->fill($shape,1.0,$dtype);
     }
 
     public function zerosLike(NDArray $x)
     {
-        $y = $this->la->alloc($x->shape(),$x->dtype());
-        $this->la->zeros($y);
+        $la = $this->la;
+        $y = $la->alloc($x->shape(),$x->dtype());
+        //$events = $la->newEventList();
+        $la->zeros($y);
+        //$events->wait();
         return $y;
     }
 
     public function onesLike(NDArray $x)
     {
-        $y = $this->la->alloc($x->shape());
-        $this->la->zeros($y);
-        $this->la->increment($y,1.0);
-        return $y;
+        return $this->fill($x->shape(),1.0,$x->dtype());
     }
 
     public function clear(NDArray $x)
@@ -332,7 +352,8 @@ class Backend
             return $la->multiply($x,$y);
         } else {
             $x = $la->copy($x);
-            return $la->multiply($y,$x);
+            $z = $la->multiply($y,$x);
+            return $z;
         }
     }
 
@@ -499,10 +520,16 @@ class Backend
 
     public function argMax(NDArray $x,int $axis=null,$dtype=null)
     {
+        $la = $this->la;
         if($axis===null) {
-            return $this->la->imax($x);
+            return $la->imax($x);
         } else {
-            return $this->la->reduceArgMax($x,$axis,null,$dtype);
+            if($dtype==null || $dtype==NDArray::int32 || $dtype==NDArray::uint32) {
+                return $la->reduceArgMax($x,$axis,null,$dtype);
+            }
+            $argMax32 = $la->reduceArgMax($x,$axis,null,NDArray::uint32);
+            $argMax = $la->alloc($argMax32->shape(),$dtype);
+            return $la->astype($argMax32,$dtype,$argMax);
         }
     }
 
@@ -685,6 +712,15 @@ class Backend
     {
         $la = $this->la;
         //  1 / (1.0+exp(-$x))
+        //$events = $la->newEventList();
+        //$X = $la->copy($inputs,null,$events);
+        //$events->wait();
+        //$scalevents = $la->newEventList();
+        //$scal = $la->scal(-1.0,$X,$scalevents);
+        //$expevents = $la->newEventList();
+        //$exp = $la->exp($scal,$expevents,$scalevents);
+        //return $la->reciprocal($exp,1.0,null,null,$expevents);
+
         $X = $la->copy($inputs);
         return $la->reciprocal(
                 $la->exp($la->scal(-1.0,$X)),1.0);
@@ -693,6 +729,7 @@ class Backend
     public function dSigmoid(NDArray $dOutputs, NDArray $outputs) : NDArray
     {
         // dx = dy * ( 1 - y ) * y
+        $la = $this->la;
         $dx = $this->onesLike($outputs);
         $this->update_sub($dx,$outputs);
         $this->update_mul($dx,$outputs);
@@ -709,6 +746,22 @@ class Backend
         // Yk = exp(Ak + C') / sum(exp(Ai + C'))
         $ndim = $X->ndim();
 
+        //if($ndim == 1) {
+        //    // Native softmax function !!!
+        //    $copyevents = $la->newEventList();
+        //    $X = $la->copy($X,null,$copyevents);
+        //    return $la->softmax($X->reshape([1,$X->size()]),null,$copyevents)
+        //        ->reshape([$X->size()]);
+        //} else {
+        //    $orig = $shape = $X->shape();
+        //    $inputDim = array_pop($shape);
+        //    $X = $X->reshape([(int)array_product($shape),$inputDim]);
+        //    $copyevents = $la->newEventList();
+        //    $X = $la->copy($X,null,$copyevents);
+        //    $y = $la->softmax($X,null,$copyevents);
+        //    return $y->reshape($orig);
+        //}
+
         if($ndim == 1) {
             //$X = $this->la->increment($this->la->copy($X), -$this->la->max($X)); # fix overflow
             //$expX = $this->la->exp($X);
@@ -724,24 +777,6 @@ class Backend
             $y = $la->softmax($la->copy($X));
             return $y->reshape($orig);
         }
-        /*
-        if($ndim == 2) {
-
-            //$X = $this->la->add($this->la->reduceMax($X, $axis=1),
-            //                    $this->la->copy($X),-1,$trans=true);  # fix overflow
-            //$expX = $this->la->exp($X);
-            //$Y = $this->la->multiply(
-            //    $this->la->reciprocal($this->la->reduceSum($expX, $axis=1)),
-            //    $expX,$trans=true);
-            //return $Y;
-
-            // Native softmax function !!!
-            return $la->softmax($la->copy($X));
-
-        } else {
-            throw new InvalidArgumentException('Array must be 1-D or 2-D.');
-        }
-        */
     }
 
     public function dSoftmax(NDArray $dOutputs, NDArray $outputs) : NDArray
@@ -755,6 +790,26 @@ class Backend
         // dsoftmax: dyk/daj =  yk * (1 - yj): j=k , -yk * yj : j!=k
         //                   =  yk * (I(kj) - yj)  ; I(kj) -> 1:k=j, 0:k!=j
         //                   =
+
+        //$copyevents = $la->newEventList();
+        //$dOutputs = $la->copy($dOutputs,null,$copyevents);
+        //$mul1events = $la->newEventList();
+        //$dx = $la->multiply($outputs, $dOutputs,null,$mul1events,$copyevents);
+        //$shape = $orgShape = $dx->shape();
+        //$n = array_pop($shape);
+        //$m = (int)array_product($shape);
+        //$dx = $dx->reshape([$m,$n]);
+        //$copy2events = $la->newEventList();
+        //$outputs = $la->copy($outputs->reshape([$m,$n]),null,$copy2events,$mul1events);
+        //$sumevents = $la->newEventList();
+        //$sum = $la->reduceSum($dx, $axis=1,null,null,$sumevents,$mul1events);
+        //$mul2events = $la->newEventList();
+        //$sumevents->copy($copy2events);
+        //$mul2 = $la->multiply($sum,$outputs,$trans=true,$mul2events,$sumevents);
+        //$mul2events->copy($mul1events);
+        //$mul2events->wait();
+        //$dInputs = $la->axpy($mul2,$dx,-1.0);
+        //$dInputs = $this->la->scal(1/$dOutputs->shape()[0],$dInputs);
 
         // dx = (y * dy) - sum(y * dy) * y
         $dx = $la->multiply($outputs, $la->copy($dOutputs));
@@ -1335,7 +1390,7 @@ class Backend
         //  E = (1/N) * sum((Yk-Tk)**2)
         $N = $predicts->size();
         return $la->sum($la->square(
-            $la->axpy($trues,$la->copy($predicts),-1.0))) / $N;
+            $la->axpy($trues,$la->copy($predicts),-1.0)))->toArray() / $N;
     }
 
     public function dMeanSquaredError(NDArray $trues,NDArray $predicts) : NDarray
@@ -1390,7 +1445,7 @@ class Backend
         return -1.0 * $la->sum($la->log($la->increment(
                 //$la->selectAxis1($predicts,$trues),
                 $la->select($predicts,$trues,$axis=1),
-                $this->epsilon))) / $batchSize;
+                $this->epsilon)))->toArray() / $batchSize;
     }
 
     public function dSparseCategoricalCrossEntropy(
@@ -1451,7 +1506,7 @@ class Backend
         $batchSize = $predicts->shape()[0];
         $tmp = $la->log($la->increment($la->copy($predicts),$this->epsilon));
         return -1.0 * $la->sum($la->multiply($trues,
-            $tmp)) / $batchSize;
+            $tmp))->toArray() / $batchSize;
 
         // way for clip
         //$predicts = $this->la->maximum($this->epsilon,
@@ -1503,7 +1558,7 @@ class Backend
                                         $la->scal(-1,$la->log($la->copy($predicts)))),
                         $la->multiply($la->increment($la->copy($trues),1,-1),
                                         $la->scal(-1,$la->log(
-                                            $la->increment($la->copy($predicts),1,-1))))))
+                                            $la->increment($la->copy($predicts),1,-1))))))->toArray()
                                             / $batchSize;
     }
 
@@ -1648,10 +1703,10 @@ class Backend
                 throw new InvalidArgumentException('NDArrays must be of the same type.');
             if($a->shape()!=$b->shape())
                 return false;
-            $delta = $mo->zerosLike($b);
+            $delta = $this->zerosLike($b);
             $this->la->copy($b,$delta);
             $this->la->axpy($a,$delta,-1.0);
-            $delta = $this->la->asum($delta);
+            $delta = $this->la->asum($delta)->toArray();
         } elseif(is_numeric($a)) {
             if(!is_numeric($b))
                 throw new InvalidArgumentException('Values must be of the same type.');
@@ -1670,4 +1725,5 @@ class Backend
             return false;
         }
     }
+
 }

@@ -72,8 +72,10 @@ function formatingImage($mo,$train_img) {
 
 fwrite(STDERR,"formating train images ...\n");
 $train_img = formatingImage($mo,$train_img);
+$train_label = $mo->la()->astype($train_label,NDArray::int32);
 fwrite(STDERR,"formating test images ...\n");
 $test_img  = formatingImage($mo,$test_img);
+$test_label = $mo->la()->astype($test_label,NDArray::int32);
 
 fwrite(STDERR,"creating model ...\n");
 $model = $nn->models()->Sequential([

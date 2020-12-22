@@ -22,7 +22,7 @@ class Test extends TestCase
         $outputs = $function->forward($x,$training=true);
         $dOutputs = $mo->ones($outputs->shape(),$outputs->dtype());
         $dInputs = $function->backward($dOutputs);
-        return $mo->la()->isclose($grads[0],$dInputs,1e-4);
+        return $mo->la()->isclose($grads[0],$dInputs,1e-3);
     }
 
     public function testDefaultInitialize()

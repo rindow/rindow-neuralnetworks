@@ -39,12 +39,15 @@ class SparseCategoricalCrossEntropy extends AbstractCrossEntropy
             $inputDim = array_pop($predShape);
             $y_pred = $y_pred->reshape([array_product($predShape),$inputDim]);
         }
-        $c_pred = $K->argmax($y_pred, $axis=1,$c_true->dtype());
+        $c_pred = $K->argMax($y_pred, $axis=1,$c_true->dtype());
         if($c_true->shape()!=$c_pred->shape())
             throw new InvalidArgumentException('unmatch categorical true and predict results');
         // calc accuracy
-        $accuracy = $K->sum($K->equal($c_true, $c_pred))
-                            / (float)$c_true->shape()[0];
+        $sum = $K->sum($K->equal($c_true, $c_pred));
+        if(!is_scalar($sum)) {
+            $sum = $sum->toArray();
+        }
+        $accuracy = $sum / (float)$c_true->shape()[0];
         return $accuracy;
     }
 }

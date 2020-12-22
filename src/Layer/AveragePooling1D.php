@@ -19,6 +19,7 @@ class AveragePooling1D extends AbstractPooling implements Layer
                 $this->strides,
                 $this->padding,
                 $this->data_format,
+                $this->dilation_rate,
                 $this->pool_mode
         );
         return $outputs;

@@ -3,18 +3,28 @@ namespace RindowTest\NeuralNetworks\Layer\DenseTest;
 
 use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
-use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Dense;
 use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newMatrixOperator()
+    {
+        return new MatrixOperator();
+    }
+
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $layer = new Dense($backend,$units=3,['input_shape'=>[2]]);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=3,['input_shape'=>[2]]);
 
         $layer->build();
         $params = $layer->getParams();
@@ -36,9 +46,9 @@ class Test extends TestCase
 
     public function testNotspecifiedInputShape()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $layer = new Dense($backend,$units=3,[]);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=3,[]);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Input shape is not defined');
@@ -47,9 +57,9 @@ class Test extends TestCase
 
     public function testSetInputShape()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $layer = new Dense($backend,$units=3,[]);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=3,[]);
         $layer->build($inputShape=[2]);
         $params = $layer->getParams();
         $this->assertCount(2,$params);
@@ -60,16 +70,16 @@ class Test extends TestCase
 
     public function testNormalForwardAndBackward()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $fn = $backend;
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $fn = $mo->la();
 
-        $layer = new Dense($backend,$units=2,['input_shape'=>[3]]);
+        $layer = new Dense($K,$units=2,['input_shape'=>[3]]);
 
         $layer->build(null,[
             'sampleWeights'=>[
-                $mo->array([[0.1, 0.2], [0.1, 0.1], [0.2, 0.2]]), // kernel
-                $mo->array([0.5, 0.1]),                         // bias
+                $K->array([[0.1, 0.2], [0.1, 0.1], [0.2, 0.2]]), // kernel
+                $K->array([0.5, 0.1]),                         // bias
             ]
         ]);
 
@@ -84,10 +94,13 @@ class Test extends TestCase
             [0.0, 0.0 , 6.0],
         ]);
         $copyInputs = $mo->copy($inputs);
+        $inputs = $K->array($inputs);
         $outputs = $layer->forward($inputs, $training=true);
+        $outputs = $K->ndarray($outputs);
+        $inputs = $K->ndarray($inputs);
         // 2 output x 4 batch
         $this->assertEquals([4,2],$outputs->shape());
-        $this->assertTrue($fn->equalTest($mo->array([
+        $this->assertTrue($fn->isclose($mo->array([
                 [1.7, 1.3],
                 [1.7, 1.3],
                 [1.7, 1.3],
@@ -107,10 +120,13 @@ class Test extends TestCase
             [0.0, -0.5],
         ]);
         $copydOutputs = $mo->copy($dOutputs);
+        $dOutputs = $K->array($dOutputs);
         $dInputs = $layer->backward($dOutputs);
+        $dInputs = $K->ndarray($dInputs);
+        $dOutputs = $K->ndarray($dOutputs);
         // 3 input x 4 batch
         $this->assertEquals([4,3],$dInputs->shape());
-        $this->assertTrue($fn->equalTest($mo->array([
+        $this->assertTrue($fn->isclose($mo->array([
                 [-0.1, -0.05 , -0.1],
                 [-0.1, -0.05 , -0.1],
                 [-0.1, -0.05 , -0.1],
@@ -122,9 +138,9 @@ class Test extends TestCase
 
     public function testNdInput()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $layer = new Dense($backend,$units=4,['input_shape'=>[2,3]]);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=4,['input_shape'=>[2,3]]);
 
         $layer->build();
         $params = $layer->getParams();
@@ -144,7 +160,9 @@ class Test extends TestCase
         $this->assertEquals([2,4],$layer->outputShape());
 
         $inputs = $mo->zeros([10,2,3]);
+        $inputs = $K->array($inputs);
         $outputs = $layer->forward($inputs,true);
+        $outputs = $K->ndarray($outputs);
         $this->assertEquals([10,2,4],$outputs->shape());
     }
 }

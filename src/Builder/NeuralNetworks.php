@@ -3,9 +3,14 @@ namespace Rindow\NeuralNetworks\Builder;
 
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend as RindowBlasBackend;
+use Rindow\NeuralNetworks\Backend\RindowCLBlast\Backend as RindowCLBlastBackend;
 
 class NeuralNetworks
 {
+    protected $backendClasses = [
+        'rindowblas' => RindowBlasBackend::class,
+        'rindowclblast' => RindowCLBlastBackend::class,
+    ];
     protected $backend;
     protected $matrixOperator;
     protected $functions;
@@ -23,7 +28,18 @@ class NeuralNetworks
             if($matrixOperator==null) {
                 $matrixOperator = new MatrixOperator();
             }
-            $backend = new RindowBlasBackend($matrixOperator);
+            $backendname = getenv('RINDOW_NEURALNETWORKS_BACKEND');
+            if($backendname) {
+                $origName = $backendname;
+                $options = explode('::',$backendname);
+                $backendname = array_shift($options);
+                if(isset($this->backendClasses[$backendname])) {
+                    $backendname = $this->backendClasses[$backendname];
+                }
+                $backend = new $backendname($matrixOperator,$origName);
+            } else {
+                $backend = new RindowBlasBackend($matrixOperator);
+            }
         }
         $this->backend = $backend;
         $this->matrixOperator = $matrixOperator;

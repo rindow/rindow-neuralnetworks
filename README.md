@@ -10,11 +10,12 @@ To find out more please visit our website now!
 
 - [Rindow projects](https://rindow.github.io/)
 
-
 If you use the rindow_openblas php extension,
 you can calculate at speed close to CPU version of tensorflow.
 The trained model trained on your laptop is available on general web hosting.
 You can also benefit from deep learning on popular PHP web hosting services.
+
+It supports GPU acceleration using OpenCL. This is an experimental attempt. The speed is not very fast yet. Only compatible with the Windows version.
 
 It has the following features.
 
@@ -28,6 +29,8 @@ Rindow Neural networks usually work with:
 - Rindow Math Matrix: scientific matrix operation library
 - Rindow OpenBLAS extension: PHP extension of OpenBLAS
 - Rindow Math Plot: Visualize machine learning results
+- Rindow OpenCL extension: PHP extension of OpenCL
+- Rindow CLBlast extension: PHP extension of CLBlast PHP binding.
 
 Requires
 ========
@@ -79,3 +82,21 @@ $ php mnist-basic-clasification.php
 ```
 
 If done correctly, a graph of the learning process will be displayed.
+
+GPU/OpenCL support
+==================
+
+Download binaries and setup PHP extension and libraries.
+
+- [Rindow OpenCL extension](https://github.com/rindow/rindow-opencl/releases)
+- [Rindow CLBlast extension](https://github.com/rindow/rindow-clblast/releases)
+- [CLBlast library](https://github.com/CNugteren/CLBlast/releases)
+
+Set environment variable.
+
+```shell
+$ RINDOW_NEURALNETWORKS_BACKEND=clblast
+$ export RINDOW_NEURALNETWORKS_BACKEND
+$ cd samples
+$ php mnist-basic-clasification.php
+```

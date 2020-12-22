@@ -18,7 +18,8 @@ class Conv3D extends AbstractConv implements Layer
                 $this->bias,
                 $this->strides,
                 $this->padding,
-                $this->data_format
+                $this->data_format,
+                $this->dilation_rate
         );
         if($this->activation)
             $outputs = $this->activation->forward($outputs,$training);

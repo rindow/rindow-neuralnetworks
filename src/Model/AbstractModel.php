@@ -206,6 +206,8 @@ abstract class AbstractModel implements Model
             throw new LogicException('Not yet built');
         }
         $K = $this->backend;
+        $mo = $K->localMatrixOperator();
+        $localLA = $K->localLA();
         extract($this->extractArgs([
             'batch_size'=>32,
             'epochs'=>1,
@@ -244,9 +246,9 @@ abstract class AbstractModel implements Model
             }
             if($batchIndexCount>1) {
                 if($shuffle) {
-                    $choice = $K->randomSequence($batchIndexCount);
+                    $choice = $localLA->randomSequence($batchIndexCount);
                 } else {
-                    $choice = $K->arange($batchIndexCount);
+                    $choice = $mo->arange($batchIndexCount);
                 }
             } else {
                 $choice = [0];
@@ -310,6 +312,8 @@ abstract class AbstractModel implements Model
 
         $inputs = $x[[$batchStart,$batchEnd]];
         $trues  = $t[[$batchStart,$batchEnd]];
+        $inputs = $K->array($inputs);
+        $trues = $K->array($trues);
 
         if($shuffle) {
             $size = $inputs->shape()[0];
@@ -352,6 +356,7 @@ abstract class AbstractModel implements Model
 
     public function evaluate(NDArray $x, NDArray $t, array $options=null) : array
     {
+        $K = $this->backend;
         extract($this->extractArgs([
             'batch_size'=>32,
             'verbose'=>0,
@@ -379,6 +384,8 @@ abstract class AbstractModel implements Model
                 $batchEnd = $inputCount-1;
             $inputs = $x[[$batchStart,$batchEnd]];
             $trues  = $t[[$batchStart,$batchEnd]];
+            $inputs = $K->array($inputs);
+            $trues = $K->array($trues);
             $preds = $this->forwardStep($inputs,$trues,$training=false);
             $loss  = $this->loss($trues,$preds);
             //$preds = $this->forwardLastlayer($preds);
@@ -502,6 +509,7 @@ abstract class AbstractModel implements Model
             if(!isset($modelWeights['layers'][$layer->getName()]))
                 $modelWeights['layers'][$layer->getName()] = [];
             foreach($layer->getParams() as $idx => $param) {
+                $param=$K->ndarray($param);
                 if($portable)
                     $param = $this->converPortableSaveMode($param);
                 $modelWeights['layers'][$layer->getName()][$idx] = serialize($param);
@@ -511,6 +519,7 @@ abstract class AbstractModel implements Model
         if(!isset($modelWeights['optimizer']))
             $modelWeights['optimizer'] = [];
         foreach ($optimizer->getWeights() as $idx => $weights) {
+            $weights=$K->ndarray($weights);
             $modelWeights['optimizer'][$idx] = serialize($weights);
         }
     }
@@ -530,13 +539,17 @@ abstract class AbstractModel implements Model
         foreach($this->layers() as $layer) {
             $weights = $modelWeights['layers'][$layer->getName()];
             foreach($layer->getParams() as $idx => $param) {
-                $K->copy(unserialize($weights[$idx]),$param);
+                $data = unserialize($weights[$idx]);
+                $data = $K->array($data);
+                $K->copy($data,$param);
             }
         }
         $optimizer = $this->optimizer();
         $optimizer->build($this->weights());
         foreach ($optimizer->getWeights() as $idx => $weights) {
-            $K->copy(unserialize($modelWeights['optimizer'][$idx]),$weights);
+            $data = unserialize($modelWeights['optimizer'][$idx]);
+            $data = $K->array($data);
+            $K->copy($data,$weights);
         }
     }
 

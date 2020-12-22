@@ -16,8 +16,9 @@ abstract class AbstractPooling extends AbstractImage implements Layer
     protected $strides;
     protected $padding;
     protected $data_format;
+    protected $dilation_rate;
     protected $status;
-    
+
     public function __construct($backend,array $options=null)
     {
         extract($this->extractArgs([
@@ -25,16 +26,18 @@ abstract class AbstractPooling extends AbstractImage implements Layer
             'strides'=>null,
             'padding'=>"valid",
             'data_format'=>null,
-            # 'dilation_rate'=>[1, 1],
+            'dilation_rate'=>1,
             'input_shape'=>null,
         ],$options));
         $this->backend = $backend;
         $pool_size=$this->normalizeFilterSize($pool_size,'pool_size',2);
         $strides=$this->normalizeFilterSize($strides,'strides',$pool_size);
+        $dilation_rate=$this->normalizeFilterSize($dilation_rate,'dilation_rate',1);
         $this->poolSize = $pool_size;
         $this->strides = $strides;
         $this->padding = $padding;
         $this->data_format = $data_format;
+        $this->dilation_rate = $dilation_rate;
         $this->inputShape = $input_shape;
     }
 
@@ -44,13 +47,14 @@ abstract class AbstractPooling extends AbstractImage implements Layer
 
         $inputShape = $this->normalizeInputShape($inputShape);
         $channels = $this->getChannels();
-        $outputShape = 
+        $outputShape =
             $K->calcConvOutputShape(
                 $this->inputShape,
                 $this->poolSize,
                 $this->strides,
                 $this->padding,
-                $this->data_format
+                $this->data_format,
+                $this->dilation_rate
             );
         array_push($outputShape,$channels);
         $this->outputShape = $outputShape;

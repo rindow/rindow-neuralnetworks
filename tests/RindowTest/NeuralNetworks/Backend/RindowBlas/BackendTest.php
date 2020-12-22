@@ -11,14 +11,25 @@ use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newMatrixOperator()
+    {
+        return new MatrixOperator();
+    }
+
+    public function newBackend($mo)
+    {
+        return new Backend($mo);
+    }
+
     public function testGetInitializer()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $backend = $this->newBackend($mo);
+        $backendClassName = get_class($backend);
 
         $initializer = $backend->getInitializer('he_normal');
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Backend\RindowBlas\Backend',
+            $backendClassName,
             $initializer[0]
         );
         $this->assertEquals('he_normal',$initializer[1]);
@@ -31,7 +42,7 @@ class Test extends TestCase
 
         $initializer = $backend->getInitializer('glorot_normal');
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Backend\RindowBlas\Backend',
+            $backendClassName,
             $initializer[0]
         );
         $this->assertEquals('glorot_normal',$initializer[1]);
@@ -44,7 +55,7 @@ class Test extends TestCase
 
         $initializer = $backend->getInitializer('zeros');
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Backend\RindowBlas\Backend',
+            $backendClassName,
             $initializer[0]
         );
         $this->assertEquals('zeros',$initializer[1]);
@@ -56,7 +67,7 @@ class Test extends TestCase
 
         $initializer = $backend->getInitializer('ones');
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Backend\RindowBlas\Backend',
+            $backendClassName,
             $initializer[0]
         );
         $this->assertEquals('ones',$initializer[1]);
@@ -69,8 +80,8 @@ class Test extends TestCase
 
     public function testUnsupportedInitializer()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $backend = $this->newBackend($mo);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Unsupported initializer: boo');
@@ -79,204 +90,243 @@ class Test extends TestCase
 
     public function testZeros()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $this->assertEquals([[0,0]],$K->zeros([1,2])->toArray());
     }
 
     public function testOnes()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $this->assertEquals([[1,1]],$K->ones([1,2])->toArray());
     }
 
-    public function testZeroLike()
+    public function testZerosLike()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $x = $mo->ones([1,2]);
         $this->assertEquals([[0,0]],$K->zerosLike($x)->toArray());
     }
 
     public function testOnesLike()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $x = $mo->zeros([1,2]);
         $this->assertEquals([[1,1]],$K->onesLike($x)->toArray());
     }
 
     public function testCast()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
-        $x = $mo->ones([1,2],$dtype=NDArray::int32);
+        $x = $K->ones([1,2],$dtype=NDArray::int32);
         $this->assertEquals(NDArray::int32,$x->dtype());
-        $this->assertEquals(NDArray::float32,$K->cast($x,NDArray::float32)->dtype());
-        $this->assertTrue(is_float($K->cast($x,NDArray::float32)[0][0]));
-        $this->assertEquals(NDArray::bool,$K->cast($x,NDArray::bool)->dtype());
-        $this->assertTrue(is_bool($K->cast($x,NDArray::bool)[0][0]));
-        $this->assertEquals(true,$K->cast($x,NDArray::bool)[0][0]);
 
-        $x = $mo->ones([1,2],$dtype=NDArray::float32);
+        $y = $K->cast($x,NDArray::float32); $K->finish();
+        $this->assertEquals(NDArray::float32,$y->dtype());
+        if(is_scalar($y[0][0])) $this->assertTrue(is_float($y[0][0]));
+
+        $y = $K->cast($x,NDArray::bool); $K->finish();
+        $this->assertEquals(NDArray::bool,$y->dtype());
+        if(is_scalar($y[0][0])) $this->assertTrue(is_bool($y[0][0]));
+        if(is_scalar($y[0][0])) $this->assertEquals(true,$y[0][0]);
+
+        $x = $K->ones([1,2],$dtype=NDArray::float32);
         $this->assertEquals(NDArray::float32,$x->dtype());
-        $this->assertEquals(NDArray::int32,$K->cast($x,NDArray::int32)->dtype());
-        $this->assertTrue(is_int($K->cast($x,NDArray::int32)[0][0]));
-        $this->assertEquals(NDArray::bool,$K->cast($x,NDArray::bool)->dtype());
-        $this->assertTrue(is_bool($K->cast($x,NDArray::bool)[0][0]));
-        $this->assertEquals(true,$K->cast($x,NDArray::bool)[0][0]);
 
-        $x = $mo->array([[true,false]],$dtype=NDArray::bool);
+        $y = $K->cast($x,NDArray::int32); $K->finish();
+        $this->assertEquals(NDArray::int32,$y->dtype());
+        if(is_scalar($y[0][0])) $this->assertTrue(is_int($y[0][0]));
+        $y = $K->cast($x,NDArray::bool); $K->finish();
+        $this->assertEquals(NDArray::bool,$y->dtype());
+        if(is_scalar($y[0][0])) $this->assertTrue($y[0][0]);
+        if(is_scalar($y[0][0])) $this->assertEquals(true,$y[0][0]);
+
+        $x = $K->array([[true,false]],$dtype=NDArray::bool);
         $this->assertEquals(NDArray::bool,$x->dtype());
-        $this->assertEquals(NDArray::int32,$K->cast($x,NDArray::int32)->dtype());
-        $this->assertTrue(is_int($K->cast($x,NDArray::int32)[0][0]));
-        $this->assertEquals(1,$K->cast($x,NDArray::int32)[0][0]);
-        $this->assertEquals(0,$K->cast($x,NDArray::int32)[0][1]);
-        $this->assertEquals(NDArray::float32,$K->cast($x,NDArray::float32)->dtype());
-        $this->assertTrue(is_float($K->cast($x,NDArray::float32)[0][0]));
-        $this->assertEquals(1.0,$K->cast($x,NDArray::float32)[0][0]);
-        $this->assertEquals(0.0,$K->cast($x,NDArray::float32)[0][1]);
+        $y = $K->cast($x,NDArray::int32); $K->finish();
+        $this->assertEquals(NDArray::int32,$y->dtype());
+        if(is_scalar($y[0][0])) $this->assertTrue(is_int($y[0][0]));
+        if(is_scalar($y[0][0])) $this->assertEquals(1,$y[0][0]);
+        if(is_scalar($y[0][0])) $this->assertEquals(0,$y[0][1]);
+        $y = $K->cast($x,NDArray::float32); $K->finish();
+        $this->assertEquals(NDArray::float32,$y->dtype());
+        if(is_scalar($y[0][0])) $this->assertTrue(is_float($y[0][0]));
+        if(is_scalar($y[0][0])) $this->assertEquals(1.0,$y[0][0]);
+        if(is_scalar($y[0][0])) $this->assertEquals(0.0,$y[0][1]);
     }
 
     public function testAdd()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([2,3]);
-        $y = $mo->array([10,20]);
-        $this->assertEquals([12,23],$K->add($x,$y)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([2,3]);
+        $y = $K->array([10,20]);
+        $z = $K->add($x,$y); $K->finish();
+        $this->assertEquals([12,23],$z->toArray());
     }
 
     public function testSub()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([10,20]);
-        $y = $mo->array([2,3]);
-        $this->assertEquals([8,17],$K->sub($x,$y)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([10,20]);
+        $y = $K->array([2,3]);
+        $z = $K->sub($x,$y); $K->finish();
+        $this->assertEquals([8,17],$z->toArray());
     }
 
     public function testMul()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([10,20]);
-        $y = $mo->array([2,3]);
-        $this->assertEquals([20,60],$K->mul($x,$y)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([10,20]);
+        $y = $K->array([2,3]);
+        $z = $K->mul($x,$y); $K->finish();
+        $this->assertEquals([20,60],$z->toArray());
     }
 
     public function testDiv()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([10,21]);
-        $y = $mo->array([2,3]);
-        $this->assertEquals([5,7],$K->div($x,$y)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([10,21]);
+        $y = $K->array([2,3]);
+        $z = $K->div($x,$y); $K->finish();
+        $this->assertTrue($K->equalTest(
+            $K->array([5,7]),$z));
     }
 
     public function testUpdate_add()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([10,20]);
-        $y = $mo->array([2,3]);
-        $this->assertEquals([12,23],$K->update_add($x,$y)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([10,20]);
+        $y = $K->array([2,3]);
+        $z = $K->update_add($x,$y); $K->finish();
+        $this->assertEquals([12,23],$z->toArray());
         $this->assertEquals([12,23],$x->toArray());
     }
 
     public function testUpdate_sub()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([10,20]);
-        $y = $mo->array([2,3]);
-        $this->assertEquals([8,17],$K->update_sub($x,$y)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([10,20]);
+        $y = $K->array([2,3]);
+        $z = $K->update_sub($x,$y); $K->finish();
+        $this->assertEquals([8,17],$z->toArray());
         $this->assertEquals([8,17],$x->toArray());
     }
 
     public function testScale()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([2,3]);
-        $this->assertEquals([4,6],$K->scale(2,$x)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([2,3]);
+        $z = $K->scale(2,$x); $K->finish();
+        $this->assertEquals([4,6],$z->toArray());
     }
 
     public function testPow()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([2,3]);
-        $this->assertEquals([3,2],$K->scale(6,$K->pow($x,-1))->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([2,3]);
+        $z = $K->scale(6,$K->pow($x,-1)); $K->finish();
+        $this->assertEquals([3,2],$z->toArray());
     }
 
     public function testSqrt()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([4,9]);
-        $this->assertEquals([2,3],$K->sqrt($x)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([4,9]);
+        $z = $K->sqrt($x); $K->finish();
+        $this->assertEquals([2,3],$z->toArray());
     }
 
     public function testGreater()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([4,9]);
-        $this->assertEquals([0,1],$K->greater($x,5)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([4,9]);
+        $z = $K->greater($x,5); $K->finish();
+        $this->assertEquals([0,1],$z->toArray());
     }
 
     public function testEqual()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([4,9],NDArray::float32);
-        $y = $mo->array([9,9],NDArray::float32);
-        $this->assertEquals([0,1],$K->equal($x,$y)->toArray());
-        $this->assertEquals(NDArray::float32,$K->equal($x,$y)->dtype());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([4,9],NDArray::float32);
+        $y = $K->array([9,9],NDArray::float32);
+        $z = $K->equal($x,$y); $K->finish();
+        $this->assertEquals([0,1],$z->toArray());
+        $this->assertEquals(NDArray::float32,$z->dtype());
 
-        $x = $mo->array([4,9],NDArray::int32);
-        $y = $mo->array([9,9],NDArray::int32);
-        $this->assertEquals([0,1],$K->equal($x,$y)->toArray());
-        $this->assertEquals(NDArray::int32,$K->equal($x,$y)->dtype());
+        $x = $K->array([4,9],NDArray::int32);
+        $y = $K->array([9,9],NDArray::int32);
+        $z = $K->equal($x,$y); $K->finish();
+        $this->assertEquals([0,1],$z->toArray());
+        $this->assertEquals(NDArray::int32,$z->dtype());
     }
 
     public function testSum()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
-        $x = $mo->array([[true,false],[true,true]],NDArray::bool);
-        $this->assertEquals(3,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::int8);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::uint8);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::int16);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::uint16);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::int32);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::uint32);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::int64);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::uint64);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::float32);
-        $this->assertEquals(8,$K->sum($x));
-        $x = $mo->array([[2,3],[1,2]],NDArray::float64);
-        $this->assertEquals(8,$K->sum($x));
+        $x = $K->array([[true,false],[true,true]],NDArray::bool);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(3,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::int8);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::uint8);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::int16);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::uint16);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::int32);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::uint32);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::int64);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::uint64);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        $x = $K->array([[2,3],[1,2]],NDArray::float32);
+        $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+        $this->assertEquals(8,$z);
+        if($K->fp64()) {
+            $x = $K->array([[2,3],[1,2]],NDArray::float64);
+            $z = $K->sum($x); $K->finish(); if(!is_scalar($z)) $z = $z->toArray();
+            $this->assertEquals(8,$z);
+        }
 
-        $x = $mo->array([[2,3],[1,2]],NDArray::float32);
-        $this->assertEquals([5,3],$K->sum($x,$axis=1)->toArray());
-        $this->assertEquals(NDArray::float32,$K->sum($x,$axis=1)->dtype());
-        $x = $mo->array([[2,3],[1,2]],NDArray::float64);
-        $this->assertEquals([5,3],$K->sum($x,$axis=1)->toArray());
-        $this->assertEquals(NDArray::float64,$K->sum($x,$axis=1)->dtype());
+        $x = $K->array([[2,3],[1,2]],NDArray::float32);
+        $z = $K->sum($x,$axis=1); $K->finish();
+        $this->assertEquals([5,3],$z->toArray());
+        $this->assertEquals(NDArray::float32,$z->dtype());
+        if($K->fp64()) {
+            $x = $K->array([[2,3],[1,2]],NDArray::float64);
+            $z = $K->sum($x,$axis=1); $K->finish();
+            $this->assertEquals([5,3],$z->toArray());
+            $this->assertEquals(NDArray::float64,$z->dtype());
+        }
 
         /// ***** CAUTION *****
         /// OpenBLAS\Math::reduceSum not supports integer dtypes
@@ -287,18 +337,19 @@ class Test extends TestCase
 
     public function testMean()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
-        $x = $mo->array([[2,3],[1,2]]);
-        $this->assertEquals([2.5,1.5],$K->mean($x,$axis=1)->toArray());
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,3],[1,2]]);
+        $z = $K->mean($x,$axis=1); $K->finish();
+        $this->assertEquals([2.5,1.5],$z->toArray());
     }
 
     public function testOneHot()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $x = $mo->array([0,1,2,3,0,1,2,3]);
-        $y = $backend->oneHot($x,4);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([0,1,2,3,0,1,2,3]);
+        $y = $K->oneHot($x,4); $K->finish();
         $this->assertEquals($y->toArray(),[
             [1,0,0,0],
             [0,1,0,0],
@@ -313,25 +364,22 @@ class Test extends TestCase
 
     public function testReLU()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $x = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $y = $backend->relu($x);
-        $this->assertTrue($y[0]==0.0);
-        $this->assertTrue($y[1]==0.0);
-        $this->assertTrue($y[2]==0.0);
-        $this->assertTrue($y[3]==0.5);
-        $this->assertTrue($y[4]==1.0);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $y = $K->relu($x); $K->finish();
+        $this->assertEquals([0.0,0.0,0.0,0.5,1.0],$y->toArray());
     }
 
     public function testSigmoid()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $x = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $y = $backend->sigmoid($x);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $y = $K->sigmoid($x); $K->finish();
 
         $this->assertEquals([-1.0,-0.5,0.0,0.5,1.0],$x->toArray());
+        $y = $y->toArray();
         $this->assertTrue($y[0]<0.5);
         $this->assertTrue($y[1]<0.5);
         $this->assertTrue($y[2]==0.5);
@@ -341,161 +389,158 @@ class Test extends TestCase
 
     public function testSoftmax()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $fn = $backend;
-        $x = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $y = $backend->softmax($x);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $fn = $K;
+        $x = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $y = $K->softmax($x); $K->finish();
+        $y = $y->toArray();
         $this->assertTrue($y[0]>0.0);
         $this->assertTrue($y[0]<$y[1]);
         $this->assertTrue($y[1]<$y[2]);
         $this->assertTrue($y[2]<$y[3]);
         $this->assertTrue($y[3]<$y[4]);
         $this->assertTrue($y[4]<1.0);
-        $this->assertTrue($fn->equalTest(1.0,$mo->sum($y)));
-        $single = $y->toArray();
+        $this->assertTrue($fn->equalTest(1.0,$mo->sum($mo->array($y))));
+        $single = $y;
 
         // batch mode
-        $x = $mo->array([
+        $x = $K->array([
             [-1.0,-0.5,0.0,0.5,1.0],
             [-1.0,-0.5,0.0,0.5,1.0],
             [-1.0,-0.5,0.0,0.5,1.0],
             [-1.0,-0.5,0.0,0.5,1.0],
             [-1.0,-0.5,0.0,0.5,1.0],
         ]);
-        $y = $backend->softmax($x);
+        $y = $K->softmax($x); $K->finish();
         $this->assertEquals($single,$y[0]->toArray());
         $this->assertEquals($single,$y[1]->toArray());
         $this->assertEquals($single,$y[2]->toArray());
         $this->assertEquals($single,$y[3]->toArray());
         $this->assertEquals($single,$y[4]->toArray());
 
-        $x = $mo->array([
+        $x = $K->array([
             [10,-10,2,8,-5],
             [10,-10,2,8,-5],
         ]);
-        $softmax = $backend->softmax($x);
-        $this->assertLessThanOrEqual(1,$mo->max($softmax));
-        $this->assertGreaterThanOrEqual(0,$mo->max($softmax));
-        $sum = $mo->sum($softmax,$axis=1)->toArray();
+        $softmax = $K->softmax($x); $K->finish();
+        $this->assertLessThanOrEqual(1,$K->scalar($K->max($softmax)));
+        $this->assertGreaterThanOrEqual(0,$K->scalar($K->max($softmax)));
+        $sum = $K->sum($softmax,$axis=1); $K->finish(); $sum = $sum->toArray();
         $this->assertLessThan(0.0001,abs($sum[0]-1));
         $this->assertLessThan(0.0001,abs($sum[1]-1));
     }
 
     public function testMeanSquaredError()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $y = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $t = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $this->assertEquals(0.0,$backend->meanSquaredError($y,$t));
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $y = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $t = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $this->assertEquals(0.0,$K->scalar($K->meanSquaredError($y,$t)));
 
-        $y = $mo->array([-1.0,-0.5,0.1,0.5,1.0]);
-        $t = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $this->assertTrue(0.0<$backend->meanSquaredError($y,$t));
-        $this->assertTrue(1.0>$backend->meanSquaredError($y,$t));
+        $y = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
+        $t = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $this->assertTrue(0.0<$K->scalar($K->meanSquaredError($y,$t)));
+        $this->assertTrue(1.0>$K->scalar($K->meanSquaredError($y,$t)));
 
-        $y = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $t = $mo->array([-1.0,-0.5,0.1,0.5,1.0]);
-        $this->assertTrue(0.0<$backend->meanSquaredError($y,$t));
-        $this->assertTrue(1.0>$backend->meanSquaredError($y,$t));
+        $y = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
+        $t = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
+        $this->assertTrue(0.0<$K->scalar($K->meanSquaredError($y,$t)));
+        $this->assertTrue(1.0>$K->scalar($K->meanSquaredError($y,$t)));
     }
 
     public function testSparseCategoricalCrossEntropy()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $fn = $backend;
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         // if test is label
-        $y = $mo->array([
+        $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $t = $mo->array([2,2]);
-        $this->assertTrue($fn->equalTest(
-            0.0,$backend->sparseCategoricalCrossEntropy($t,$y)));
+        $t = $K->array([2,2]);
+        $this->assertTrue($K->equalTest(
+            0.0,$K->scalar($K->sparseCategoricalCrossEntropy($t,$y))));
 
-        $y = $mo->array([
+        $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $t = $mo->array([2]);
-        $this->assertTrue($fn->equalTest(
-            0.0,$backend->sparseCategoricalCrossEntropy($t,$y)));
+        $t = $K->array([2]);
+        $this->assertTrue($K->equalTest(
+            0.0,$K->scalar($K->sparseCategoricalCrossEntropy($t,$y))));
     }
 
     public function testCategoricalCrossEntropy()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $fn = $backend;
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         // if test is label
-        $y = $mo->array([
+        $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $this->assertTrue($fn->equalTest(
-            0.0,$backend->categoricalCrossEntropy($t,$y)));
+        $this->assertTrue($K->equalTest(
+            0.0,$K->categoricalCrossEntropy($t,$y)));
 
-        $y = $mo->array([
+        $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $this->assertTrue($fn->equalTest(
-            0.0,$backend->categoricalCrossEntropy($t,$y)));
+        $this->assertTrue($K->equalTest(
+            0.0,$K->categoricalCrossEntropy($t,$y)));
     }
 
     public function testEqualArray()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $fn = $backend;
-        $a = $mo->array([1.0,2.0,3.0,4.0,5.0]);
-        $b = $mo->array([1.0,2.0,3.0,4.0,5.0]);
-        $this->assertTrue($fn->equalTest($a,$b));
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $a = $K->array([1.0,2.0,3.0,4.0,5.0]);
+        $b = $K->array([1.0,2.0,3.0,4.0,5.0]);
+        $this->assertTrue($K->equalTest($a,$b));
 
-        $b = $mo->array([1.0,2.0,3.0,4.0,6.0]);
-        $this->assertFalse($fn->equalTest($a,$b));
+        $b = $K->array([1.0,2.0,3.0,4.0,6.0]);
+        $this->assertFalse($K->equalTest($a,$b));
 
-        $b = $mo->array([1.0,2.0,3.0,4.0, 5.0+1e-07 ]);
-        $this->assertTrue($fn->equalTest($a,$b));
+        $b = $K->array([1.0,2.0,3.0,4.0, 5.0+1e-07 ]);
+        $this->assertTrue($K->equalTest($a,$b));
 
-        $b = $mo->array([1.0,2.0,3.0,4.0, 5.0+9e-06 ]);
-        $this->assertFalse($fn->equalTest($a,$b));
+        $b = $K->array([1.0,2.0,3.0,4.0, 5.0+9e-06 ]);
+        $this->assertFalse($K->equalTest($a,$b));
 
-        $b = $mo->array([1.0,2.0,3.0,4.0, 5.0-1e-07 ]);
-        $this->assertTrue($fn->equalTest($a,$b));
+        $b = $K->array([1.0,2.0,3.0,4.0, 5.0-1e-07 ]);
+        $this->assertTrue($K->equalTest($a,$b));
 
-        $b = $mo->array([1.0,2.0,3.0,4.0, 5.0-9e-06 ]);
-        $this->assertFalse($fn->equalTest($a,$b));
+        $b = $K->array([1.0,2.0,3.0,4.0, 5.0-9e-06 ]);
+        $this->assertFalse($K->equalTest($a,$b));
 
-        $b = $mo->array([[1.0,2.0,3.0,4.0,5.0]]);
-        $this->assertFalse($fn->equalTest($a,$b));
+        $b = $K->array([[1.0,2.0,3.0,4.0,5.0]]);
+        $this->assertFalse($K->equalTest($a,$b));
     }
 
     public function testEqualNumeric()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $fn = $backend;
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
-        $this->assertTrue($fn->equalTest(1,1));
-        $this->assertFalse($fn->equalTest(1,2));
-        $this->assertTrue($fn->equalTest(1, 1+9e-08));
-        $this->assertTrue($fn->equalTest(1, 1-9e-08));
-        $this->assertFalse($fn->equalTest(1, 1+9e-06));
-        $this->assertFalse($fn->equalTest(1, 1-9e-06));
+        $this->assertTrue($K->equalTest(1,1));
+        $this->assertFalse($K->equalTest(1,2));
+        $this->assertTrue($K->equalTest(1, 1+9e-08));
+        $this->assertTrue($K->equalTest(1, 1-9e-08));
+        $this->assertFalse($K->equalTest(1, 1+9e-06));
+        $this->assertFalse($K->equalTest(1, 1-9e-06));
     }
 
     public function testConv1d()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_w = 4;
@@ -506,24 +551,24 @@ class Test extends TestCase
         $padding = null;
         $data_format = null;
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_w,
             $channels
         ]);
 
-        $kernel = $mo->ones([
+        $kernel = $K->ones([
             $kernel_w,
             $channels,
             $filters
         ]);
-        $bias = $mo->zeros([
+        $bias = $K->zeros([
             $filters
         ]);
 
@@ -545,9 +590,9 @@ class Test extends TestCase
             $outputs->shape()
         );
 
-        $dOutputs = $mo->ones($outputs->shape());
-        $dKernel = $mo->zerosLike($kernel);
-        $dBias = $mo->zerosLike($bias);
+        $dOutputs = $K->ones($outputs->shape());
+        $dKernel = $K->zerosLike($kernel);
+        $dBias = $K->zerosLike($bias);
         $dInputs = $K->dConv1d(
             $status,
             $dOutputs,
@@ -561,22 +606,22 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
         $this->assertNotEquals(
             $dKernel->toArray(),
-            $mo->zerosLike($dKernel)->toArray()
+            $K->zerosLike($dKernel)->toArray()
             );
         $this->assertNotEquals(
             $dBias->toArray(),
-            $mo->zerosLike($dBias)->toArray()
+            $K->zerosLike($dBias)->toArray()
             );
     }
 
     public function testPool1dMax()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_w = 4;
@@ -588,13 +633,13 @@ class Test extends TestCase
         $data_format = null;
         $pool_mode = null;
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_w,
             $channels
@@ -620,7 +665,7 @@ class Test extends TestCase
         $this->assertEquals([[
             [3,4,5],[9,10,11],
         ]],$outputs->toArray());
-        $dOutputs = $mo->ones($outputs->shape());
+        $dOutputs = $K->ones($outputs->shape());
         $dInputs = $K->dPool1d(
             $status,
             $dOutputs
@@ -632,14 +677,14 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
     }
 
     public function testPool1dAvg()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_w = 4;
@@ -651,13 +696,13 @@ class Test extends TestCase
         $data_format = null;
         $pool_mode = 'avg';
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_w,
             $channels
@@ -672,6 +717,7 @@ class Test extends TestCase
             $strides=null,
             $padding,
             $data_format,
+            $dilation_rate=null,
             $pool_mode
         );
         $this->assertEquals(
@@ -683,7 +729,7 @@ class Test extends TestCase
         $this->assertEquals([[
             [1.5,2.5,3.5],[7.5,8.5,9.5],
         ]],$outputs->toArray());
-        $dOutputs = $mo->ones($outputs->shape());
+        $dOutputs = $K->ones($outputs->shape());
         $dInputs = $K->dPool1d(
             $status,
             $dOutputs
@@ -695,14 +741,14 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
     }
 
     public function testConv2d()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_h = 4;
@@ -716,26 +762,26 @@ class Test extends TestCase
         $padding = null;
         $data_format = null;
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_h*$im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_h,
             $im_w,
             $channels
         ]);
 
-        $kernel = $mo->ones([
+        $kernel = $K->ones([
             $kernel_h,
             $kernel_w,
             $channels,
             $filters
         ]);
-        $bias = $mo->zeros([
+        $bias = $K->zeros([
             $filters
         ]);
 
@@ -758,9 +804,9 @@ class Test extends TestCase
             $outputs->shape()
         );
 
-        $dOutputs = $mo->ones($outputs->shape());
-        $dKernel = $mo->zerosLike($kernel);
-        $dBias = $mo->zerosLike($bias);
+        $dOutputs = $K->ones($outputs->shape());
+        $dKernel = $K->zerosLike($kernel);
+        $dBias = $K->zerosLike($bias);
         $dInputs = $K->dConv2d(
             $status,
             $dOutputs,
@@ -774,22 +820,22 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
         $this->assertNotEquals(
             $dKernel->toArray(),
-            $mo->zerosLike($dKernel)->toArray()
+            $K->zerosLike($dKernel)->toArray()
             );
         $this->assertNotEquals(
             $dBias->toArray(),
-            $mo->zerosLike($dBias)->toArray()
+            $K->zerosLike($dBias)->toArray()
             );
     }
 
     public function testPool2d()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_h = 4;
@@ -803,13 +849,13 @@ class Test extends TestCase
         $data_format = null;
         $pool_mode = null;
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_h*$im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_h,
             $im_w,
@@ -825,6 +871,7 @@ class Test extends TestCase
             $strides=null,
             $padding,
             $data_format,
+            $dilation_rate=null,
             $pool_mode
         );
         $this->assertEquals(
@@ -838,7 +885,7 @@ class Test extends TestCase
             [[15,16,17],[21,22,23]],
             [[39,40,41],[45,46,47]],
         ]],$outputs->toArray());
-        $dOutputs = $mo->ones($outputs->shape());
+        $dOutputs = $K->ones($outputs->shape());
         $dInputs = $K->dPool2d(
             $status,
             $dOutputs
@@ -850,14 +897,14 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
     }
 
     public function testConv3d()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_d = 4;
@@ -874,13 +921,13 @@ class Test extends TestCase
         $padding = null;
         $data_format = null;
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_d*$im_h*$im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_d,
             $im_h,
@@ -888,14 +935,14 @@ class Test extends TestCase
             $channels
         ]);
 
-        $kernel = $mo->ones([
+        $kernel = $K->ones([
             $kernel_d,
             $kernel_h,
             $kernel_w,
             $channels,
             $filters
         ]);
-        $bias = $mo->zeros([
+        $bias = $K->zeros([
             $filters
         ]);
 
@@ -919,9 +966,9 @@ class Test extends TestCase
             $outputs->shape()
         );
 
-        $dOutputs = $mo->ones($outputs->shape());
-        $dKernel = $mo->zerosLike($kernel);
-        $dBias = $mo->zerosLike($bias);
+        $dOutputs = $K->ones($outputs->shape());
+        $dKernel = $K->zerosLike($kernel);
+        $dBias = $K->zerosLike($bias);
         $dInputs = $K->dConv3d(
             $status,
             $dOutputs,
@@ -935,22 +982,22 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
         $this->assertNotEquals(
             $dKernel->toArray(),
-            $mo->zerosLike($dKernel)->toArray()
+            $K->zerosLike($dKernel)->toArray()
             );
         $this->assertNotEquals(
             $dBias->toArray(),
-            $mo->zerosLike($dBias)->toArray()
+            $K->zerosLike($dBias)->toArray()
             );
     }
 
     public function testPool3d()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
 
         $batches = 1;
         $im_d = 4;
@@ -966,13 +1013,13 @@ class Test extends TestCase
         $data_format = null;
         $pool_mode = null;
 
-        $inputs = $mo->arange(
+        $inputs = $K->array($mo->arange(
             $batches*
             $im_d*$im_h*$im_w*
             $channels,
             null,null,
             NDArray::float32
-        )->reshape([
+        ))->reshape([
             $batches,
             $im_d,
             $im_h,
@@ -989,6 +1036,7 @@ class Test extends TestCase
             $strides=null,
             $padding,
             $data_format,
+            $dilation_rate=null,
             $pool_mode
         );
         $this->assertEquals(
@@ -1005,7 +1053,7 @@ class Test extends TestCase
             [[39,40,41],[45,46,47]],
         ]],$outputs->toArray());
         */
-        $dOutputs = $mo->ones($outputs->shape());
+        $dOutputs = $K->ones($outputs->shape());
         $dInputs = $K->dPool3d(
             $status,
             $dOutputs
@@ -1017,44 +1065,50 @@ class Test extends TestCase
             );
         $this->assertNotEquals(
             $dInputs->toArray(),
-            $mo->zerosLike($dInputs)->toArray()
+            $K->zerosLike($dInputs)->toArray()
             );
     }
 
     public function testGlorotNormal()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $w = $K->glorot_normal([16,4],[16,4]);
         #echo "--------\n";
         #foreach($w->toArray() as $array)
         #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
         #$this->assertLessThan(1.0/0.87962566103423978,abs($K->amax($w)));
-        $this->assertLessThan(1.8,abs($K->amax($w)));
-        $this->assertGreaterThan(1e-6,abs($K->amin($w)));
+        $max = $K->amax($w); if(!is_scalar($max)) $max = $max->toArray();
+        $this->assertLessThan(1.8,abs($max));
+        $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
+        $this->assertGreaterThan(1e-6,abs($min));
     }
 
     public function testGlorotUniform()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $w = $K->glorot_uniform([16,4],[16,4]);
         #echo "--------\n";
         #foreach($w->toArray() as $array)
         #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
-        $this->assertLessThan(1.0,abs($K->amax($w)));
-        $this->assertGreaterThan(1e-6,abs($K->amin($w)));
+        $max = $K->amax($w); if(!is_scalar($max)) $max = $max->toArray();
+        $this->assertLessThan(1.0,abs($max));
+        $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
+        $this->assertGreaterThan(1e-6,abs($min));
     }
 
     public function testOrthogonal()
     {
-        $mo = new MatrixOperator();
-        $K = new Backend($mo);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
         $w = $K->orthogonal([16,4]);
         #echo "--------\n";
         #foreach($w->toArray() as $array)
         #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
-        $this->assertLessThan(1.0,abs($K->amax($w)));
-        $this->assertGreaterThan(1e-6,abs($K->amin($w)));
+        $max = $K->amax($w); if(!is_scalar($max)) $max = $max->toArray();
+        $this->assertLessThan(1.0,abs($max));
+        $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
+        $this->assertGreaterThan(1e-6,abs($min));
     }
 }

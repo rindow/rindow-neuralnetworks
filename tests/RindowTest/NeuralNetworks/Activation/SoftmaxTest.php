@@ -4,29 +4,41 @@ namespace RindowTest\NeuralNetworks\Activation\SoftmaxTest;
 use PHPUnit\Framework\TestCase;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
-use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Activation\Softmax;
-
+use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
 class Test extends TestCase
 {
-    public function verifyGradient($mo, $function, NDArray $x, ...$args)
+    public function newMatrixOperator()
     {
-        $f = function($x) use ($function,$args){
-            return $function->forward($x,...$args);
+        return new MatrixOperator();
+    }
+
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
+    public function verifyGradient($mo, $K, $function, NDArray $x, ...$args)
+    {
+        $f = function($x) use ($K,$function,$args){
+            $x = $K->array($x);
+            $y = $function->forward($x,...$args);
+            return $K->ndarray($y);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
-        $outputs = $function->forward($x, ...$args);
+        $outputs = $K->ndarray($function->forward($K->array($x), ...$args));
         $ones = $mo->ones($outputs->shape(),$outputs->dtype());
-        $dInputs = $function->backward($ones);
+        $dInputs = $K->ndarray($function->backward($K->array($ones)));
         return $mo->la()->isclose($grads[0],$dInputs,null,1e-4);
     }
 
     public function testNormal()
     {
-        $mo = new MatrixOperator();
-        $backend = new Backend($mo);
-        $activation = new Softmax($backend);
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $activation = new Softmax($K);
 
         $x = $mo->array([
             [-1.0,-0.5,0.0,0.5,1.0],
@@ -34,7 +46,10 @@ class Test extends TestCase
             [-1.0,-0.5,0.0,0.5,1.0],
         ]);
         $copyX = $mo->copy($x);
+        $x = $K->array($x);
         $y = $activation->forward($x, $training=true);
+        $y = $K->ndarray($y);
+        $x = $K->ndarray($x);
         $this->assertEquals($copyX->toArray(),$x->toArray());
         $this->assertEquals($x->shape(),$y->shape());
         $this->assertTrue($mo->la()->isclose(
@@ -48,7 +63,10 @@ class Test extends TestCase
             [-0.5,-0.25,0.0,0.25,0.5],
         ]);
         $copydout = $mo->copy($dout);
+        $dout = $K->array($dout);
         $dx = $activation->backward($dout);
+        $dx = $K->ndarray($dx);
+        $dout = $K->ndarray($dout);
         $this->assertEquals($dout->shape(),$dx->shape());
         $this->assertEquals($copydout->toArray(),$dout->toArray());
 
@@ -58,6 +76,6 @@ class Test extends TestCase
             [-10.0,-0.5,0.0,0.5,10.0],
         ]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$activation,$inputs,$training=true));
+            $this->verifyGradient($mo,$K,$activation,$inputs,$training=true));
     }
 }
