@@ -95,7 +95,7 @@ Download binaries and setup PHP extension and libraries.
 Set environment variable.
 
 ```shell
-$ RINDOW_NEURALNETWORKS_BACKEND=clblast
+$ RINDOW_NEURALNETWORKS_BACKEND=rindowclblast
 $ export RINDOW_NEURALNETWORKS_BACKEND
 $ cd samples
 $ php mnist-basic-clasification.php
