@@ -60,8 +60,9 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
         if($trues->dtype()!=$predicts->dtype()) {
             $predicts = $K->cast($predicts,$trues->dtype());
         }
-        $accuracy = $K->sum($K->equal($trues, $predicts))
-                            / (float)$trues->size();
+        $sum = $K->sum($K->equal($trues, $predicts));
+        $sum = $K->scalar($sum);
+        $accuracy = $sum / (float)$trues->size();
         return $accuracy;
     }
 }

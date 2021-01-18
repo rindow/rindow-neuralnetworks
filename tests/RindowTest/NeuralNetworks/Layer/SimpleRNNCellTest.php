@@ -12,27 +12,34 @@ use Rindow\NeuralNetworks\Activation\Tanh;
 
 class Test extends TestCase
 {
-    public function verifyGradient($mo, $function, NDArray $x,array $states)
+    public function newBackend($mo)
     {
-        $f = function($x) use ($mo,$function,$states){
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
+    public function verifyGradient($mo, $K, $function, NDArray $x,array $states)
+    {
+        $f = function($x) use ($mo,$K,$function,$states){
+            $x = $K->array($x);
             $object = new \stdClass();
             [$y,$states] = $function->forward($x,$states,$training=true,$object);
-            return $y;
+            return $K->ndarray($y);
         };
-        $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
+        $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
         $object = new \stdClass();
         [$outputs,$next_states] = $function->forward($x,$states,$training=true,$object);
-        $dOutputs = $mo->ones($outputs->shape(),$outputs->dtype());
-        $dNextStates = [$mo->zeros([1,3])];
+        $dOutputs = $K->ones($outputs->shape(),$outputs->dtype());
+        $dNextStates = [$K->zeros([1,3])];
         [$dInputs,$dPrevStates] = $function->backward($dOutputs,$dNextStates,$object);
 
-        return $mo->la()->isclose($grads[0],$dInputs,1e-4);
+        return $mo->la()->isclose($grads[0],$K->ndarray($dInputs),1e-4);
     }
 
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNNCell(
             $backend,
             $units=4,
@@ -63,7 +70,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNNCell(
             $backend,
             $units=4,
@@ -78,7 +85,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNNCell(
             $backend,
             $units=4,
@@ -93,7 +100,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNNCell(
@@ -111,11 +118,11 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->ones([2,3]);
-        $states = [$mo->ones([2,4])];
+        $inputs = $K->ones([2,3]);
+        $states = [$K->ones([2,4])];
         $object = new \stdClass();
-        $copyInputs = $mo->copy($inputs);
-        $copyStates = [$mo->copy($states[0])];
+        $copyInputs = $K->copy($inputs);
+        $copyStates = [$K->copy($states[0])];
         [$outputs,$nextStates] = $layer->forward($inputs, $states,$training=true,$object);
         //
         $this->assertEquals([2,4],$outputs->shape());
@@ -129,13 +136,13 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([2,4]);
+            $K->ones([2,4]);
         $dStates =
-            [$mo->ones([2,4])];
+            [$K->ones([2,4])];
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
-        $copydStates = [$mo->copy(
+        $copydStates = [$K->copy(
             $dStates[0])];
         [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates,$object);
         // 2 batch
@@ -159,7 +166,7 @@ class Test extends TestCase
     public function testOutputsAndGrads()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNNCell(
@@ -170,9 +177,9 @@ class Test extends TestCase
                 'activation'=>null,
             ]);
 
-        $kernel = $mo->ones([3,4]);
-        $recurrent = $mo->ones([4,4]);
-        $bias = $mo->ones([4]);
+        $kernel = $K->ones([3,4]);
+        $recurrent = $K->ones([4,4]);
+        $bias = $K->ones([4]);
         $layer->build(null,
             ['sampleWeights'=>[$kernel,$recurrent,$bias]]
         );
@@ -184,8 +191,8 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->ones([2,3]);
-        $states = [$mo->ones([2,4])];
+        $inputs = $K->ones([2,3]);
+        $states = [$K->ones([2,4])];
         $object = new \stdClass();
         [$outputs,$nextStates] = $layer->forward($inputs, $states,$training=true,$object);
         //
@@ -202,9 +209,9 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([2,4]);
+            $K->ones([2,4]);
         $dStates =
-            [$mo->ones([2,4])];
+            [$K->ones([2,4])];
 
         [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates,$object);
         // 2 batch
@@ -235,7 +242,7 @@ class Test extends TestCase
     public function testVerifyGradient()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNNCell(
@@ -248,15 +255,15 @@ class Test extends TestCase
         $layer->build();
         $weights = $layer->getParams();
 
-        $x = $mo->array([
+        $x = $K->array([
             [1],
         ]);
-        $states = [$mo->zeros([1,3])];
+        $states = [$K->zeros([1,3])];
         $object = new \stdClass();
-        $x = $mo->la()->onehot($x->reshape([1]),$numClass=10)->reshape([1,10]);
+        $x = $K->onehot($x->reshape([1]),$numClass=10)->reshape([1,10]);
         $outputs = $layer->forward($x,$states,$training=true,$object);
 
         $this->assertTrue(
-            $this->verifyGradient($mo,$layer,$x,$states));
+            $this->verifyGradient($mo,$K,$layer,$x,$states));
     }
 }

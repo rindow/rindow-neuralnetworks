@@ -59,8 +59,9 @@ class MeanSquaredError implements Loss
         }
         $predicts = $K->argmax($predicts, $axis=1,$dtype);
         $trues = $K->argmax($trues, $axis=1,$dtype);
-        $accuracy = $K->sum($K->equal($trues, $predicts))
-                            / (float)$trues->shape()[0];
+        $sum = $K->sum($K->equal($trues, $predicts));
+        $sum = $K->scalar($sum);
+        $accuracy = $sum / (float)$trues->shape()[0];
         return $accuracy;
     }
 }

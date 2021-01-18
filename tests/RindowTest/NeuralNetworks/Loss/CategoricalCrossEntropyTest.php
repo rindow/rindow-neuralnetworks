@@ -10,6 +10,12 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function getPlotConfig()
     {
         return [
@@ -21,7 +27,7 @@ class Test extends TestCase
     public function testBuilder()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy',
@@ -31,14 +37,14 @@ class Test extends TestCase
     public function testDefault()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $func = new CategoricalCrossEntropy($backend);
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             [0.0, 0.0 , 1.0],
             [0.0, 0.0 , 1.0],
         ]);
@@ -49,14 +55,14 @@ class Test extends TestCase
         $this->assertLessThan(0.01,abs(0.0-$loss));
 
         $dx = $backend->dsoftmax($func->differentiateLoss(),$y);
-        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',$t)));
+        $this->assertLessThan(0.0001, $K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
 
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             [0.0, 1.0 , 0.0],
             [0.0, 1.0 , 0.0],
         ]);
@@ -65,21 +71,21 @@ class Test extends TestCase
         $this->assertLessThan(0.01,abs(6.0-$loss));
 
         $dx = $backend->dsoftmax($func->differentiateLoss(),$y);
-        $this->assertLessThan(0.001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',$t)));
+        $this->assertLessThan(0.001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
     }
 
     public function testFromLogits()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $func = new CategoricalCrossEntropy($backend);
         $func->setFromLogits(true);
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             [0.0, 0.0 , 1.0],
             [0.0, 0.0 , 1.0],
         ]);
@@ -88,13 +94,13 @@ class Test extends TestCase
         $this->assertLessThan(0.01,abs(0.0-$loss));
 
         $dx = $func->differentiateLoss();
-        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',$t)));
+        $this->assertLessThan(0.0001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             [0.0, 1.0 , 0.0],
             [0.0, 1.0 , 0.0],
         ]);
@@ -103,6 +109,6 @@ class Test extends TestCase
         $this->assertLessThan(0.01,abs(6.0-$loss));
 
         $dx = $func->differentiateLoss();
-        $this->assertLessThan(0.0001,$mo->asum($mo->op($mo->op($y,'-',$dx),'-',$t)));
+        $this->assertLessThan(0.0001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
     }
 }

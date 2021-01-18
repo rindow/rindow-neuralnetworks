@@ -10,10 +10,16 @@ use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Flatten(
             $backend,
             [
@@ -33,7 +39,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Flatten(
             $backend,
             [
@@ -47,7 +53,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Flatten(
             $backend,
             [
@@ -60,7 +66,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new Flatten(
@@ -73,10 +79,10 @@ class Test extends TestCase
         // forward
         //
         //  batch size 2
-        $inputs = $mo->arange(2*4*4*3)->reshape([2,4,4,3]);
-        $copyInputs = $mo->copy($inputs);
+        $inputs = $K->array($mo->arange(2*4*4*3)->reshape([2,4,4,3]));
+        $copyInputs = $K->copy($inputs);
         $outputs = $layer->forward($inputs, $training=true);
-        // 
+        //
         $this->assertEquals(
             [2,48],$outputs->shape());
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
@@ -86,9 +92,9 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->arange(2*4*4*3)->reshape([2,4*4*3]);
+            $K->array($mo->arange(2*4*4*3)->reshape([2,4*4*3]));
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch

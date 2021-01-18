@@ -12,23 +12,30 @@ use Rindow\NeuralNetworks\Activation\Tanh;
 
 class Test extends TestCase
 {
-    public function verifyGradient($mo, $function, NDArray $x)
+    public function newBackend($mo)
     {
-        $f = function($x) use ($mo,$function){
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
+    public function verifyGradient($mo, $K, $function, NDArray $x)
+    {
+        $f = function($x) use ($mo,$K,$function){
+            $x = $K->array($x);
             $y = $function->forward($x,$training=true);
-            return $y;
+            return $K->ndarray($y);
         };
-        $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
+        $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
         $outputs = $function->forward($x,$training=true);
-        $dOutputs = $mo->ones($outputs->shape(),$outputs->dtype());
+        $dOutputs = $K->ones($outputs->shape(),$outputs->dtype());
         $dInputs = $function->backward($dOutputs);
-        return $mo->la()->isclose($grads[0],$dInputs,1e-3);
+        return $mo->la()->isclose($grads[0],$K->ndarray($dInputs),1e-3);
     }
 
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNN(
             $backend,
             $units=4,
@@ -59,7 +66,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNN(
             $backend,
             $units=4,
@@ -74,7 +81,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNN(
             $backend,
             $units=4,
@@ -89,7 +96,7 @@ class Test extends TestCase
     public function testInitializeWithReturnSequence()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new SimpleRNN(
             $backend,
             $units=4,
@@ -107,7 +114,7 @@ class Test extends TestCase
     public function testDefaultForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNN(
@@ -125,10 +132,10 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->ones([6,5,3]);
-        $initialStates = [$mo->ones([6,4])];
-        $copyInputs = $mo->copy($inputs);
-        $copyStates = [$mo->copy($initialStates[0])];
+        $inputs = $K->ones([6,5,3]);
+        $initialStates = [$K->ones([6,4])];
+        $copyInputs = $K->copy($inputs);
+        $copyStates = [$K->copy($initialStates[0])];
         $outputs = $layer->forward($inputs,$training=true, $initialStates
         );
         //
@@ -140,13 +147,13 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([6,4]);
+            $K->ones([6,4]);
         $dStates =
-            [$mo->ones([6,4])];
+            [$K->ones([6,4])];
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
-        $copydStates = [$mo->copy(
+        $copydStates = [$K->copy(
             $dStates[0])];
         $dInputs = $layer->backward($dOutputs,$dStates);
         // 2 batch
@@ -168,7 +175,7 @@ class Test extends TestCase
     public function testForwardAndBackwardWithReturnSeqquence()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNN(
@@ -188,10 +195,10 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->ones([6,5,3]);
-        $initialStates = [$mo->ones([6,4])];
-        $copyInputs = $mo->copy($inputs);
-        $copyStates = [$mo->copy($initialStates[0])];
+        $inputs = $K->ones([6,5,3]);
+        $initialStates = [$K->ones([6,4])];
+        $copyInputs = $K->copy($inputs);
+        $copyStates = [$K->copy($initialStates[0])];
         [$outputs,$nextStates] = $layer->forward($inputs,$training=true, $initialStates
         );
         //
@@ -206,13 +213,13 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([6,5,4]);
+            $K->ones([6,5,4]);
         $dStates =
-            [$mo->ones([6,4])];
+            [$K->ones([6,4])];
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
-        $copydStates = [$mo->copy(
+        $copydStates = [$K->copy(
             $dStates[0])];
         [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
         // 2 batch
@@ -236,7 +243,7 @@ class Test extends TestCase
     public function testForwardAndBackwardWithReturnSeqquenceWithoutInitialStates()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNN(
@@ -256,9 +263,9 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->ones([6,5,3]);
+        $inputs = $K->ones([6,5,3]);
         $initialStates = null;
-        $copyInputs = $mo->copy($inputs);
+        $copyInputs = $K->copy($inputs);
         //$copyStates = [$mo->copy($initialStates[0])];
         [$outputs,$nextStates] = $layer->forward($inputs,$training=true, $initialStates
         );
@@ -274,13 +281,13 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([6,5,4]);
+            $K->ones([6,5,4]);
         $dStates =
-            [$mo->ones([6,4])];
+            [$K->ones([6,4])];
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
-        $copydStates = [$mo->copy(
+        $copydStates = [$K->copy(
             $dStates[0])];
         [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
         // 2 batch
@@ -304,7 +311,7 @@ class Test extends TestCase
     public function testOutputsAndGrads()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNN(
@@ -317,9 +324,9 @@ class Test extends TestCase
                 'activation'=>null,
             ]);
 
-        $kernel = $mo->ones([5,4]);
-        $recurrent = $mo->ones([4,4]);
-        $bias = $mo->ones([4]);
+        $kernel = $K->ones([5,4]);
+        $recurrent = $K->ones([4,4]);
+        $bias = $K->ones([4]);
         $layer->build(null,
             ['sampleWeights'=>[$kernel,$recurrent,$bias]]
         );
@@ -331,8 +338,8 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->ones([2,3,5]);
-        $states = [$mo->ones([2,4])];
+        $inputs = $K->ones([2,3,5]);
+        $states = [$K->ones([2,4])];
         [$outputs,$nextStates] = $layer->forward($inputs,$training=true, $states);
         //
         $this->assertEquals([
@@ -348,9 +355,9 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([2,3,4]);
+            $K->ones([2,3,4]);
         $dStates =
-            [$mo->ones([2,4])];
+            [$K->ones([2,4])];
 
         [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
         // 2 batch
@@ -383,7 +390,7 @@ class Test extends TestCase
     public function testVerifyReturnSequences()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNN(
@@ -398,20 +405,20 @@ class Test extends TestCase
         $layer->build();
         $weights = $layer->getParams();
 
-        $x = $mo->array([
+        $x = $K->array([
             [0,1,2,9],
         ]);
-        $x = $mo->la()->onehot($x->reshape([4]),$numClass=10)->reshape([1,4,10]);
+        $x = $K->onehot($x->reshape([4]),$numClass=10)->reshape([1,4,10]);
         $outputs = $layer->forward($x,$training=true);
 
         $this->assertTrue(
-            $this->verifyGradient($mo,$layer,$x));
+            $this->verifyGradient($mo,$K,$layer,$x));
     }
 
     public function testVerifyGoBackwards()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new SimpleRNN(
@@ -427,13 +434,13 @@ class Test extends TestCase
         $layer->build();
         $weights = $layer->getParams();
 
-        $x = $mo->array([
+        $x = $K->array([
             [0,1,2,9],
         ]);
-        $x = $mo->la()->onehot($x->reshape([4]),$numClass=10)->reshape([1,4,10]);
+        $x = $K->onehot($x->reshape([4]),$numClass=10)->reshape([1,4,10]);
         $outputs = $layer->forward($x,$training=true);
 
         $this->assertTrue(
-            $this->verifyGradient($mo,$layer,$x));
+            $this->verifyGradient($mo,$K,$layer,$x));
     }
 }

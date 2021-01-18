@@ -54,6 +54,11 @@ abstract class AbstractModel implements Model
         }
     }
 
+    public function backend()
+    {
+        return $this->backend;
+    }
+
     public function lossFunction()
     {
         return $this->lossFunction;
@@ -416,9 +421,11 @@ abstract class AbstractModel implements Model
         if(!($callbacks instanceof CallbackList)) {
             $callbacks = new CallbackList($this,$callbacks);
         }
+        $inputs = $this->backend->array($inputs);
         $callbacks->onPredictBegin();
         $outputs = $this->forwardStep($inputs,$trues=null, $training=false);
         $callbacks->onPredictEnd();
+        $outputs = $this->backend->ndarray($outputs);
         return $outputs;
         //return $this->forwardLastlayer($outputs);
     }

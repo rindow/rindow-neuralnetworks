@@ -11,10 +11,16 @@ use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new RepeatVector(
             $backend,
             $repeats=2,
@@ -35,7 +41,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new RepeatVector(
             $backend,
             $repeats=2,
@@ -50,7 +56,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new RepeatVector(
             $backend,
             $repeats=2,
@@ -64,7 +70,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new RepeatVector(
@@ -78,8 +84,8 @@ class Test extends TestCase
         // forward
         //
         //  batch size 2
-        $inputs = $mo->arange(2*3,null,null,NDArray::float32)->reshape([2,3]);
-        $copyInputs = $mo->copy($inputs);
+        $inputs = $K->array($mo->arange(2*3,null,null,NDArray::float32)->reshape([2,3]));
+        $copyInputs = $K->copy($inputs);
         $outputs = $layer->forward($inputs, $training=true);
         //
         $this->assertEquals([2,2,3],$outputs->shape());
@@ -92,12 +98,12 @@ class Test extends TestCase
         // backward
         //
         // 2 batch
-        $dOutputs = $mo->array([
+        $dOutputs = $K->array([
             [[0,1,2],[0,1,2]],
             [[3,4,5],[3,4,5]],
         ],NDArray::float32)->reshape([2,2,3]);
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch

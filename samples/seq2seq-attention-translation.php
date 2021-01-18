@@ -168,6 +168,7 @@ class Encoder extends AbstractRNNLayer
         int $units
         )
     {
+        $this->backend = $backend;
         $this->vocabSize = $vocabSize;
         $this->wordVectSize = $wordVectSize;
         $this->units = $units;
@@ -206,6 +207,7 @@ class Encoder extends AbstractRNNLayer
         array $options=null
         ) : array
     {
+        $K = $this->backend;
         $wordVect = $this->embedding->forward($inputs,$training);
         [$outputs,$states] = $this->rnn->forward(
             $wordVect,$training,$initial_state);
@@ -214,6 +216,7 @@ class Encoder extends AbstractRNNLayer
 
     protected function differentiate(NDArray $dOutputs, array $dStates=null)
     {
+        $K = $this->backend;
         [$dWordvect,$dStates] = $this->rnn->backward($dOutputs,$dStates);
         $dInputs = $this->embedding->backward($dWordvect);
         return $dInputs;
@@ -351,7 +354,7 @@ class Seq2seq extends AbstractModel
         $units=256,
         $startVocId=0,
         $endVocId=0,
-        $plt
+        $plt=null
         )
     {
         parent::__construct($backend,$builder);
@@ -441,6 +444,7 @@ class Seq2seq extends AbstractModel
     {
         $K = $this->backend;
         $attentionPlot = $options['attention_plot'];
+        $inputs = $K->array($inputs);
 
         if($inputs->ndim()!=2) {
             throw new InvalidArgumentException('inputs shape must be 2D.');
@@ -462,9 +466,9 @@ class Seq2seq extends AbstractModel
 
             # storing the attention weights to plot later on
             $scores = $this->decoder->getAttentionScores();
-            $K->copy($scores->reshape([$this->inputLength]),$attentionPlot[$t]);
+            $this->mo->la()->copy($K->ndarray($scores->reshape([$this->inputLength])),$attentionPlot[$t]);
 
-            $predictedId = $K->argmax($predictions[0][0]);
+            $predictedId = $K->scalar($K->argmax($predictions[0][0]));
 
             $result[] = $predictedId;
 
@@ -477,7 +481,7 @@ class Seq2seq extends AbstractModel
         $this->setShapeInspection(true);
         $result = $K->array([$result],NDArray::int32);
         #return result, sentence, attention_plot
-        return $result;
+        return $K->ndarray($result);
     }
 
     public function plotAttention(

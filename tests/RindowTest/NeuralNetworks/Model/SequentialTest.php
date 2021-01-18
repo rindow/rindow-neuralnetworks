@@ -25,6 +25,7 @@ class WeightLog extends AbstractCallback
     {
         #echo "\n";
         $model = $this->getModel();
+        $K = $model->backend();
         $weights = $model->weights();
         if($this->prev_w==null) {
             $this->prev_w = $weights;
@@ -34,6 +35,8 @@ class WeightLog extends AbstractCallback
         $next = [];
         foreach($weights as $key => $w) {
             $prev = $this->prev_w[$key];
+            $w = $K->ndarray($w);
+            $prev = $K->ndarray($prev);
             $g = $this->mo->op($prev,'-',$w);
             if(in_array($num,[100])) {
                 for($i=0;$i<3;$i++) {
@@ -68,6 +71,12 @@ class Test extends TestCase
 {
     protected $plot = false;
 
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function getPlotConfig()
     {
         return [
@@ -91,7 +100,7 @@ class Test extends TestCase
     public function testComplieDefaults()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
 
         $model = $nn->models()->Sequential([
@@ -165,7 +174,7 @@ class Test extends TestCase
     public function testFitAndPredictWithDefaults()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -196,7 +205,7 @@ class Test extends TestCase
     public function testEvaluate()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -221,7 +230,7 @@ class Test extends TestCase
     public function testFitWithEvaluate()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -257,7 +266,7 @@ class Test extends TestCase
     public function testFitAndPredictWithReLUAndAdam()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -300,7 +309,7 @@ class Test extends TestCase
     public function testFitWithMeanSquareError()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -344,7 +353,7 @@ class Test extends TestCase
     public function testFitWithDropout()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -380,7 +389,7 @@ class Test extends TestCase
     public function testFitWithBatchNorm()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -417,7 +426,7 @@ class Test extends TestCase
     public function testFitBinaryClassification()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -459,7 +468,7 @@ class Test extends TestCase
     public function testFitOnehotCategoricalClassification()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -506,7 +515,7 @@ class Test extends TestCase
             $epoch = 50;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -574,7 +583,7 @@ class Test extends TestCase
             $epoch = 30;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -642,7 +651,7 @@ class Test extends TestCase
             $epoch = 20;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -705,7 +714,7 @@ class Test extends TestCase
             $epoch = 50;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -773,7 +782,7 @@ class Test extends TestCase
             $epoch = 30;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -841,7 +850,7 @@ class Test extends TestCase
             $epoch = 20;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -902,7 +911,7 @@ class Test extends TestCase
             $epoch = 50;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -973,7 +982,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1044,7 +1053,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1128,7 +1137,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1201,7 +1210,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1264,7 +1273,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1334,7 +1343,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1400,7 +1409,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1467,7 +1476,7 @@ class Test extends TestCase
             $epoch = 100;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1551,7 +1560,7 @@ class Test extends TestCase
             $epoch = 50;
         }
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
@@ -1621,7 +1630,7 @@ class Test extends TestCase
     public function testToJson()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
@@ -1637,7 +1646,7 @@ class Test extends TestCase
     public function testSaveAndLoadWeightsNormal()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $loader = new ModelLoader($backend,$nn);
 

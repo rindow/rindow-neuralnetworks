@@ -11,10 +11,16 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Embedding(
             $backend,
             $inputDim=4,
@@ -39,7 +45,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Embedding(
             $backend,
             $inputDim=4,
@@ -55,7 +61,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Embedding(
             $backend,
             $inputDim=4,
@@ -71,7 +77,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new Embedding(
@@ -80,7 +86,7 @@ class Test extends TestCase
             $outputDim=5,
             ['input_length'=>3]);
 
-        $kernel = $mo->arange(4*5,null,null,NDArray::float32)->reshape([4,5]);
+        $kernel = $K->array($mo->arange(4*5,null,null,NDArray::float32)->reshape([4,5]));
         $layer->build(null,
             ['sampleWeights'=>[$kernel]]
         );
@@ -90,11 +96,11 @@ class Test extends TestCase
         // forward
         //
         //  2 batch
-        $inputs = $mo->array([
+        $inputs = $K->array([
             [0,1,2],
             [3,2,1],
         ]);
-        $copyInputs = $mo->copy($inputs);
+        $copyInputs = $K->copy($inputs);
         $outputs = $layer->forward($inputs, $training=true);
         //
         $this->assertEquals([
@@ -112,9 +118,9 @@ class Test extends TestCase
         //
         // 2 batch
         $dOutputs =
-            $mo->ones([2,3,5]);
+            $K->ones([2,3,5]);
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch

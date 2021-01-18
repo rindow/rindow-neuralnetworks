@@ -44,9 +44,7 @@ class SparseCategoricalCrossEntropy extends AbstractCrossEntropy
             throw new InvalidArgumentException('unmatch categorical true and predict results');
         // calc accuracy
         $sum = $K->sum($K->equal($c_true, $c_pred));
-        if(!is_scalar($sum)) {
-            $sum = $sum->toArray();
-        }
+        $sum = $K->scalar($sum);
         $accuracy = $sum / (float)$c_true->shape()[0];
         return $accuracy;
     }

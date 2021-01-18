@@ -27,11 +27,11 @@ class Test extends TestCase
             $y = $function->forward($x,...$args);
             return $K->ndarray($y);
         };
-        $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
-        $outputs = $K->ndarray($function->forward($K->array($x), ...$args));
-        $ones = $mo->ones($outputs->shape(),$outputs->dtype());
-        $dInputs = $K->ndarray($function->backward($K->array($ones)));
-        return $mo->la()->isclose($grads[0],$dInputs);
+        $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
+        $outputs = $function->forward($x, ...$args);
+        $ones = $K->ones($outputs->shape(),$outputs->dtype());
+        $dInputs = $function->backward($ones);
+        return $mo->la()->isclose($grads[0],$K->ndarray($dInputs));
     }
 
     public function testNormal()
@@ -77,7 +77,7 @@ class Test extends TestCase
         );
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
 
-        $inputs = $mo->array([
+        $inputs = $K->array([
             [-1.0,-0.5,0.01,0.5,1.0],
         ]);
         $this->assertTrue(

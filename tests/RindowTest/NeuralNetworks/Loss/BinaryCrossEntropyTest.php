@@ -11,18 +11,27 @@ use Rindow\Math\Plot\Plot;
 
 class Test extends TestCase
 {
-    public function verifyGradient($mo, $function, NDArray $t, NDArray $x,$fromLogits=null)
+    public function newBackend($mo)
     {
-        $f = function($x) use ($mo,$function,$t,$fromLogits){
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
+    public function verifyGradient($mo, $K, $function, NDArray $t, NDArray $x,$fromLogits=null)
+    {
+        $f = function($x) use ($mo,$K,$function,$t,$fromLogits){
+            $x = $K->array($x);
             if($fromLogits) {
                 $x = $function->forward($x,true);
             }
             $l = $function->loss($t,$x);
             return $mo->array([$l]);
         };
-        $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
+        $xx = $K->ndarray($x);
+        $grads = $mo->la()->numericalGradient(1e-3,$f,$xx);
         $outputs = $function->loss($t,$x);
         $dInputs = $function->differentiateLoss();
+        $dInputs = $K->ndarray($dInputs);
 #echo "\n";
 #echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
 #echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
@@ -41,7 +50,7 @@ class Test extends TestCase
     public function testGraph()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
         $loss = $nn->losses()->BinaryCrossEntropy();
@@ -50,7 +59,7 @@ class Test extends TestCase
         $y = [];
         foreach($x as $k => $xx) {
             $tt = $t[$k];
-            $y[] = $loss->loss($mo->array([$tt]),$mo->array([[$xx]]));
+            $y[] = $loss->loss($K->array([$tt]),$K->array([[$xx]]));
         }
         $plt->plot($mo->array($y));
         #$plt->show();
@@ -60,7 +69,7 @@ class Test extends TestCase
     public function testBuilder()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\BinaryCrossEntropy',
@@ -70,17 +79,17 @@ class Test extends TestCase
     public function testDefault()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $func = new BinaryCrossEntropy($backend);
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.00001], [0.00001] , [0.99999],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             0.0, 0.0 , 1.0,
         ]);
-        $copyx = $mo->copy($x);
-        $copyt = $mo->copy($t);
+        $copyx = $K->copy($x);
+        $copyt = $K->copy($t);
         $loss = $func->loss($t,$x);
         #$accuracy = $func->accuracy($t,$x);
         $this->assertLessThan(0.001,abs($loss));
@@ -100,16 +109,17 @@ class Test extends TestCase
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.9999],[0.9999],[0.0001],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             0.0, 0.0 , 1.0,
         ]);
         $loss = $func->loss($t,$x);
         $this->assertGreaterThan(8,abs($loss));
 
         $dx = $func->differentiateLoss();
+        $dx = $K->ndarray($dx);
         $this->assertGreaterThan(100,$dx[0][0]);
         $this->assertGreaterThan(100,$dx[1][0]);
         $this->assertLessThan(100,$dx[2][0]);
@@ -117,33 +127,33 @@ class Test extends TestCase
         $accuracy = $func->accuracy($t,$x);
         $this->assertLessThan(0.0001,abs(0-$accuracy));
 
-        $x = $mo->array([
+        $x = $K->array([
             [0.001,],
             [0.999,],
             [0.5,],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             0, 1 , 1,
         ]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$func,$t,$x));
+            $this->verifyGradient($mo,$K,$func,$t,$x));
     }
 
     public function testFromLogits()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $func = new BinaryCrossEntropy($backend);
         $func->setFromLogits(true);
 
-        $x = $mo->array([
+        $x = $K->array([
             [-10.0], [-10.0] , [10.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             0.0, 0.0 , 1.0,
         ]);
-        $copyx = $mo->copy($x);
-        $copyt = $mo->copy($t);
+        $copyx = $K->copy($x);
+        $copyt = $K->copy($t);
         $y = $func->forward($x,true);
         $loss = $func->loss($t,$y);
         $this->assertLessThan(0.001,abs($loss));
@@ -154,14 +164,14 @@ class Test extends TestCase
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $x = $mo->array([
+        $x = $K->array([
             [10.0], [-10.0] , [10.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             0.0, 1.0 , 0.0,
         ]);
-        $copyx = $mo->copy($x);
-        $copyt = $mo->copy($t);
+        $copyx = $K->copy($x);
+        $copyt = $K->copy($t);
         $y = $func->forward($x,true);
         $loss = $func->loss($t,$y);
         $this->assertGreaterThan(7,abs($loss));
@@ -172,13 +182,13 @@ class Test extends TestCase
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $x = $mo->array([
+        $x = $K->array([
             [-2.0], [2.0] , [0.0],
         ]);
-        $t = $mo->array([
+        $t = $K->array([
             0.0, 1.0 , 0.0,
         ]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$func,$t,$x,true));
+            $this->verifyGradient($mo,$K,$func,$t,$x,true));
     }
 }

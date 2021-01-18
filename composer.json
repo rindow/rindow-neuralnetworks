@@ -6,16 +6,16 @@
     "license": "BSD-3-Clause",
     "require": {
         "php": ">=7.2",
-        "rindow/rindow-math-matrix": ">=1.0.8"
+        "rindow/rindow-math-matrix": ">=1.0.10"
     },
     "require-dev": {
         "rindow/rindow-math-plot": ">=1.0.3"
     },
     "suggest": {
         "rindow/rindow-math-plot": "when visualize machine learning results",
-        "ext-rindow_openblas": "0.1.6 strongly recommended for speed",
-        "ext-rindow_opencl": "0.1.0 GPU/OpenCL support",
-        "ext-rindow_clblast": "0.1.0 GPU/OpenCL support"
+        "ext-rindow_openblas": "0.2.2 strongly recommended for speed",
+        "ext-rindow_opencl": "0.1.1 GPU/OpenCL support",
+        "ext-rindow_clblast": "0.1.2 GPU/OpenCL support"
     },
     "autoload": {
         "psr-4": {

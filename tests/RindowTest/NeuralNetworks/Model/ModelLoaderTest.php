@@ -15,6 +15,12 @@ class Test extends TestCase
     private $plot=true;
     private $filename;
 
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function getPlotConfig()
     {
         return [
@@ -44,7 +50,7 @@ class Test extends TestCase
     public function testModelFromConfig()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $loader = new ModelLoader($backend,$nn);
 
@@ -74,7 +80,7 @@ class Test extends TestCase
     public function testSaveAndLoadModelDefault()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
 
         $model = $nn->models()->Sequential([
@@ -104,7 +110,7 @@ class Test extends TestCase
     public function testSaveAndLoadModelPortable()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $plt = new Plot($this->getPlotConfig(),$mo);
 

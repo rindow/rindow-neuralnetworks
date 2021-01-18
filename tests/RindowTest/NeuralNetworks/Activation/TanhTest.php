@@ -27,11 +27,11 @@ class Test extends TestCase
             $y = $function->forward($x,...$args);
             return $K->ndarray($y);
         };
-        $grads = $mo->la()->numericalGradient(null,$f,$x);
-        $outputs = $K->ndarray($function->forward($K->array($x), ...$args));
-        $ones = $mo->ones($outputs->shape(),$outputs->dtype());
-        $dInputs = $K->ndarray($function->backward($K->array($ones)));
-        return $mo->la()->isclose($grads[0],$dInputs);
+        $grads = $mo->la()->numericalGradient(null,$f,$K->ndarray($x));
+        $outputs = $function->forward($x, ...$args);
+        $ones = $K->ones($outputs->shape(),$outputs->dtype());
+        $dInputs = $function->backward($ones);
+        return $mo->la()->isclose($grads[0],$K->ndarray($dInputs));
     }
 
     public function testNormal()
@@ -40,27 +40,23 @@ class Test extends TestCase
         $K = $this->newBackend($mo);
         $activation = new Tanh($K);
 
-        $inputs = $mo->array([
+        $inputs = $K->array([
             [-1.0,-0.5,0.0,0.5,1.0],
             [-2.0,-1.0,0.0,1.0,2.0],
         ]);
-        $copyInputs = $mo->copy($inputs);
+        $copyInputs = $K->copy($inputs);
         $inputs = $K->array($inputs);
         $outputs = $activation->forward($inputs, $training=true);
-        $outputs = $K->ndarray($outputs);
-        $inputs = $K->ndarray($inputs);
         $this->assertEquals([2,5],$outputs->shape());
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
 
-        $dOutputs = $mo->array([
+        $dOutputs = $K->array([
             [-1.0,-0.5,0.0,0.5,1.0],
             [-2.0,-1.0,0.0,1.0,2.0],
         ]);
-        $copydOutputs = $mo->copy($dOutputs);
+        $copydOutputs = $K->copy($dOutputs);
         $dOutputs = $K->array($dOutputs);
         $dInputs = $activation->backward($dOutputs);
-        $dInputs = $K->ndarray($dInputs);
-        $dOutputs = $K->ndarray($dOutputs);
         $this->assertEquals([2,5],$dInputs->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
 

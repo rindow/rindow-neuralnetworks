@@ -86,10 +86,16 @@ class TestLayer extends AbstractLayer
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testComplieAndFit()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $model = new TestModel($backend,$nn);
 

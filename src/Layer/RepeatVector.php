@@ -66,7 +66,7 @@ class RepeatVector extends AbstractLayer implements Layer
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        $dInput = $K->reduceSumRepeated($dOutputs);
+        $dInput = $K->sum($dOutputs,$axis=1);
         return $dInput;
     }
 }

@@ -10,10 +10,16 @@ use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new MaxPooling3D(
             $backend,
             [
@@ -33,7 +39,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new MaxPooling3D(
             $backend,
             [
@@ -47,7 +53,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new MaxPooling3D(
             $backend,
             [
@@ -60,7 +66,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new MaxPooling3D(
@@ -73,8 +79,8 @@ class Test extends TestCase
         // forward
         //
         //  batch size 2
-        $inputs = $mo->ones([2,4,4,4,3]);
-        $copyInputs = $mo->copy($inputs);
+        $inputs = $K->ones([2,4,4,4,3]);
+        $copyInputs = $K->copy($inputs);
         $outputs = $layer->forward($inputs, $training=true);
         //
         $this->assertEquals(
@@ -85,12 +91,11 @@ class Test extends TestCase
         // backward
         //
         // 2 batch
-        $dOutputs = $mo->op(
-            $mo->ones([2,2,2,2,3]),
-            '*',
-            0.1);
+        $dOutputs = $K->scale(
+            0.1,
+            $K->ones([2,2,2,2,3]));
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch

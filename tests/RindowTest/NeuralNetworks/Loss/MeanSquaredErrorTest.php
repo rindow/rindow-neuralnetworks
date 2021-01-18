@@ -10,6 +10,12 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function getPlotConfig()
     {
         return [
@@ -21,7 +27,7 @@ class Test extends TestCase
     public function testBuilder()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\MeanSquaredError',
@@ -31,14 +37,14 @@ class Test extends TestCase
     public function testOneHot()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $lossFunction = new MeanSquaredError($backend);
 
-        $trues = $mo->array([
+        $trues = $K->array([
             [0.0, 0.0 , 1.0],
             [0.0, 1.0 , 0.0],
         ]);
-        $predicts = $mo->array([
+        $predicts = $K->array([
             [0.025, 0.025 , 0.95],
             [0.025, 0.95 , 0.025],
         ]);
@@ -47,6 +53,6 @@ class Test extends TestCase
 
         $dx = $lossFunction->differentiateLoss();
         $this->assertEquals($predicts->shape(),$dx->shape());
-        $this->assertTrue($mo->asum($dx)<0.1);
+        $this->assertTrue($K->scalar($K->asum($dx))<0.1);
     }
 }

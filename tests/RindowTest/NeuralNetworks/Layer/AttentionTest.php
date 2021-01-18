@@ -11,10 +11,16 @@ use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Attention(
             $backend,
             [
@@ -34,7 +40,7 @@ class Test extends TestCase
     public function testInitializeWithReturnAttentionScores()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Attention(
             $backend,
             [
@@ -56,7 +62,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Attention(
             $backend,
             [
@@ -70,7 +76,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Attention(
             $backend,
             [
@@ -84,7 +90,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new Attention(
@@ -99,16 +105,16 @@ class Test extends TestCase
         // forward
         //
         //  batch size 2
-        $query = $mo->array([
+        $query = $K->array([
             [[1,0,0],[0,1,0]],
             [[1,0,0],[0,1,0]],
         ]);
-        $value = $mo->array([
+        $value = $K->array([
             [[1,0,0],[0,1,0],[0,0,1],[0,0,0]],
             [[1,0,0],[0,1,0],[0,0,1],[0,0,0]],
         ]);
         $inputs = [$query,$value];
-        $copyInputs = [$mo->copy($query),$mo->copy($value)];
+        $copyInputs = [$K->copy($query),$K->copy($value)];
         [$outputs,$scores] = $layer->forward($inputs, $training=true);
         //
         $this->assertEquals([2,2,4],$scores->shape());
@@ -120,20 +126,20 @@ class Test extends TestCase
                 [1,0,0,0],[0,1,0,0],
                 [1,0,0,0],[0,1,0,0],
             ])),
-            $scores->reshape([4,4])));
+            $K->ndarray($scores->reshape([4,4]))));
         $this->assertTrue($mo->la()->isclose(
             $mo->array([
                 [[0.475367,0.174878,0.174878],[0.174878,0.475367,0.174878]],
                 [[0.475367,0.174878,0.174878],[0.174878,0.475367,0.174878]],
             ]),
-            $outputs));
+            $K->ndarray($outputs)));
         //
         // backward
         //
         // 2 batch
-        $dOutputs = $mo->ones($outputs->shape());
+        $dOutputs = $K->ones($outputs->shape());
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch
@@ -148,7 +154,7 @@ class Test extends TestCase
                 [[0.08313105, 0.0305822 , 0.0305822],
                  [0.0305822 , 0.08313105, 0.0305822]],
             ]),
-            $dInputs[0]));
+            $K->ndarray($dInputs[0])));
         $this->assertTrue($mo->la()->isclose(
             $mo->array([
                 [[0.73337567, 0.68082684, 0.65024465],
@@ -160,6 +166,6 @@ class Test extends TestCase
                  [0.38033763, 0.38033763, 0.34975544],
                  [0.20545992, 0.20545992, 0.34975544]],
             ]),
-            $dInputs[1]));
+            $K->ndarray($dInputs[1])));
     }
 }

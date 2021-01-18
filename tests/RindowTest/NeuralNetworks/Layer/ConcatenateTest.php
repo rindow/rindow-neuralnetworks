@@ -11,10 +11,16 @@ use InvalidArgumentException;
 
 class Test extends TestCase
 {
+    public function newBackend($mo)
+    {
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
     public function testDefaultInitialize()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Concatenate(
             $backend,
             [
@@ -35,7 +41,7 @@ class Test extends TestCase
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Concatenate(
             $backend,
             [
@@ -49,7 +55,7 @@ class Test extends TestCase
     public function testSetInputShape()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $backend = $this->newBackend($mo);
         $layer = new Concatenate(
             $backend,
             [
@@ -64,7 +70,7 @@ class Test extends TestCase
     public function testNormalForwardAndBackward()
     {
         $mo = new MatrixOperator();
-        $backend = new Backend($mo);
+        $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
         $layer = new Concatenate(
@@ -79,10 +85,10 @@ class Test extends TestCase
         // forward
         //
         //  batch size 2
-        $i1 = $mo->arange(2*2*2,null,null,NDArray::float32)->reshape([2,2,2]);
-        $i2 = $mo->arange(2*2*3,100,null,NDArray::float32)->reshape([2,2,3]);
+        $i1 = $K->array($mo->arange(2*2*2,null,null,NDArray::float32)->reshape([2,2,2]));
+        $i2 = $K->array($mo->arange(2*2*3,100,null,NDArray::float32)->reshape([2,2,3]));
         $inputs = [$i1,$i2];
-        $copyInputs = [$mo->copy($i1),$mo->copy($i2)];
+        $copyInputs = [$K->copy($i1),$K->copy($i2)];
         $outputs = $layer->forward($inputs, $training=true);
         //
         $this->assertEquals([2,2,5],$outputs->shape());
@@ -96,9 +102,9 @@ class Test extends TestCase
         // backward
         //
         // 2 batch
-        $dOutputs = $mo->copy($outputs);
+        $dOutputs = $K->copy($outputs);
 
-        $copydOutputs = $mo->copy(
+        $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch

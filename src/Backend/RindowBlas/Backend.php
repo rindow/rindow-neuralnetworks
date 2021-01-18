@@ -647,17 +647,6 @@ class Backend
             );
     }
 
-    public function reduceSumRepeated(
-        NDArray $inputs
-        ) {
-        if($inputs->ndim()!=3) {
-            throw new InvalidArgumentException('inputs dimension must be 3D');
-        }
-        return $this->la->reduceSumRepeated(
-            $inputs
-            );
-    }
-
     public function oneHot(NDArray $indices, int $numClass) : NDArray
     {
         if($indices->ndim()!=1) {
@@ -763,7 +752,7 @@ class Backend
         $m = (int)array_product($shape);
         $dx = $dx->reshape([$m,$n]);
         $dInputs = $la->axpy(
-            $la->multiply($la->reduceSum($dx, $axis=1),
+            $la->multiply($la->reduceSum($dx, $axis=-1),
                                 $la->copy($outputs->reshape([$m,$n])),$trans=true),$dx,-1.0);
         //$dInputs = $this->la->scal(1/$dOutputs->shape()[0],$dInputs);
         return $dInputs->reshape($orgShape);

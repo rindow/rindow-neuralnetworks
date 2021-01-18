@@ -3,7 +3,7 @@ namespace Rindow\NeuralNetworks\Backend\RindowCLBlast;
 
 use Interop\Polite\Math\Matrix\NDArray;
 use Interop\Polite\Math\Matrix\OpenCL;
-use Rindow\Math\Matrix\NDArrayOpenCL;
+use Rindow\Math\Matrix\NDArrayCL;
 use InvalidArgumentException;
 
 class Backend
@@ -82,22 +82,26 @@ class Backend
 
     public function alloc(array $shape,$dtype=null)
     {
-        return $this->la->alloc($shape,$dtype);
+        $array = $this->la->alloc($shape,$dtype);
+        return $array;
     }
 
     public function allocLike(NDArray $x)
     {
-        return $this->la->alloc($x->shape(),$x->dtype());
+        $array = $this->la->alloc($x->shape(),$x->dtype());
+        return $array;
     }
 
     public function array($value, $dtype=null)
     {
-        return $this->la->array($value, $dtype);
+        $array = $this->la->array($value, $dtype);
+        return $array;
     }
 
     public function variable($value, int $dtype=null, string $name=null, bool $constraint=null)
     {
-        return $this->la->array($value, $dtype);
+        $array = $this->la->array($value, $dtype);
+        return $array;
     }
 
     public function fill(array $shape, $value, $dtype=null)
@@ -112,7 +116,9 @@ class Backend
 
     public function ndarray(NDArray $ndarray)
     {
-        return $ndarray->toNDArray();
+        if($ndarray instanceof NDArrayCL)
+            return $ndarray->toNDArray();
+        return $ndarray;
     }
 
     public function scalar($array)
@@ -671,17 +677,6 @@ class Backend
         return $this->la->repeat(
             $inputs,
             $repeats
-            );
-    }
-
-    public function reduceSumRepeated(
-        NDArray $inputs
-        ) {
-        if($inputs->ndim()!=3) {
-            throw new InvalidArgumentException('inputs dimension must be 3D');
-        }
-        return $this->la->reduceSumRepeated(
-            $inputs
             );
     }
 
