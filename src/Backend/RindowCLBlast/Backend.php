@@ -64,6 +64,11 @@ class Backend
         $this->la->fp64();
     }
 
+    public function accelerated()
+    {
+        return $this->la->accelerated();
+    }
+
     public function epsilon()
     {
         return $this->epsilon;
@@ -205,7 +210,6 @@ class Backend
         $flat_shape = [$num_rows,$num_cols];
         $a = $this->la->randomNormal($flat_shape,0.0,1.0);
         [$u,$s,$vt] = $this->la->svd($a,$full_matrices=false);
-
         # Pick the one with the correct shape.
         $q = ($u->shape()==$flat_shape)? $u : $vt;
         $q = $q->reshape($shape);
@@ -240,7 +244,7 @@ class Backend
         $scale = 2/max($fanIn, 1.0);
         $limit = sqrt(3*$scale);
         //$events = $this->la->newEventList();
-        $kernel = $this->la->randomUniform($shape,-$limit,$limit,null,null,null,$events);
+        $kernel = $this->la->randomUniform($shape,-$limit,$limit);
         //$events->wait();
         return $kernel;
     }
@@ -481,37 +485,43 @@ class Backend
         return $this->la->asum($x);
     }
 
-    public function sum(NDArray $x, int $axis=null)
+    public function sum(NDArray $x, int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
             return $this->la->sum($x);
         } else {
-            return $this->la->reduceSum($x,$axis);
+            return $this->la->reduceSum($x,$axis,$r);
         }
     }
 
-    public function mean(NDArray $x,int $axis=null)
+    public function mean(NDArray $x,int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
             return $this->la->sum($x) / $x->size();
         } else {
-            return $this->la->reduceMean($x,$axis);
+            return $this->la->reduceMean($x,$axis,$r);
         }
     }
 
-    public function max(NDArray $x,int $axis=null)
+    public function max(NDArray $x,int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
             return $this->la->max($x);
         } else {
-            return $this->la->reduceMax($x,$axis);
+            return $this->la->reduceMax($x,$axis,$r);
         }
     }
 
     public function min(NDArray $x,int $axis=null)
     {
         $mo = $this->matrixOperator;
-        return $mo->min($x,$axis);
+        if($axis===null) {
+            return $this->la->min($x);
+        } else {
+            $x = $this->la->scal(-1,$this->la->copy($x));
+            $r = $this->la->reduceMax($x,$axis);
+            return $this->la->scal(-1,$r);
+        }
     }
 
     public function amax(NDArray $x)
@@ -598,9 +608,9 @@ class Backend
         return $this->la->matmul($a,$b,$transA,$transB,$c,$alpha,$beta);
     }
 
-    public function select(NDArray $source,NDArray $selector,$axis=null)
+    public function gather(NDArray $source,NDArray $indices,$axis=null)
     {
-        return $this->la->select($source,$selector,$axis);
+        return $this->la->gather($source,$indices,$axis);
     }
 
     public function scatter(NDArray $indices,NDArray $values,int  $numClass,$axis=null,NDArray $target=null)
@@ -669,14 +679,13 @@ class Backend
 
     public function repeat(
         NDArray $inputs,
-        int $repeats
+        int $repeats,
+        int $axis=null
         ) {
-        if($inputs->ndim()!=2) {
-            throw new InvalidArgumentException('inputs dimension must be 2D');
-        }
         return $this->la->repeat(
             $inputs,
-            $repeats
+            $repeats,
+            $axis
             );
     }
 
@@ -1438,8 +1447,7 @@ class Backend
         }
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
         return -1.0 * $la->sum($la->log($la->increment(
-                //$la->selectAxis1($predicts,$trues),
-                $la->select($predicts,$trues,$axis=1),
+                $la->gather($predicts,$trues,$axis=1),
                 $this->epsilon)))->toArray() / $batchSize;
     }
 

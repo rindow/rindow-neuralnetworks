@@ -6,10 +6,11 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Model\ModelLoader;
+use Rindow\NeuralNetworks\Callback\AbstractCallback;
+use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
 use Rindow\Math\Plot\Plot;
 use Rindow\Math\Plot\Renderer\GDDriver;
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Callback\AbstractCallback;
 
 class WeightLog extends AbstractCallback
 {
@@ -64,6 +65,30 @@ class WeightLog extends AbstractCallback
     public function getGradlog()
     {
         return $this->gradlog;
+    }
+}
+
+class TestFilter implements DatasetFilter
+{
+    public function __construct($mo = null)
+    {
+        $this->mo = $mo;
+    }
+    public function translate($inputs,$tests=null) : array
+    {
+        $batchSize= count($inputs);
+        $cols = count($inputs[0])-1;
+        $inputsNDArray = $this->mo->la()->alloc([$batchSize,$cols]);
+        $testsNDArray = $this->mo->la()->alloc([$batchSize,1]);
+        foreach ($inputs as $i => $row) {
+            $testsNDArray[$i][0] = (float)array_pop($row);
+            for($j=0;$j<$cols;$j++) {
+                $inputsNDArray[$i][$j] = (float)$row[$j];
+            }
+        }
+        //echo 'inputs=['.implode(',',$inputsNDArray->shape()).']';
+        //echo 'tests=['.implode(',',$testsNDArray->shape())."]\n";
+        return [$inputsNDArray,$testsNDArray->reshape([count($testsNDArray)])];
     }
 }
 
@@ -202,7 +227,85 @@ class Test extends TestCase
         //$plt->show();
     }
 
-    public function testEvaluate()
+    public function testFitAndPredictWithNDArrayDataset()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2],
+                    'activation'=>'sigmoid']),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
+        ]);
+
+        $model->compile();
+        $this->assertTrue($model->layers()[1]->getActivation()->fromLogits());
+        $this->assertTrue($model->lossFunction()->fromLogits());
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $dataset = $nn->data->NDArrayDataset($x,[
+            'tests'=>$t,
+            'batch_size'=>64,
+            'shuffle'=>true,
+        ]);
+        $history = $model->fit($dataset,null,['epochs'=>100,'verbose'=>0]);
+
+        $y = $model->predict($x);
+        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+
+        //$plt->plot($mo->array($history['loss']));
+        //$plt->plot($mo->array($history['accuracy']));
+        //$plt->title('fit and predict');
+        //$plt->show();
+    }
+
+    public function testFitAndPredictWithNCSVDataset()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2],
+                    'activation'=>'sigmoid']),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
+        ]);
+
+        $model->compile();
+        $this->assertTrue($model->layers()[1]->getActivation()->fromLogits());
+        $this->assertTrue($model->lossFunction()->fromLogits());
+
+        // training greater or less
+        //$x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        //$t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $dataset = $nn->data->CSVDataset(
+            __DIR__.'/csv',
+            [
+                'pattern'=>'@.*\\.csv@',
+                'batch_size'=>64,
+                'shuffle'=>true,
+                'filter'=>new TestFilter($mo),
+            ]
+        );
+        $history = $model->fit($dataset,null,['epochs'=>100,'verbose'=>0]);
+
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $y = $model->predict($x);
+        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+
+        //$plt->plot($mo->array($history['loss']));
+        //$plt->plot($mo->array($history['accuracy']));
+        //$plt->title('fit and predict');
+        //$plt->show();
+    }
+
+    public function testEvaluateDefault()
     {
         $mo = new MatrixOperator();
         $backend = $this->newBackend($mo);
@@ -223,6 +326,70 @@ class Test extends TestCase
         $history = $model->fit($x,$t,['epochs'=>100,'verbose'=>0]);
 
         [$loss,$accuracy] = $model->evaluate($x,$t);
+        $this->assertLessThan(1.0,$loss);
+        $this->assertEquals(1.0,$accuracy);
+    }
+
+    public function testEvaluateNDArrayDataset()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2],
+                'activation'=>'sigmoid']),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
+        ]);
+
+        $model->compile();
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $history = $model->fit($x,$t,['epochs'=>100,'verbose'=>0]);
+
+        $dataset = $nn->data->NDArrayDataset($x,[
+            'tests'=>$t,
+            'batch_size'=>64,
+            'shuffle'=>true,
+        ]);
+        [$loss,$accuracy] = $model->evaluate($dataset);
+        $this->assertLessThan(1.0,$loss);
+        $this->assertEquals(1.0,$accuracy);
+    }
+
+    public function testEvaluateCSVDataset()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2],
+                'activation'=>'sigmoid']),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
+        ]);
+
+        $model->compile();
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $history = $model->fit($x,$t,['epochs'=>100,'verbose'=>0]);
+
+        $dataset = $nn->data->CSVDataset(
+            __DIR__.'/csv',
+            [
+                'pattern'=>'@.*\\.csv@',
+                'batch_size'=>64,
+                'shuffle'=>true,
+                'filter'=>new TestFilter($mo),
+            ]
+        );
+        [$loss,$accuracy] = $model->evaluate($dataset);
         $this->assertLessThan(1.0,$loss);
         $this->assertEquals(1.0,$accuracy);
     }

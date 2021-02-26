@@ -59,7 +59,7 @@ class RepeatVector extends AbstractLayer implements Layer
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
-        $outputs = $K->repeat($inputs,$this->repeats);
+        $outputs = $K->repeat($inputs,$this->repeats,$axis=1);
         return $outputs;
     }
 

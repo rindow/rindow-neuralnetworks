@@ -4,6 +4,7 @@ namespace Rindow\NeuralNetworks\Builder;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend as RindowBlasBackend;
 use Rindow\NeuralNetworks\Backend\RindowCLBlast\Backend as RindowCLBlastBackend;
+use LogicException;
 
 class NeuralNetworks
 {
@@ -20,6 +21,7 @@ class NeuralNetworks
     protected $optimizers;
     protected $networks;
     protected $datasets;
+    protected $data;
     protected $utils;
 
     public function __construct($matrixOperator=null,$backend=null)
@@ -43,6 +45,19 @@ class NeuralNetworks
         }
         $this->backend = $backend;
         $this->matrixOperator = $matrixOperator;
+    }
+
+    public function __get( string $name )
+    {
+        if(!method_exists($this,$name)) {
+            throw new LogicException('Unknown builder: '.$name);
+        }
+        return $this->$name();
+    }
+
+    public function __set( string $name, $value ) : void
+    {
+        throw new LogicException('Invalid operation to set');
     }
 
     public function backend()
@@ -88,6 +103,14 @@ class NeuralNetworks
             $this->datasets = new Datasets($this->matrixOperator);
         }
         return $this->datasets;
+    }
+
+    public function data()
+    {
+        if($this->data==null) {
+            $this->data = new Data($this->matrixOperator);
+        }
+        return $this->data;
     }
 
     public function utils()

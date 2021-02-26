@@ -9,7 +9,7 @@ class Attention extends AbstractLayerBase
 {
     use GenericUtils;
     protected $backend;
-    protected $returnAttentionScores;
+    //protected $returnAttentionScores;
     protected $query;
     protected $value;
     protected $key;
@@ -21,11 +21,11 @@ class Attention extends AbstractLayerBase
     {
         extract($this->extractArgs([
             'input_shapes'=>null,
-            'return_attention_scores'=>false,
+            //'return_attention_scores'=>false,
         ],$options));
         $this->backend = $K = $backend;
         $this->inputShape = $input_shapes;
-        $this->returnAttentionScores = $return_attention_scores;
+        //$this->returnAttentionScores = $return_attention_scores;
     }
 
     public function build(array $inputShape=null, array $options=null) : array
@@ -53,11 +53,11 @@ class Attention extends AbstractLayerBase
         }
         $this->outputShape = [$tq,$dim];
         $this->scoresShape = [$tq,$tv];
-        if($this->returnAttentionScores) {
-            return [$this->outputShape,$this->scoresShape];
-        } else {
+        //if($this->returnAttentionScores) {
+        //    return [$this->outputShape,$this->scoresShape];
+        //} else {
             return $this->outputShape;
-        }
+        //}
     }
 
     public function getConfig() : array
@@ -125,11 +125,12 @@ class Attention extends AbstractLayerBase
         }
     }
 
-    public function forward(array $inputs, bool $training)
+    public function forward(array $inputs, bool $training, array $options=null)
     {
         $this->assertInputShapes($inputs,'forward');
-        $outputs = $this->call($inputs,$training);
-        if($this->returnAttentionScores) {
+        $outputs = $this->call($inputs,$training,$options);
+        if(array_key_exists('return_attention_scores',$options)&&
+            $options['return_attention_scores']) {
             $this->assertOutputShape($outputs[0],'forward');
             $this->assertScoresShape($outputs[1],'forward');
         } else {
@@ -146,7 +147,7 @@ class Attention extends AbstractLayerBase
         return $dInputs;
     }
 
-    protected function call(array $inputs, bool $training)
+    protected function call(array $inputs, bool $training, array $options=null)
     {
         $K = $this->backend;
         $query = $inputs[0];
@@ -169,7 +170,8 @@ class Attention extends AbstractLayerBase
         $this->attentionWeight = $attentionWeight;
         $this->query = $query;
         $this->key = $key;
-        if($this->returnAttentionScores) {
+        if(array_key_exists('return_attention_scores',$options)&&
+            $options['return_attention_scores']) {
             return [$contextVector,$attentionWeight];
         } else {
             return $contextVector;

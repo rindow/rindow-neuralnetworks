@@ -138,10 +138,7 @@ class Mnist
     {
         $mo = $this->matrixOperator;
         $filePath = $this->datasetDir."/".$filename;
-        $imageSize = 1;
-        foreach ($this->imageShape as $value) {
-            $imageSize = $imageSize * $value;
-        }
+        $imageSize = (int)array_product($this->imageShape);
 
         $this->console("Converting ".$filename." to NDArray ...");
 

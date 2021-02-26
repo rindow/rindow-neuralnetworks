@@ -1,9 +1,17 @@
+os: linux
 language: php
+dist: focal
 
 php:
-    - '7.2'
-    - '7.3'
     - '7.4'
+    - '8.0'
+
+matrix:
+  include:
+    - php: '7.2'
+      dist: bionic
+    - php: '7.3'
+      dist: bionic
 
 before_install:
   - phpenv config-add tests/travis/php$TRAVIS_PHP_VERSION.ini

@@ -18,6 +18,12 @@ use Rindow\NeuralNetworks\Layer\MaxPooling3D;
 use Rindow\NeuralNetworks\Layer\AveragePooling1D;
 use Rindow\NeuralNetworks\Layer\AveragePooling2D;
 use Rindow\NeuralNetworks\Layer\AveragePooling3D;
+use Rindow\NeuralNetworks\Layer\GlobalMaxPooling1D;
+use Rindow\NeuralNetworks\Layer\GlobalMaxPooling2D;
+use Rindow\NeuralNetworks\Layer\GlobalMaxPooling3D;
+use Rindow\NeuralNetworks\Layer\GlobalAveragePooling1D;
+use Rindow\NeuralNetworks\Layer\GlobalAveragePooling2D;
+use Rindow\NeuralNetworks\Layer\GlobalAveragePooling3D;
 use Rindow\NeuralNetworks\Layer\Dropout;
 use Rindow\NeuralNetworks\Layer\BatchNormalization;
 use Rindow\NeuralNetworks\Layer\SimpleRNN;
@@ -144,6 +150,54 @@ class Layers
         array $options=null)
     {
         return new AveragePooling3D(
+            $this->backend,
+            $options);
+    }
+
+    public function GlobalMaxPooling1D(
+        array $options=null)
+    {
+        return new GlobalMaxPooling1D(
+            $this->backend,
+            $options);
+    }
+
+    public function GlobalMaxPooling2D(
+        array $options=null)
+    {
+        return new GlobalMaxPooling2D(
+            $this->backend,
+            $options);
+    }
+
+    public function GlobalMaxPooling3D(
+        array $options=null)
+    {
+        return new GlobalMaxPooling3D(
+            $this->backend,
+            $options);
+    }
+
+    public function GlobalAveragePooling1D(
+        array $options=null)
+    {
+        return new GlobalAveragePooling1D(
+            $this->backend,
+            $options);
+    }
+
+    public function GlobalAveragePooling2D(
+        array $options=null)
+    {
+        return new GlobalAveragePooling2D(
+            $this->backend,
+            $options);
+    }
+
+    public function GlobalAveragePooling3D(
+        array $options=null)
+    {
+        return new GlobalAveragePooling3D(
             $this->backend,
             $options);
     }

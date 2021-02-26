@@ -1,12 +1,11 @@
 <?php
-namespace RindowTest\NeuralNetworks\Layer\RepeatVectorTest;
+namespace RindowTest\NeuralNetworks\Layer\GlobalMaxPooling2DTest;
 
 use PHPUnit\Framework\TestCase;
-use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
-use Rindow\NeuralNetworks\Layer\RepeatVector;
+use Rindow\NeuralNetworks\Layer\GlobalMaxPooling2D;
 use InvalidArgumentException;
 
 class Test extends TestCase
@@ -21,11 +20,10 @@ class Test extends TestCase
     {
         $mo = new MatrixOperator();
         $backend = $this->newBackend($mo);
-        $layer = new RepeatVector(
+        $layer = new GlobalMaxPooling2D(
             $backend,
-            $repeats=2,
             [
-                'input_shape'=>[3]
+                'input_shape'=>[4,4,3]
             ]);
 
         $layer->build();
@@ -35,16 +33,15 @@ class Test extends TestCase
         $grads = $layer->getGrads();
         $this->assertCount(0,$grads);
 
-        $this->assertEquals([2,3],$layer->outputShape());
+        $this->assertEquals([3],$layer->outputShape());
     }
 
     public function testNotspecifiedInputShape()
     {
         $mo = new MatrixOperator();
         $backend = $this->newBackend($mo);
-        $layer = new RepeatVector(
+        $layer = new GlobalMaxPooling2D(
             $backend,
-            $repeats=2,
             [
             ]);
 
@@ -53,19 +50,17 @@ class Test extends TestCase
         $layer->build();
     }
 
-    public function testInvalidInputShape()
+    public function testSetInputShape()
     {
         $mo = new MatrixOperator();
         $backend = $this->newBackend($mo);
-        $layer = new RepeatVector(
+        $layer = new GlobalMaxPooling2D(
             $backend,
-            $repeats=2,
-            ['input_shape'=>[3,2]
+            [
             ]);
+        $layer->build($inputShape=[4,4,3]);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('input shape must be 1D');
-        $layer->build();
+        $this->assertEquals([3],$layer->outputShape());
     }
 
     public function testNormalForwardAndBackward()
@@ -74,10 +69,9 @@ class Test extends TestCase
         $K = $backend = $this->newBackend($mo);
         $fn = $backend;
 
-        $layer = new RepeatVector(
+        $layer = new GlobalMaxPooling2D(
             $backend,
-            $repeats=2,
-            ['input_shape'=>[3]]);
+            ['input_shape'=>[4,4,3]]);
 
         $layer->build();
 
@@ -85,34 +79,27 @@ class Test extends TestCase
         // forward
         //
         //  batch size 2
-        $inputs = $K->array($mo->arange(2*3,null,null,NDArray::float32)->reshape([2,3]));
+        $inputs = $K->ones([2,4,4,3]);
         $copyInputs = $K->copy($inputs);
         $outputs = $layer->forward($inputs, $training=true);
         //
-        $this->assertEquals([2,2,3],$outputs->shape());
+        $this->assertEquals(
+            [2,3],$outputs->shape());
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
-        $this->assertEquals([
-            [[0,1,2],[0,1,2]],
-            [[3,4,5],[3,4,5]],
-        ],$outputs->toArray());
+
         //
         // backward
         //
         // 2 batch
-        $dOutputs = $K->array([
-            [[0,1,2],[0,1,2]],
-            [[3,4,5],[3,4,5]],
-        ],NDArray::float32)->reshape([2,2,3]);
+        $dOutputs = $K->scale(
+            0.1,
+            $K->ones([2,3]));
 
         $copydOutputs = $K->copy(
             $dOutputs);
         $dInputs = $layer->backward($dOutputs);
         // 2 batch
-        $this->assertEquals([2,3],$dInputs->shape());
+        $this->assertEquals([2,4,4,3],$dInputs->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
-        $this->assertEquals([
-            [0,2,4],
-            [6,8,10],
-        ],$dInputs->toArray());
     }
 }

@@ -9,6 +9,7 @@ The goal is to make it easy to write network models in PHP, just like Keras on P
 To find out more please visit our website now!
 
 - [Rindow projects](https://rindow.github.io/)
+- [Rindow NeuralNetworks](https://rindow.github.io/neuralnetworks)
 
 If you use the rindow_openblas php extension,
 you can calculate at speed close to CPU version of tensorflow.
@@ -35,7 +36,7 @@ Rindow Neural networks usually work with:
 Requires
 ========
 
-- PHP 7.2 or later.
+- PHP 7.2, 7.3, 7.4 and 8.0.
 
 Install
 =======
@@ -53,7 +54,7 @@ $ composer require rindow/rindow-math-plot
 
 Training will take a lot of time if left untouched. It is **strongly recommended** that you set up the **rindow_openblas extension** in php for speed.
 
-- [Pre-build binaries](https://github.com/rindow/rindow-openblas-binaries)
+- [Pre-build binaries](https://github.com/rindow/rindow-openblas/releases)
 - [Build from source](https://github.com/rindow/rindow-openblas)
 
 ## Expansion of memory used
@@ -77,8 +78,8 @@ $ RINDOW_MATH_PLOT_VIEWER=/some/bin/dir/png-file-viewer
 $ export RINDOW_MATH_PLOT_VIEWER
 $ mkdir samples
 $ cd samples
-$ cp ../vendor/rindow/rindow-neuralnetworks/samples/mnist-basic-clasification.php .
-$ php mnist-basic-clasification.php
+$ cp ../vendor/rindow/rindow-neuralnetworks/samples/basic-image-clasification.php .
+$ php basic-image-clasification.php
 ```
 
 If done correctly, a graph of the learning process will be displayed.
@@ -98,5 +99,5 @@ Set environment variable.
 $ RINDOW_NEURALNETWORKS_BACKEND=rindowclblast
 $ export RINDOW_NEURALNETWORKS_BACKEND
 $ cd samples
-$ php mnist-basic-clasification.php
+$ php basic-image-clasification.php
 ```

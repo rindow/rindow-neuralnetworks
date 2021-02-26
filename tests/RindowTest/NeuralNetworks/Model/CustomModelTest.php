@@ -9,6 +9,7 @@ use Rindow\NeuralNetworks\Model\ModelLoader;
 use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\NeuralNetworks\Layer\AbstractLayer;
 use Interop\Polite\Math\Matrix\NDArray;
+use PDO;
 
 class TestModel extends AbstractModel
 {
@@ -92,6 +93,17 @@ class Test extends TestCase
         return $builder->backend();
     }
 
+    public function initSaveModel() : void
+    {
+        $this->filename = __DIR__.'/../../../tmp/savedcustommodel.hda.sqlite3';
+        $pdo = new PDO('sqlite:'.$this->filename);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $sql = "DROP TABLE IF EXISTS hda";
+        $stat = $pdo->exec($sql);
+        unset($stat);
+        unset($pdo);
+    }
+
     public function testComplieAndFit()
     {
         $mo = new MatrixOperator();
@@ -110,5 +122,55 @@ class Test extends TestCase
             ['epochs'=>5,'batch_size'=>2,'validation_data'=>[$val_train,$val_label],'verbose'=>0]
         );
         $this->assertTrue(true);
+    }
+
+    public function testSaveAndLoad()
+    {
+        $this->initSaveModel();
+
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+        $model = new TestModel($backend,$nn);
+
+        $train = $mo->random()->randn([10,5]);
+        $label = $mo->arange(10);
+        $val_train = $mo->random()->randn([10,5]);
+        $val_label = $mo->arange(10);
+
+        $model->compile();
+        $history = $model->fit(
+            $train,$label,
+            ['epochs'=>5,'batch_size'=>2,'validation_data'=>[$val_train,$val_label],'verbose'=>0]
+        );
+        $weightsOriginal = ['layers'=>[],'optimizer'=>[]];
+        foreach ($model->weights() as $key => $value) {
+            $weightsOriginal['layers'][$key] = $backend->ndarray($value);
+        };
+        foreach ($model->optimizer()->getWeights() as $key => $value) {
+            $weightsOriginal['optimizer'][$key] = $backend->ndarray($value);
+        };
+
+        $model->saveWeightsToFile($this->filename);
+
+        // load model
+        $model = new TestModel($backend,$nn);
+        $train = $mo->random()->randn([10,5]);
+        $label = $mo->arange(10);
+        $val_train = $mo->random()->randn([10,5]);
+        $val_label = $mo->arange(10);
+
+        $model->compile();
+        $history = $model->fit(
+            $train,$label,
+            ['epochs'=>5,'batch_size'=>2,'validation_data'=>[$val_train,$val_label],'verbose'=>0]
+        );
+        $model->loadWeightsFromFile($this->filename);
+        foreach ($model->weights() as $key => $value) {
+            $this->assertEquals($value->toArray(),$weightsOriginal['layers'][$key]->toArray());
+        }
+        foreach ($model->optimizer()->getWeights() as $key => $value) {
+            $this->assertEquals($value->toArray(),$weightsOriginal['optimizer'][$key]->toArray());
+        }
     }
 }

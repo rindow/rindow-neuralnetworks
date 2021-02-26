@@ -79,7 +79,7 @@ class Embedding extends AbstractLayer implements Layer
             'inputDim' => $this->inputDim,
             'outputDim' => $this->outputDim,
             'options' => [
-                'input_length'=>$this->input_length,
+                'input_length'=>$this->inputLength,
                 'kernel_initializer' => $this->kernelInitializerName,
             ]
         ];
@@ -91,7 +91,7 @@ class Embedding extends AbstractLayer implements Layer
         $this->originalShape = $inputs->shape();
         $this->inputs = $inputs->reshape(
             [$inputs->size()]);
-        $outputs = $K->select($this->kernel,$this->inputs,$axis=0);
+        $outputs = $K->gather($this->kernel,$this->inputs);
         $this->flattenOutputsShape = $outputs->shape();
         $shape = $this->originalShape;
         array_push($shape,$this->outputDim);

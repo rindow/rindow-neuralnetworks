@@ -9,9 +9,13 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-$TRAINING_SIZE = 5000;
+$TRAINING_SIZE = 20000;
 $DIGITS = 3;
 $REVERSE = True;
+$WORD_VECTOR = 16;
+$UNITS = 128;
+$EPOCHS = 10;
+$BATCH_SIZE = 8;
 
 
 class NumAdditionDataset
@@ -118,17 +122,6 @@ class NumAdditionDataset
         return $str;
     }
 
-    //public function translate($model,$str)
-    //{
-    //    $inputs = $this->mo->zeros([1,$this->length]);
-    //    $this->str2seq(
-    //        $str,$this->dict_input,$inputs[0]);
-    //    $target = $model->translate($inputs);
-    //    return $this->seq2str(
-    //        $target,$this->vocab_target
-    //        );
-    //}
-
     public function loadData($path=null)
     {
         if($path==null){
@@ -144,7 +137,6 @@ class NumAdditionDataset
         }
         return $dataset;
     }
-
 }
 
 $mo = new MatrixOperator();
@@ -171,62 +163,67 @@ $y_val   = $answers[[$split_at,$corpus_size-1]];
 
 echo "train,test: ".$x_train->shape()[0].",".$y_train->shape()[0]."\n";
 
-echo "Build model...\n";
+$modelFilePath = __DIR__."/learn-add-numbers-with-rnn.model";
 
-$model = $nn->models()->Sequential([
-    $nn->layers()->Embedding(count($input_dic), 16,
-        ['input_length'=>$input_length]
-    ),
-    # Encoder
-    $nn->layers()->GRU(128,['go_backwards'=>$REVERSE]),
-    #$nn->layers()->LSTM(128,['go_backwards'=>$REVERSE]),
-    #$nn->layers()->SimpleRNN(128,['go_backwards'=>$REVERSE]),
-    # Expand to answer length and peeking hidden states
-    $nn->layers()->RepeatVector($output_length),
-    # Decoder
-    $nn->layers()->GRU(128, [
-        'return_sequences'=>true,
-        'go_backwards'=>$REVERSE,
-        #'reset_after'=>false,
-    ]),
-    #$nn->layers()->LSTM(128, [
-    #    'return_sequences'=>true,
-    #    'go_backwards'=>$REVERSE,
-    #]),
-    #$nn->layers()->SimpleRNN(128, [
-    #    'return_sequences'=>true,
-    #    'go_backwards'=>$REVERSE,
-    #]),
-    # Output
-    $nn->layers()->Dense(
-        count($target_dic),
-        ['activation'=>'softmax']
-    ),
-]);
+if(file_exists($modelFilePath)) {
+    echo "loading model ...\n";
+    $model = $nn->models()->loadModel($modelFilePath);
+    $model->summary();
+} else {
+    echo "Build model...\n";
 
-echo "Compile model...\n";
-
-$model->compile([
-    'loss'=>'sparse_categorical_crossentropy',
-    'optimizer'=>'adam',
+    $model = $nn->models()->Sequential([
+        $nn->layers()->Embedding(count($input_dic), $WORD_VECTOR,
+            ['input_length'=>$input_length]
+        ),
+        # Encoder
+        $nn->layers()->GRU($UNITS,['go_backwards'=>$REVERSE]),
+        # Expand to answer length and peeking hidden states
+        $nn->layers()->RepeatVector($output_length),
+        # Decoder
+        $nn->layers()->GRU($UNITS, [
+            'return_sequences'=>true,
+            'go_backwards'=>$REVERSE,
+            #'reset_after'=>false,
+        ]),
+        # Output
+        $nn->layers()->Dense(
+            count($target_dic),
+            ['activation'=>'softmax']
+        ),
     ]);
-$model->summary();
 
-# Train the model
-echo "Train model...\n";
+    echo "Compile model...\n";
 
-$epochs = 30;
-$batch_size = 32;
+    $model->compile([
+        'loss'=>'sparse_categorical_crossentropy',
+        'optimizer'=>'adam',
+        ]);
+    $model->summary();
 
-$history = $model->fit(
-    $x_train,
-    $y_train,
-    [
-        'epochs'=>$epochs,
-        'batch_size'=>$batch_size,
-        'validation_data'=>[$x_val, $y_val],
-    ]
-);
+    # Train the model
+    echo "Train model...\n";
+
+    $history = $model->fit(
+        $x_train,
+        $y_train,
+        [
+            'epochs'=>$EPOCHS,
+            'batch_size'=>$BATCH_SIZE,
+            'validation_data'=>[$x_val, $y_val],
+        ]
+    );
+
+    $model->save($modelFilePath);
+
+    $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+    $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+    $plt->plot($mo->array($history['loss']),null,null,'loss');
+    $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+    $plt->legend();
+    $plt->title('seq2seq-simple-numaddition');
+    $plt->show();
+}
 
 for($i=0;$i<10;$i++) {
     $idx = $mo->random()->randomInt($corpus_size);
@@ -241,11 +238,3 @@ for($i=0;$i<10;$i++) {
     $correct = ($predict_str==$answer_str) ? '*' : ' ';
     echo "$question_str=$predict_str : $correct $answer_str\n";
 }
-
-$plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
-$plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
-$plt->plot($mo->array($history['loss']),null,null,'loss');
-$plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
-$plt->legend();
-$plt->title('seq2seq-simple-numaddition');
-$plt->show();

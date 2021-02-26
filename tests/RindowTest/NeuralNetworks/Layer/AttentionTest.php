@@ -45,7 +45,6 @@ class Test extends TestCase
             $backend,
             [
                 'input_shapes'=>[[3,2],[4,2]],
-                'return_attention_scores'=>true,
             ]);
 
         $shapes = $layer->build();
@@ -56,7 +55,7 @@ class Test extends TestCase
         $this->assertCount(0,$grads);
 
         $this->assertEquals([3,2],$layer->outputShape());
-        $this->assertEquals([3,4],$shapes[1]);
+        //$this->assertEquals([3,4],$shapes[1]);
     }
 
     public function testNotspecifiedInputShape()
@@ -96,7 +95,6 @@ class Test extends TestCase
         $layer = new Attention(
             $backend,
             [
-                'return_attention_scores'=>true,
             ]);
 
         $layer->build($inputShape=[[2,3],[4,3]]);
@@ -115,7 +113,9 @@ class Test extends TestCase
         ]);
         $inputs = [$query,$value];
         $copyInputs = [$K->copy($query),$K->copy($value)];
-        [$outputs,$scores] = $layer->forward($inputs, $training=true);
+        [$outputs,$scores] = $layer->forward($inputs, $training=true,
+                        ['return_attention_scores'=>true]
+        );
         //
         $this->assertEquals([2,2,4],$scores->shape());
         $this->assertEquals([2,2,3],$outputs->shape());

@@ -21,6 +21,14 @@ class Test extends TestCase
         return new Backend($mo);
     }
 
+    public function getPlotConfig()
+    {
+        return [
+            'renderer.skipCleaning' => true,
+            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+        ];
+    }
+
     public function testGetInitializer()
     {
         $mo = $this->newMatrixOperator();
@@ -87,6 +95,7 @@ class Test extends TestCase
         $this->expectExceptionMessage('Unsupported initializer: boo');
         $initializer = $backend->getInitializer('boo');
     }
+
 
     public function testZeros()
     {
@@ -1082,6 +1091,20 @@ class Test extends TestCase
         $this->assertLessThan(1.8,abs($max));
         $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
         $this->assertGreaterThan(1e-6,abs($min));
+
+        $kernel = $K->glorot_normal([200,10],[200,10])->reshape([2000]);
+        $min = $K->scalar($K->min($kernel));
+        $max = $K->scalar($K->max($kernel));
+        $kernel = $K->scale(1/($max-$min),$K->increment($kernel,-$min));
+        $indices = $K->cast($K->scale(9.999,$kernel),NDArray::int32);
+        $ones = $K->ones([2000,1]);
+        $frequency = $K->zeros([10,1]);
+        $K->scatterAdd($frequency,$indices,$ones);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+        $x = $mo->arange(10,$min,($max-$min)/10,NDArray::float32);
+        $plt->plot($x,$K->ndarray($frequency->reshape([10])));
+        $plt->title('glorot_normal'.($K->accelerated()?':accel':''));
+        $plt->show();
     }
 
     public function testGlorotUniform()
@@ -1096,6 +1119,78 @@ class Test extends TestCase
         $this->assertLessThan(1.0,abs($max));
         $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
         $this->assertGreaterThan(1e-6,abs($min));
+
+        $kernel = $K->glorot_uniform([200,10],[200,10])->reshape([2000]);
+        $min = $K->scalar($K->min($kernel));
+        $max = $K->scalar($K->max($kernel));
+        $kernel = $K->scale(1/($max-$min),$K->increment($kernel,-$min));
+        $indices = $K->cast($K->scale(9.999,$kernel),NDArray::int32);
+        $ones = $K->ones([2000,1]);
+        $frequency = $K->zeros([10,1]);
+        $K->scatterAdd($frequency,$indices,$ones);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+        $x = $mo->arange(10,$min,($max-$min)/10,NDArray::float32);
+        $plt->plot($x,$K->ndarray($frequency->reshape([10])));
+        $plt->title('glorot_uniform'.($K->accelerated()?':accel':''));
+        $plt->show();
+    }
+
+    public function testHeUniform()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $w = $K->he_uniform([16,4],[16,4]);
+        #echo "--------\n";
+        #foreach($w->toArray() as $array)
+        #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
+        #$this->assertLessThan(1.0/0.87962566103423978,abs($K->amax($w)));
+        $max = $K->amax($w); if(!is_scalar($max)) $max = $max->toArray();
+        $this->assertLessThan(1.8,abs($max));
+        $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
+        $this->assertGreaterThan(1e-6,abs($min));
+
+        $kernel = $K->he_uniform([200,10],[200,10])->reshape([2000]);
+        $min = $K->scalar($K->min($kernel));
+        $max = $K->scalar($K->max($kernel));
+        $kernel = $K->scale(1/($max-$min),$K->increment($kernel,-$min));
+        $indices = $K->cast($K->scale(9.999,$kernel),NDArray::int32);
+        $ones = $K->ones([2000,1]);
+        $frequency = $K->zeros([10,1]);
+        $K->scatterAdd($frequency,$indices,$ones);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+        $x = $mo->arange(10,$min,($max-$min)/10,NDArray::float32);
+        $plt->plot($x,$K->ndarray($frequency->reshape([10])));
+        $plt->title('he_uniform'.($K->accelerated()?':accel':''));
+        $plt->show();
+    }
+
+    public function testHeNormal()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $w = $K->he_normal([16,4],[16,4]);
+        #echo "--------\n";
+        #foreach($w->toArray() as $array)
+        #    echo '['.implode(',',array_map(function($a){return sprintf('%5.2f',$a);},$array))."],\n";
+        #$this->assertLessThan(1.0/0.87962566103423978,abs($K->amax($w)));
+        $max = $K->amax($w); if(!is_scalar($max)) $max = $max->toArray();
+        $this->assertLessThan(1.8,abs($max));
+        $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
+        $this->assertGreaterThan(1e-6,abs($min));
+
+        $kernel = $K->he_normal([200,10],[200,10])->reshape([2000]);
+        $min = $K->scalar($K->min($kernel));
+        $max = $K->scalar($K->max($kernel));
+        $kernel = $K->scale(1/($max-$min),$K->increment($kernel,-$min));
+        $indices = $K->cast($K->scale(9.999,$kernel),NDArray::int32);
+        $ones = $K->ones([2000,1]);
+        $frequency = $K->zeros([10,1]);
+        $K->scatterAdd($frequency,$indices,$ones);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+        $x = $mo->arange(10,$min,($max-$min)/10,NDArray::float32);
+        $plt->plot($x,$K->ndarray($frequency->reshape([10])));
+        $plt->title('he_normal'.($K->accelerated()?':accel':''));
+        $plt->show();
     }
 
     public function testOrthogonal()
@@ -1109,6 +1204,25 @@ class Test extends TestCase
         $max = $K->amax($w); if(!is_scalar($max)) $max = $max->toArray();
         $this->assertLessThan(1.0,abs($max));
         $min = $K->amin($w); if(!is_scalar($min)) $min = $min->toArray();
-        $this->assertGreaterThan(1e-6,abs($min));
+        //$this->assertGreaterThan(1e-6,abs($min));
+
+        $bins = 10;
+        $m = 200;//200;
+        $n = 10;//10;
+        $kernel = $K->orthogonal([$m,$n],[$m,$n])->reshape([$m*$n]);
+        $min = $K->scalar($K->min($kernel));
+        $max = $K->scalar($K->max($kernel));
+        //var_dump([$min,$max]);
+        $kernel = $K->scale(1/($max-$min),$K->increment($kernel,-$min));
+        $indices = $K->cast($K->scale($bins-0.001,$kernel),NDArray::int32);
+        $ones = $K->ones([$m*$n,1]);
+        $frequency = $K->zeros([$bins,1]);
+        $K->scatterAdd($frequency,$indices,$ones);
+        $plt = new Plot($this->getPlotConfig(),$mo);
+        $x = $mo->arange($bins,$min,($max-$min)/$bins,NDArray::float32);
+        $plt->plot($x,$K->ndarray($frequency->reshape([$bins])));
+        $plt->title('orthogonal'.($K->accelerated()?':accel':''));
+        $plt->show();
     }
+
 }

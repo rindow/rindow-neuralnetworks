@@ -5,7 +5,10 @@ use InvalidArgumentException;
 
 trait GenericUtils
 {
-    protected function extractArgs(array $keywords,array $kwargs=null)
+    protected function extractArgs(
+        array $keywords,
+        array $kwargs=null,
+        array &$leftargs=null)
     {
         if($kwargs===null) {
             $kwargs = [];
@@ -15,8 +18,12 @@ trait GenericUtils
             if(array_key_exists($key, $keywords)) {
                 $vars[$key] = $value;
             } else {
-                throw new InvalidArgumentException(
-                    'Unexpected keyword argument "'.$key.'"');
+                if($leftargs===null) {
+                    throw new InvalidArgumentException(
+                        'Unexpected keyword argument "'.$key.'"');
+                } else {
+                    $leftargs[$key] = $value;
+                }
             }
         }
         foreach ($keywords as $key => $default) {

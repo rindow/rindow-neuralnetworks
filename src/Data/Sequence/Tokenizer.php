@@ -78,6 +78,7 @@ class Tokenizer
     {
         $this->mo = $mo;
         extract($this->extractArgs([
+            'analyzer'=>null,
             'num_words'=>null,
             'filters'=>"!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n",
             'specials'=>null,
@@ -87,6 +88,7 @@ class Tokenizer
             'oov_token'=>null,
             'document_count'=>0,
         ],$options));
+        $this->analyzer = $analyzer;
         $this->numWords = $num_words;
         $this->filters = $filters;
         $this->specials = $specials;
@@ -231,7 +233,7 @@ class Tokenizer
             }
             $vect = [];
             foreach ($seq as $num) {
-                if(!is_int($num)) {
+                if(!is_numeric($num)) {
                     throw new InvalidArgumentException('sequence includes "'.gettype($num).'". it must be numeric.');
                 }
                 if(array_key_exists($num,$this->indexToWord)) {
@@ -290,5 +292,25 @@ class Tokenizer
         if(!array_key_exists($index,$this->indexToWord))
             return null;
         return $this->indexToWord[$index];
+    }
+
+    public function save() : string
+    {
+        return serialize([
+            $this->documentCount,
+            $this->wordCounts,
+            $this->wordToIndex,
+            $this->indexToWord,
+        ]);
+    }
+
+    public function load(string $string)
+    {
+        [
+            $this->documentCount,
+            $this->wordCounts,
+            $this->wordToIndex,
+            $this->indexToWord,
+        ] = unserialize($string);
     }
 }

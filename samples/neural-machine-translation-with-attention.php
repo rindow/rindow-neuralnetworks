@@ -240,6 +240,7 @@ class Decoder extends AbstractRNNLayer
     protected $attention;
     protected $concat;
     protected $dense;
+    protected $attentionScores;
 
     public function __construct(
         $backend,
@@ -262,8 +263,7 @@ class Decoder extends AbstractRNNLayer
             ['return_state'=>true,'return_sequences'=>true,
              'recurrent_initializer'=>'glorot_uniform']
         );
-        $this->attention = $builder->layers()->Attention(
-            ['return_attention_scores'=>true]);
+        $this->attention = $builder->layers()->Attention();
         $this->concat = $builder->layers()->Concatenate();
         $this->dense = $builder->layers()->Dense($vocabSize);
     }
@@ -275,7 +275,7 @@ class Decoder extends AbstractRNNLayer
         $inputShape = $this->registerLayer($this->embedding,$inputShape);
         [$rnnShape,$statesShapes] = $this->registerLayer($this->rnn,$inputShape);
 
-        [$contextVectorShape,$scoresShape] = $this->registerLayer($this->attention,
+        $contextVectorShape = $this->registerLayer($this->attention,
             [$rnnShape,$encOutputsShape]);
 
         $outputShape = $this->registerLayer($this->concat,[$contextVectorShape,$rnnShape]);
@@ -310,14 +310,17 @@ class Decoder extends AbstractRNNLayer
         [$rnnSequence,$states] = $this->rnn->forward(
             $x,$training,$initial_state);
 
-        [$contextVector,$attentionScores] = $this->attention->forward(
-            [$rnnSequence,$encOutputs],$training);
+        $contextVector = $this->attention->forward(
+            [$rnnSequence,$encOutputs],$training,$options);
+        if(is_array($contextVector)) {
+            [$contextVector,$attentionScores] = $contextVector;
+            $this->attentionScores = $attentionScores;
+        }
         $outputs = $this->concat->forward([$contextVector, $rnnSequence],$training);
 
         $outputs = $this->dense->forward($outputs,$training);
         $this->contextVectorShape = $contextVector->shape();
         $this->rnnSequenceShape = $rnnSequence->shape();
-        $this->attentionScores = $attentionScores;
         return [$outputs,$states];
     }
 
@@ -413,7 +416,7 @@ class Seq2seq extends AbstractModel
         $K = $this->backend;
         [$encOutputs,$states] = $this->encoder->forward($inputs,$training);
         $options = ['enc_outputs'=>$encOutputs];
-        [$outputs,$dummy] = $this->decoder->forward($trues,$training,$states,$options);
+        [$outputs,$dmyStatus] = $this->decoder->forward($trues,$training,$states,$options);
         $outputs = $this->out->forward($outputs,$training);
         return $outputs;
     }
@@ -462,7 +465,8 @@ class Seq2seq extends AbstractModel
         $this->setShapeInspection(false);
         for($t=0;$t<$this->outputLength;$t++) {
             [$predictions, $status] = $this->decoder->forward(
-                $decInputs, $training=false, $status, ['enc_outputs'=>$encOutputs]);
+                $decInputs, $training=false, $status,
+                ['enc_outputs'=>$encOutputs,'return_attention_scores'=>true]);
 
             # storing the attention weights to plot later on
             $scores = $this->decoder->getAttentionScores();
@@ -497,12 +501,12 @@ class Seq2seq extends AbstractModel
     }
 }
 
-$numExamples=30000;#30000
-$numWords=256;
-$epochs = 10;#10
+$numExamples=20000;#30000
+$numWords=null;
+$epochs = 10;
 $batchSize = 64;
 $wordVectSize=256;#256
-$units=256;#1024
+$units=1024;
 
 
 $mo = new MatrixOperator();
@@ -534,6 +538,7 @@ $corpusSize = count($inputTensor);
 echo "num_examples: $numExamples\n";
 echo "num_words: $numWords\n";
 echo "epoch: $epochs\n";
+echo "batchSize: $batchSize\n";
 echo "embedding_dim: $wordVectSize\n";
 echo "units: $units\n";
 echo "Total questions: $corpusSize\n";
@@ -565,32 +570,32 @@ $seq2seq->compile([
     'metrics'=>['accuracy','loss'],
 ]);
 
-#$a=$inpLang->sequencesToTexts($inputTensorTrain[[0,10]]);
-#$v=$targLang->sequencesToTexts($targetTensorTrain[[0,10]]);
-#foreach(array_map(null,$a->getArrayCopy(),$v->getArrayCopy()) as  $values) {
-#    [$i,$t] = $values;
-#    echo "input:".$i."\n";
-#    echo "target:".$t."\n";
-#}
-#echo "---------\n";
-#$a=$inpLang->sequencesToTexts($inputTensorVal[[0,10]]);
-#$v=$targLang->sequencesToTexts($targetTensorVal[[0,10]]);
-#foreach(array_map(null,$a->getArrayCopy(),$v->getArrayCopy()) as  $values) {
-#    [$i,$t] = $values;
-#    echo "input: ".$i."\n";
-#    echo "target:".$t."\n";
-#}
-#exit();
-echo "Train model...\n";
-$history = $seq2seq->fit(
-    $inputTensorTrain,
-    $targetTensorTrain,
-    [
-        'batch_size'=>$batchSize,
-        'epochs'=>$epochs,
-        'validation_data'=>[$inputTensorVal,$targetTensorVal],
-        #callbacks=[checkpoint],
-    ]);
+$modelFilePath = __DIR__."/neural-machine-translation-with-attention.model";
+
+if(file_exists($modelFilePath)) {
+    echo "Loading model...\n";
+    $seq2seq->loadWeightsFromFile($modelFilePath);
+} else {
+    echo "Train model...\n";
+    $history = $seq2seq->fit(
+        $inputTensorTrain,
+        $targetTensorTrain,
+        [
+            'batch_size'=>$batchSize,
+            'epochs'=>$epochs,
+            'validation_data'=>[$inputTensorVal,$targetTensorVal],
+            #callbacks=[checkpoint],
+        ]);
+    $seq2seq->saveWeightsToFile($modelFilePath);
+
+    $plt->figure();
+    $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
+    $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
+    $plt->plot($mo->array($history['loss']),null,null,'loss');
+    $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+    $plt->legend();
+    $plt->title('seq2seq-attention-translation');
+}
 
 $choice = $mo->random()->choice($corpusSize,10,false);
 foreach($choice as $idx)
@@ -610,11 +615,4 @@ foreach($choice as $idx)
     #attention_plot = attention_plot[:len(predicted_sentence.split(' ')), :len(sentence.split(' '))]
     $seq2seq->plotAttention($attentionPlot,  explode(' ',$sentence), explode(' ',$predictedSentence));
 }
-$plt->figure();
-$plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
-$plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
-$plt->plot($mo->array($history['loss']),null,null,'loss');
-$plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
-$plt->legend();
-$plt->title('seq2seq-attention-translation');
 $plt->show();

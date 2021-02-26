@@ -27,10 +27,12 @@ class Test extends TestCase
             $y = $function->forward($x,...$args);
             return $K->ndarray($y);
         };
-        $grads = $mo->la()->numericalGradient(null,$f,$K->ndarray($x));
+        $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
         $outputs = $function->forward($x, ...$args);
         $ones = $K->ones($outputs->shape(),$outputs->dtype());
         $dInputs = $function->backward($ones);
+
+        //echo $mo->toString($K->sub($grads[0],$K->ndarray($dInputs)),'%6.4e',true)."\n";
         return $mo->la()->isclose($grads[0],$K->ndarray($dInputs));
     }
 
@@ -44,6 +46,7 @@ class Test extends TestCase
             [-1.0,-0.5,0.0,0.5,1.0],
             [-2.0,-1.0,0.0,1.0,2.0],
         ]);
+        $inputs = $K->scale(1/1,$inputs);
         $copyInputs = $K->copy($inputs);
         $inputs = $K->array($inputs);
         $outputs = $activation->forward($inputs, $training=true);

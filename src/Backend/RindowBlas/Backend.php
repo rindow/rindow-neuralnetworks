@@ -47,6 +47,11 @@ class Backend
         $this->la->fp64();
     }
 
+    public function accelerated()
+    {
+        return $this->la->accelerated();
+    }
+
     public function epsilon()
     {
         return $this->epsilon;
@@ -61,6 +66,12 @@ class Backend
     {
         $mo = $this->matrixOperator;
         return $mo->dtypeToString($dtype);
+    }
+
+    public function toString(NDArray $array,string $format=null,$indent=null) : string
+    {
+        $mo = $this->matrixOperator;
+        return $mo->toString($array,$format,$indent);
     }
 
     public function alloc(array $shape,$dtype=null)
@@ -454,30 +465,30 @@ class Backend
         return $this->la->asum($x);
     }
 
-    public function sum(NDArray $x, int $axis=null)
+    public function sum(NDArray $x, int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
             return $this->la->sum($x);
         } else {
-            return $this->la->reduceSum($x,$axis);
+            return $this->la->reduceSum($x,$axis,$r);
         }
     }
 
-    public function mean(NDArray $x,int $axis=null)
+    public function mean(NDArray $x,int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
             return $this->la->sum($x) / $x->size();
         } else {
-            return $this->la->reduceMean($x,$axis);
+            return $this->la->reduceMean($x,$axis,$r);
         }
     }
 
-    public function max(NDArray $x,int $axis=null)
+    public function max(NDArray $x,int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
             return $this->la->max($x);
         } else {
-            return $this->la->reduceMax($x,$axis);
+            return $this->la->reduceMax($x,$axis,$r);
         }
     }
 
@@ -565,9 +576,9 @@ class Backend
         return $this->la->matmul($a,$b,$transA,$transB,$c,$alpha,$beta);
     }
 
-    public function select(NDArray $source,NDArray $selector,$axis=null)
+    public function gather(NDArray $source,NDArray $indices,$axis=null)
     {
-        return $this->la->select($source,$selector,$axis);
+        return $this->la->gather($source,$indices,$axis);
     }
 
     public function scatter(NDArray $indices,NDArray $values,int  $numClass,$axis=null,NDArray $target=null)
@@ -636,14 +647,13 @@ class Backend
 
     public function repeat(
         NDArray $inputs,
-        int $repeats
+        int $repeats,
+        int $axis=null
         ) {
-        if($inputs->ndim()!=2) {
-            throw new InvalidArgumentException('inputs dimension must be 2D');
-        }
         return $this->la->repeat(
             $inputs,
-            $repeats
+            $repeats,
+            $axis
             );
     }
 
@@ -1188,6 +1198,7 @@ class Backend
         for($i=0;$i<$rank;$i++){
             $filterSize[] = array_shift($tmp);
         }
+        // cols.shape = [batches*outshape*channels, filtersize]
         $cols =
             $cols->reshape([$batches*array_product($outShape)*$channels,
         array_product($filterSize)    ]);
@@ -1237,10 +1248,12 @@ class Backend
             $tmp = $this->la->scal(1/$num,$this->copy($dOutputs));
             $dCols = $this->la->duplicate($tmp,$num,$trans=true);
         } else {
+            // cols.shape == [batches*outshape*channels, filtersize]
             // d max
             //dx = dy * onehot(argMax(x))
             $argMax = $this->la->reduceArgMax(
                 $status->cols,$axis=1);
+            // argMax.shape == [batches*outshape*channels]
             /*
             $dCols = $this->la->onehot(
                 $argMax,
@@ -1251,12 +1264,14 @@ class Backend
             $this->la->multiply(
                 $dOutputs,$dCols,$trans=true);
             */
+            // dOutputs.shape == [batches*outshape*channels]
             $dCols = $this->la->scatter(
                 $argMax,
                 $dOutputs->reshape([$dOutputs->size()]),
                 array_product($status->poolSize),
                 $axis=1
             );
+            // dCols.shape == [batches*outshape*channels, filtersize]
         }
 
         $dInputs = $this->zeros(
@@ -1377,8 +1392,7 @@ class Backend
         }
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
         return -1.0 * $la->sum($la->log($la->increment(
-                //$la->selectAxis1($predicts,$trues),
-                $la->select($predicts,$trues,$axis=1),
+                $la->gather($predicts,$trues,$axis=1),
                 $this->epsilon))) / $batchSize;
     }
 
