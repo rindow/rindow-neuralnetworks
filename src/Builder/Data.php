@@ -6,6 +6,7 @@ use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
 use Rindow\NeuralNetworks\Data\Dataset\CSVDataset;
 use Rindow\NeuralNetworks\Data\Dataset\ClassifiedTextDataset;
 use Rindow\NeuralNetworks\Data\Image\ImageFilter;
+use Rindow\NeuralNetworks\Data\Image\ImageClassifiedDataset;
 use Rindow\NeuralNetworks\Data\Sequence\TextClassifiedDataset;
 use LogicException;
 
@@ -62,5 +63,10 @@ class Data
     public function TextClassifiedDataset(string $path, array $options=null)
     {
         return new TextClassifiedDataset($this->matrixOperator, $path, $options);
+    }
+
+    public function ImageClassifiedDataset(string $path, array $options=null)
+    {
+        return new ImageClassifiedDataset($this->matrixOperator, $path, $options);
     }
 }

@@ -42,8 +42,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
 
-        $dataset = new TextClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->TextClassifiedDataset(
             __DIR__.'/../Dataset/text',
             [
                 'pattern'=>'@.*\\.txt@',
@@ -117,8 +116,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
 
-        $dataset = new TextClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->TextClassifiedDataset(
             __DIR__.'/../Dataset/text',
             [
                 'pattern'=>'@.*\\.txt@',
@@ -153,8 +151,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
 
-        $dataset = new TextClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->TextClassifiedDataset(
             __DIR__.'/../Dataset/text',
             [
                 'pattern'=>'@.*\\.txt@',

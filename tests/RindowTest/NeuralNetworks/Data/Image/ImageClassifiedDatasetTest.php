@@ -24,8 +24,7 @@ class Test extends TestCase
         $nn = new NeuralNetworks($mo);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $dataset = new ImageClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
             [
                 'pattern'=>'@.*\\.png@',
@@ -58,8 +57,7 @@ class Test extends TestCase
         $nn = new NeuralNetworks($mo);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $dataset = new ImageClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
             [
                 'pattern'=>'@.*\\.png@',
@@ -91,8 +89,7 @@ class Test extends TestCase
         $nn = new NeuralNetworks($mo);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $dataset = new ImageClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
             [
                 'pattern'=>'@.*\\.png@',
@@ -123,8 +120,7 @@ class Test extends TestCase
         $nn = new NeuralNetworks($mo);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $dataset = new ImageClassifiedDataset(
-            $mo,
+        $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
             [
                 'pattern'=>'@.*\\.png@',

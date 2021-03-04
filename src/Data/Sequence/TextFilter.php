@@ -20,7 +20,6 @@ class TextFilter implements DatasetFilter
         )
     {
         extract($this->extractArgs([
-            'padding'=>'post',
             'tokenizer'=>null,
             'classnames'=>[],
             'analyzer'=>null,
