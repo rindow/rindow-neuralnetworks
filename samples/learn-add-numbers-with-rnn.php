@@ -161,7 +161,7 @@ $x_val   = $questions[[$split_at,$corpus_size-1]];
 $y_train = $answers[[0,$split_at-1]];
 $y_val   = $answers[[$split_at,$corpus_size-1]];
 
-echo "train,test: ".$x_train->shape()[0].",".$y_train->shape()[0]."\n";
+echo "train,test: ".$x_train->shape()[0].",".$x_val->shape()[0]."\n";
 
 $modelFilePath = __DIR__."/learn-add-numbers-with-rnn.model";
 

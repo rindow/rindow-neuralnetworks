@@ -22,7 +22,7 @@ class Preprocessor
             'dtype'=>NDArray::int32,
             'padding'=>"pre",
             'truncating'=>"pre",
-            'value'=>0.0,
+            'value'=>0,
         ],$options));
         if(!is_iterable($sequences)) {
             throw new InvalidArgumentException('sequences must be iterable.');
@@ -41,6 +41,9 @@ class Preprocessor
             if($max >= $maxlen) {
                 $max = $maxlen;
             }
+        }
+        if($dtype==NDArray::float32||$dtype==NDArray::float64) {
+            $value = (float)$value;
         }
         $tensor = $this->mo->full([$size,$max],$value,$dtype);
         $i = 0;

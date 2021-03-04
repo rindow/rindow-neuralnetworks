@@ -22,7 +22,7 @@ class TextFilter implements DatasetFilter
         extract($this->extractArgs([
             'padding'=>'post',
             'tokenizer'=>null,
-            'labels'=>[],
+            'classnames'=>[],
             'analyzer'=>null,
             'num_words'=>null,
             'tokenizer_filters'=>"!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n\r",
@@ -35,9 +35,9 @@ class TextFilter implements DatasetFilter
             'preprocessor'=>null,
             'maxlen'=>null,
             'dtype'=>NDArray::int32,
-            'padding'=>"pre",
-            'truncating'=>"pre",
-            'value'=>0.0,
+            'padding'=>"post",
+            'truncating'=>"post",
+            'value'=>0,
         ],$options,$leftargs));
         $this->mo = $mo;
         if($tokenizer==null) {
@@ -57,7 +57,7 @@ class TextFilter implements DatasetFilter
         if($preprocessor==null) {
             $preprocessor = new Preprocessor($mo);
         }
-        $this->labels = $labels;
+        $this->labels = array_flip($classnames);
         $this->preprocessor = $preprocessor;
         //if($maxlen==null||$maxlen<1) {
         //    throw new InvalidArgumentException('maxlen must be greater then 0');
@@ -109,7 +109,10 @@ class TextFilter implements DatasetFilter
         return $classname;
     }
 
-    public function translate($inputs, $tests=null) : array
+    public function translate(
+        iterable $inputs,
+        iterable $tests=null,
+        $options=null) : array
     {
         //$this->tokenizer->fitOnTexts($inputs);
         $sequences = $this->tokenizer->textsToSequences($inputs);
@@ -120,6 +123,7 @@ class TextFilter implements DatasetFilter
             'truncating'=>$this->truncating,
             'value'=>$this->value,
         ]);
+        //var_dump($inputsArray->toArray());
 
         $testsCount = count($tests);
         $testsArray = $this->mo->la()->alloc([$testsCount],$this->dtype);

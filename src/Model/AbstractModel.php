@@ -374,6 +374,12 @@ abstract class AbstractModel implements Model
             $this->setShapeInspection(false);
             $callbacks->onTrainBatchEnd($batchIndex,['loss'=>$loss,'accuracy'=>$accuracy]);
         }
+        if($verbose==1) {
+            $this->progressBar($epoch,$epochs,$startTime,
+                    $totalSteps,$totalSteps,25);
+        } elseif($verbose>1) {
+            $this->console(".");
+        }
         return [$totalLoss,$totalAccuracy];
     }
 
@@ -400,7 +406,7 @@ abstract class AbstractModel implements Model
             $this->console($maxDot."\n");
         }
         $this->console("\rEpoch $epoch/$epochs [".str_repeat('.',$dot).str_repeat(' ',$maxDot-$dot).
-            "] ${elapsed} sec. remain:${rem_string}  ");
+            "] ${elapsed} sec. remaining:${rem_string}  ");
     }
 
     protected function loss(NDArray $trues,NDArray $preds) : float

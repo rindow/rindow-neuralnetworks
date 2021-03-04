@@ -74,7 +74,8 @@ class TestFilter implements DatasetFilter
     {
         $this->mo = $mo;
     }
-    public function translate($inputs,$tests=null) : array
+    public function translate(
+        iterable $inputs, iterable $tests=null, $options=null) : array
     {
         $batchSize= count($inputs);
         $cols = count($inputs[0])-1;

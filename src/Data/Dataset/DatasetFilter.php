@@ -9,5 +9,8 @@ use InvalidArgumentException;
  */
 interface DatasetFilter
 {
-    public function translate($inputs, $tests=null) : array;
+    public function translate(
+        iterable $inputs,
+        iterable $tests=null,
+        $options=null) : array;
 }

@@ -78,7 +78,10 @@ class ImageFilter implements DatasetFilter
         $this->widthShiftHigh = $widthShiftInteger;
     }
 
-    public function translate($inputs, $tests=null) : array
+    public function translate(
+        iterable $inputs,
+        iterable $tests=null,
+        $options=null) : array
     {
         $la = $this->mo->la();
         if($this->heightShiftInteger===null) {

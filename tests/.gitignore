@@ -1,4 +1,4 @@
-cache/
-data/
-tmp/
+/cache/
+/data/
+/tmp/
 .phpunit.*

@@ -147,6 +147,9 @@ class Tokenizer
                     $text,$this->filters,$this->specials,$this->lower,$this->split);
             }
             foreach ($seq as $w) {
+                if(is_float($w)) {
+                    $w = (int)$w;
+                }
                 if(array_key_exists($w,$this->wordCounts)) {
                     $this->wordCounts[$w]++;
                 } else {
@@ -233,7 +236,7 @@ class Tokenizer
             }
             $vect = [];
             foreach ($seq as $num) {
-                if(!is_numeric($num)) {
+                if(!is_int($num)) {
                     throw new InvalidArgumentException('sequence includes "'.gettype($num).'". it must be numeric.');
                 }
                 if(array_key_exists($num,$this->indexToWord)) {
