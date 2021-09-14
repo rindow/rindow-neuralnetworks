@@ -19,14 +19,15 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
 
     protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : float
     {
-        if($predicts->ndim()!=2||$predicts->shape()[1]!=1) {
+        $ndimP = $predicts->ndim();
+        if($ndimP!=1 && ($ndimP!=2 || $predicts->shape()[1]!=1)) {
             throw new InvalidArgumentException('Invalid shape of predicts: ['.implode(',',$predicts->shape()).']');
         }
         $ndimT = $trues->ndim();
         if($ndimT==1) {
             ;
         } elseif($ndimT==2 && $trues->shape()[1]==1) {
-            $trues = $trues->reshape([$trues->shape()[1]]);
+            $trues = $trues->reshape([$trues->shape()[0]]);
         } else {
             throw new InvalidArgumentException('Invalid shape of trues: ['.implode(',',$trues->shape()).']');
         }
@@ -54,6 +55,9 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
         }
         if($trues->shape()!=$shape)
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
+        if($this->fromLogits) {
+            $predicts = $this->activationFunction($predicts);
+        }
         $predicts = $predicts->reshape([$predicts->size()]);
         // calc accuracy
         $predicts = $K->greater($K->copy($predicts),0.5);

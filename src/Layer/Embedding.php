@@ -37,7 +37,7 @@ class Embedding extends AbstractLayer implements Layer
         $this->kernelInitializerName = $kernel_initializer;
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variable=null, array $options=null)
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
@@ -45,7 +45,7 @@ class Embedding extends AbstractLayer implements Layer
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
 
-        $inputShape = $this->normalizeInputShape($inputShape);
+        $inputShape = $this->normalizeInputShape($variable);
         if(count($inputShape)!=1) {
             throw new InvalidArgumentException(
                 'Unsuppored input shape: ['.implode(',',$inputShape).']');
@@ -60,7 +60,7 @@ class Embedding extends AbstractLayer implements Layer
         }
         $this->dKernel = $K->zerosLike($this->kernel);
         $this->outputShape = array_merge($inputShape,[$this->outputDim]);
-        return $this->outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

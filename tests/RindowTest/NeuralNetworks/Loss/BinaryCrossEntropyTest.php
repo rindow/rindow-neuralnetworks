@@ -21,17 +21,18 @@ class Test extends TestCase
     {
         $f = function($x) use ($mo,$K,$function,$t,$fromLogits){
             $x = $K->array($x);
-            if($fromLogits) {
-                $x = $function->forward($x,true);
-            }
-            $l = $function->loss($t,$x);
+            //if($fromLogits) {
+            //    #$x = $function->forward($x,true);
+            //    $x = $K->sigmoid($x);
+            //}
+            $l = $function->forward($t,$x);
             return $mo->array([$l]);
         };
         $xx = $K->ndarray($x);
         $grads = $mo->la()->numericalGradient(1e-3,$f,$xx);
-        $outputs = $function->loss($t,$x);
-        $dInputs = $function->differentiateLoss();
-        $dInputs = $K->ndarray($dInputs);
+        $outputs = $function->forward($t,$x);
+        $dInputs = $function->backward([$K->array(1.0)]);
+        $dInputs = $K->ndarray($dInputs[0]);
 #echo "\n";
 #echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
 #echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
@@ -59,7 +60,7 @@ class Test extends TestCase
         $y = [];
         foreach($x as $k => $xx) {
             $tt = $t[$k];
-            $y[] = $loss->loss($K->array([$tt]),$K->array([[$xx]]));
+            $y[] = $loss->forward($K->array([$tt]),$K->array([[$xx]]));
         }
         $plt->plot($mo->array($y));
         #$plt->show();
@@ -90,13 +91,13 @@ class Test extends TestCase
         ]);
         $copyx = $K->copy($x);
         $copyt = $K->copy($t);
-        $loss = $func->loss($t,$x);
+        $loss = $func->forward($t,$x);
         #$accuracy = $func->accuracy($t,$x);
         $this->assertLessThan(0.001,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
         //$this->assertLessThan(0.001,abs(1-$dx[0][0])/6);
@@ -115,11 +116,11 @@ class Test extends TestCase
         $t = $K->array([
             0.0, 0.0 , 1.0,
         ]);
-        $loss = $func->loss($t,$x);
+        $loss = $func->forward($t,$x);
         $this->assertGreaterThan(8,abs($loss));
 
-        $dx = $func->differentiateLoss();
-        $dx = $K->ndarray($dx);
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $K->ndarray($dx[0]);
         $this->assertGreaterThan(100,$dx[0][0]);
         $this->assertGreaterThan(100,$dx[1][0]);
         $this->assertLessThan(100,$dx[2][0]);
@@ -154,13 +155,14 @@ class Test extends TestCase
         ]);
         $copyx = $K->copy($x);
         $copyt = $K->copy($t);
-        $y = $func->forward($x,true);
-        $loss = $func->loss($t,$y);
+        //$y = $func->forward($x,true);
+        //$y = $backend->sigmoid($x);
+        $loss = $func->forward($t,$x);
         $this->assertLessThan(0.001,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
@@ -172,13 +174,14 @@ class Test extends TestCase
         ]);
         $copyx = $K->copy($x);
         $copyt = $K->copy($t);
-        $y = $func->forward($x,true);
-        $loss = $func->loss($t,$y);
+        //$y = $func->forward($x,true);
+        //$y = $backend->sigmoid($x);
+        $loss = $func->forward($t,$x);
         $this->assertGreaterThan(7,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 

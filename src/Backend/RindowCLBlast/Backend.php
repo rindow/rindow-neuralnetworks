@@ -300,6 +300,24 @@ class Backend
         return $this->la->transpose($x);
     }
 
+    public function batch_transpose(NDArray $x)
+    {
+        $la = $this->la;
+        if($x->ndim()!=3) {
+            throw new InvalidArgumentException('The shape of X must be an array of three dimensions.');
+        }
+        $shape = $x->shape();
+        $repeats = array_shift($shape);
+        $feature = array_pop($shape);
+        $size = (int)array_product($shape);
+        $flattenX = $x->reshape([$repeats,$size,$feature]);
+        $y = $la->alloc([$repeats,$feature,$size],$x->dtype());
+        for($i=0;$i<$repeats;$i++) {
+            $la->transpose($flattenX[$i],$y[$i]);
+        }
+        return $y->reshape(array_merge([$repeats],[$feature],$shape));
+    }
+
     public function add(NDArray $x, NDArray $y)
     {
         $la = $this->la;
@@ -1519,20 +1537,21 @@ class Backend
     }
 
     public function dCategoricalCrossEntropy(
-        NDArray $trues, NDArray $predicts, bool $fromLogits=null) : NDArray
+        NDArray $trues, NDArray $predicts, bool $withSoftmax=null) : NDArray
     {
         $la = $this->la;
         if($trues->shape()!=$predicts->shape()){
             $msg = '['.implode(',',$trues->shape()).'] ['.implode(',',$predicts->shape()).']';
             throw new InvalidArgumentException('must be same shape of dimensions:'.$msg);
         }
-        if($fromLogits) {
-            //  dx = y - t   :  y = softmax(x)
-            $dInput = $la->axpy($trues, $la->copy($predicts), -1);
+        $n = $predicts->shape()[0];
+        if($withSoftmax) {
+            //  dx = (y - t) / N   :  y = softmax(x)
+            $dInput = $la->scal(1/$n,$la->axpy($trues, $la->copy($predicts), -1));
             return $dInput;
         } else {
-            // dx = - trues / predicts
-            return $la->scal(-1.0,$la->multiply($trues,
+            // dx = - trues / predicts / N
+            return $la->scal(-1/$n,$la->multiply($trues,
                 $la->reciprocal($la->copy($predicts),$this->epsilon)));
         }
     }

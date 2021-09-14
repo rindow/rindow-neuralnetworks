@@ -8,6 +8,6 @@ use Interop\Polite\Math\Matrix\NDArray;
  */
 interface Layer extends LayerBase
 {
-    public function forward(NDArray $inputs, bool $training) : NDArray;
-    public function backward(NDArray $dOutputs) : NDArray;
+    public function forward(object $inputs, bool $training);
+    public function backward(array $dOutputs) : array;
 }

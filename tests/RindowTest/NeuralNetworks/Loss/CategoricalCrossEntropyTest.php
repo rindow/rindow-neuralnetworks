@@ -39,7 +39,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $K = $backend = $this->newBackend($mo);
         $func = new CategoricalCrossEntropy($backend);
-
+/*
         $x = $K->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
@@ -48,30 +48,43 @@ class Test extends TestCase
             [0.0, 0.0 , 1.0],
             [0.0, 0.0 , 1.0],
         ]);
+        $n = $x->shape()[0];
+
         $y = $backend->softmax($x);
-        $loss = $func->loss($t,$y);
+        $loss = $func->forward($t,$y);
         $accuracy = $func->accuracy($t,$x);
 
         $this->assertLessThan(0.01,abs(0.0-$loss));
 
-        $dx = $backend->dsoftmax($func->differentiateLoss(),$y);
-        $this->assertLessThan(0.0001, $K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
-
-
+        $dx = $backend->dsoftmax($func->backward(1.0),$y);
+        #$this->assertLessThan(0.0001, $K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
+*/
+        #$x = $K->array([
+        #    [0.0, 0.0 , 6.0],
+        #    [0.0, 0.0 , 6.0],
+        #]);
+        #$t = $K->array([
+        #    [0.0, 1.0 , 0.0],
+        #    [0.0, 1.0 , 0.0],
+        #]);
         $x = $K->array([
-            [0.0, 0.0 , 6.0],
-            [0.0, 0.0 , 6.0],
+            [0.05, 0.95, 0], [0.1, 0.8, 0.1]
         ]);
         $t = $K->array([
-            [0.0, 1.0 , 0.0],
-            [0.0, 1.0 , 0.0],
+            [0, 1, 0], [0, 0, 1]
         ]);
-        $y = $backend->softmax($x);
-        $loss = $func->loss($t,$y);
-        $this->assertLessThan(0.01,abs(6.0-$loss));
 
-        $dx = $backend->dsoftmax($func->differentiateLoss(),$y);
-        $this->assertLessThan(0.001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
+        $y = $backend->softmax($x);
+        $loss = $func->forward($t,$y);
+        $this->assertLessThan(0.01,abs(0.9868951-$loss));
+
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $backend->dsoftmax($dx[0],$y);
+        #$this->assertLessThan(0.001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([[ 0.11335728, -0.22118606,  0.10782879],
+                        [ 0.12457169,  0.25085658, -0.3754283 ]]),
+            $K->ndarray($dx)));
     }
 
     public function testFromLogits()
@@ -80,7 +93,7 @@ class Test extends TestCase
         $K = $backend = $this->newBackend($mo);
         $func = new CategoricalCrossEntropy($backend);
         $func->setFromLogits(true);
-
+/*
         $x = $K->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
@@ -89,26 +102,39 @@ class Test extends TestCase
             [0.0, 0.0 , 1.0],
             [0.0, 0.0 , 1.0],
         ]);
-        $y = $func->forward($x,true);
-        $loss = $func->loss($t,$y);
+        $y = $backend->softmax($x);
+
+        $loss = $func->forward($t,$x);
         $this->assertLessThan(0.01,abs(0.0-$loss));
 
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward(1.0);
         $this->assertLessThan(0.0001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
-
+*/
+        #$x = $K->array([
+        #    [0.0, 0.0 , 6.0],
+        #    [0.0, 0.0 , 6.0],
+        #]);
+        #$t = $K->array([
+        #    [0.0, 1.0 , 0.0],
+        #    [0.0, 1.0 , 0.0],
+        #]);
         $x = $K->array([
-            [0.0, 0.0 , 6.0],
-            [0.0, 0.0 , 6.0],
+            [0.05, 0.95, 0], [0.1, 0.8, 0.1]
         ]);
         $t = $K->array([
-            [0.0, 1.0 , 0.0],
-            [0.0, 1.0 , 0.0],
+            [0, 1, 0], [0, 0, 1]
         ]);
-        $y = $func->forward($x,true);
-        $loss = $func->loss($t,$y);
-        $this->assertLessThan(0.01,abs(6.0-$loss));
+        //$y = $backend->softmax($x);
 
-        $dx = $func->differentiateLoss();
-        $this->assertLessThan(0.0001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
+        $loss = $func->forward($t,$x);
+        $this->assertLessThan(0.01,abs(0.9868951-$loss));
+
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $dx[0];
+        #$this->assertLessThan(0.0001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([[ 0.11335728, -0.22118606,  0.10782879],
+                        [ 0.12457169,  0.25085658, -0.3754283 ]]),
+            $K->ndarray($dx)));
     }
 }

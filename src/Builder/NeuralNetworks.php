@@ -4,6 +4,8 @@ namespace Rindow\NeuralNetworks\Builder;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend as RindowBlasBackend;
 use Rindow\NeuralNetworks\Backend\RindowCLBlast\Backend as RindowCLBlastBackend;
+use Rindow\NeuralNetworks\Support\Control\Execute;
+use Rindow\NeuralNetworks\Support\Control\Context;
 use LogicException;
 
 class NeuralNetworks
@@ -23,6 +25,7 @@ class NeuralNetworks
     protected $datasets;
     protected $data;
     protected $utils;
+    protected $gradient;
 
     public function __construct($matrixOperator=null,$backend=null)
     {
@@ -119,5 +122,18 @@ class NeuralNetworks
             $this->utils = new Utils($this->matrixOperator);
         }
         return $this->utils;
+    }
+
+    public function gradient()
+    {
+        if($this->gradient==null) {
+            $this->gradient = new Gradient($this->backend);
+        }
+        return $this->gradient;
+    }
+
+    public function with(Context $context, callable $function)
+    {
+        return Execute::with($context,$function);
     }
 }

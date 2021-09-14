@@ -5,6 +5,8 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Dense;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use InvalidArgumentException;
 
 class Test extends TestCase
@@ -18,6 +20,13 @@ class Test extends TestCase
     {
         $builder = new NeuralNetworks($mo);
         return $builder->backend();
+    }
+
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
     public function testDefaultInitialize()
@@ -42,6 +51,7 @@ class Test extends TestCase
         $this->assertEquals($mo->zeros([3])->toArray(),$grads[1]->toArray());
 
         $this->assertEquals([3],$layer->outputShape());
+        //$layer->unlink();
     }
 
     public function testNotspecifiedInputShape()
@@ -60,7 +70,7 @@ class Test extends TestCase
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
         $layer = new Dense($K,$units=3,[]);
-        $layer->build($inputShape=[2]);
+        $layer->build($this->newInputShape([2]));
         $params = $layer->getParams();
         $this->assertCount(2,$params);
         $this->assertEquals([2,3],$params[0]->shape());
@@ -121,7 +131,7 @@ class Test extends TestCase
         ]);
         $copydOutputs = $mo->copy($dOutputs);
         $dOutputs = $K->array($dOutputs);
-        $dInputs = $layer->backward($dOutputs);
+        [$dInputs] = $layer->backward([$dOutputs]);
         $dInputs = $K->ndarray($dInputs);
         $dOutputs = $K->ndarray($dOutputs);
         // 3 input x 4 batch

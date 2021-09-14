@@ -4,10 +4,17 @@ namespace Rindow\NeuralNetworks\Layer;
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
+use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
+use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
+use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use Rindow\NeuralNetworks\Model\BuildContext;
 
 class Concatenate extends AbstractLayerBase
 {
     use GenericUtils;
+    use GradientUtils;
     protected $backend;
     protected $axis;
     protected $shapes;
@@ -28,10 +35,13 @@ class Concatenate extends AbstractLayerBase
         $this->inputShape = $input_shapes;
     }
 
-    public function build(array $inputShapes=null, array $options=null) : array
+    public function build($variables=null, array $options=null)
     {
         $K = $this->backend;
-        $inputShapes = $this->normalizeInputShape($inputShapes);
+        if(!is_array($variables) && $variables!==null) {
+            throw new InvalidArgumentException('inputs must be list of variable');
+        }
+        $inputShapes = $this->normalizeInputShape($variables);
         if(count($inputShapes)<2) {
             throw new InvalidArgumentException('num of inputs must be greater then 2 or equal: input dims is '.count($inputShape));
         }
@@ -67,7 +77,7 @@ class Concatenate extends AbstractLayerBase
         array_unshift($shape,$m);
         $shape = array_merge($shapestack,$shape);
         $this->outputShape = $shape;
-        return $this->outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
@@ -118,8 +128,11 @@ class Concatenate extends AbstractLayerBase
         }
     }
 
-    public function forward(array $inputs, bool $training) : NDArray
+    public function forward(array $inputs, bool $training)
     {
+        if(BuildContext::$build) {
+            return $this->build($inputs);
+        }
         if(count($inputs)<2) {
             throw new InvalidArgumentException('Must have arguments greater than 2 or equal');
         }
@@ -129,8 +142,15 @@ class Concatenate extends AbstractLayerBase
         return $outputs;
     }
 
-    public function backward(NDArray $dOutputs) : array
+    public function backward(array $dOutputs) : array
     {
+        if(count($dOutputs)!=1) {
+            throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
+        }
+        $dOutputs = $dOutputs[0];
+        if(!($dOutputs instanceof NDArray)) {
+            throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
+        }
         $this->assertOutputShape($dOutputs,'backward');
         $dInputs = $this->differentiate($dOutputs);
         $this->assertInputShapes($dInputs,'backward');
@@ -161,5 +181,31 @@ class Concatenate extends AbstractLayerBase
         }
         $dInputs = $K->split($dOutputs,$sizeSplits,$axis);
         return $dInputs;
+    }
+
+    /**
+    *  @param array<Variable>  $inputs
+    *  @return array<Variable>
+    */
+    public function __invoke($inputs, bool $training)
+    {
+        if(!is_array($inputs)) {
+            throw new InvalidArgumentException('inputs must be list of Variable');
+        }
+        $outputs = null;
+        if($this->outputShape==null) {
+            $outputs = $this->build($inputs);
+        }
+        if($inputs[0] instanceof Undetermined) {
+            if($outputs===null) {
+                throw new InvalidArgumentException('Undetermined is found in second calling.');
+            }
+            return $outputs;
+        }
+        $rawInputs = array_map(function($value){return $value->value();},$inputs);
+        $outputs = $this->forward($rawInputs,$training);
+        $outputs = $this->postGradientProcess(
+            $this->backend, $inputs, [$outputs]);
+        return $outputs[0];
     }
 }

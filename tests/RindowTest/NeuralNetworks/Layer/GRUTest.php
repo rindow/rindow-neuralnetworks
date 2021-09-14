@@ -6,6 +6,8 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\GRU;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Activation\Tanh;
@@ -18,6 +20,13 @@ class Test extends TestCase
         return $builder->backend();
     }
 
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
+    }
+
     public function verifyGradient($mo, $K, $function, NDArray $x)
     {
         $f = function($x) use ($mo,$K,$function){
@@ -28,7 +37,7 @@ class Test extends TestCase
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
         $outputs = $function->forward($x,$training=true);
         $dOutputs = $K->ones($outputs->shape(),$outputs->dtype());
-        $dInputs = $function->backward($dOutputs);
+        [$dInputs] = $function->backward([$dOutputs]);
 #echo "\n";
 #echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
 #echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
@@ -123,7 +132,22 @@ class Test extends TestCase
             $units=4,
             [
             ]);
-        $layer->build($inputShape=[5,3]);
+        $layer->build([$this->newInputShape([5,3])]);
+
+        //$this->assertEquals([3],$layer->inputShape());
+        $this->assertEquals([4],$layer->outputShape());
+    }
+
+    public function testSetInputShapeForSequential()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $layer = new GRU(
+            $backend,
+            $units=4,
+            [
+            ]);
+        $layer->build($this->newInputShape([5,3]));
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([4],$layer->outputShape());
@@ -192,7 +216,9 @@ class Test extends TestCase
             $dOutputs);
         $copydStates = [
             $K->copy($dStates[0])];
-        $dInputs = $layer->backward($dOutputs,$dStates);
+        $dPrevStates = $layer->backward([$dOutputs]);
+        $dInputs = array_shift($dPrevStates);
+        $this->assertCount(1,$dPrevStates);
         // 2 batch
         $this->assertEquals([6,5,3],$dInputs->shape());
         $this->assertNotEquals(
@@ -249,7 +275,9 @@ class Test extends TestCase
 
         $copydOutputs = $K->copy(
             $dOutputs);
-        $dInputs = $layer->backward($dOutputs,$dStates);
+        $dPrevStates = $layer->backward([$dOutputs]);
+        $dInputs = array_shift($dPrevStates);
+        $this->assertCount(0,$dPrevStates);
         // 2 batch
         $this->assertEquals([6,5,3],$dInputs->shape());
         $this->assertNotEquals(
@@ -316,7 +344,9 @@ class Test extends TestCase
             $dOutputs);
         $copydStates = [
             $K->copy($dStates[0])];
-        [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
+        $dInputs = array_shift($dPrevStates);
         // 2 batch
         $this->assertEquals([6,5,3],$dInputs->shape());
         $this->assertCount(1,$dPrevStates);
@@ -384,11 +414,13 @@ class Test extends TestCase
             $dOutputs);
         $copydStates = [
             $K->copy($dStates[0])];
-        [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
+        $dInputs = array_shift($dPrevStates);
         // 2 batch
         $this->assertEquals([6,5,3],$dInputs->shape());
-        $this->assertCount(1,$dPrevStates);
-        $this->assertEquals([6,4],$dPrevStates[0]->shape());
+        $this->assertCount(0,$dPrevStates);
+        //$this->assertEquals([6,4],$dPrevStates[0]->shape());
         $this->assertNotEquals(
             $mo->zerosLike($grads[0])->toArray(),
             $grads[0]->toArray());
@@ -454,7 +486,10 @@ class Test extends TestCase
         $dStates =
             [$K->ones([2,4])];
 
-        [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
+        $dInputs = array_shift($dPrevStates);
+        $this->assertCount(1,$dPrevStates);
         // 2 batch
         $this->assertEquals(
             [2,3,5],
@@ -567,7 +602,7 @@ class Test extends TestCase
         echo "outputs=".$mo->toString($outputs,'%5.3f',true);
 
         $ones = $mo->ones($outputs->shape());
-        $dInputs = $layer->backward($ones);
+        [$dInputs] = $layer->backward([$ones]);
         echo "dInputs=".$mo->toString($dInputs,'%5.3f',true);
 
         #$this->assertTrue(
@@ -614,7 +649,7 @@ class Test extends TestCase
         echo "outputs=".$mo->toString($outputs,'%5.2f',true);
 
         $ones = $mo->ones($outputs->shape());
-        $dInputs = $layer->backward($ones);
+        [$dInputs] = $layer->backward([$ones]);
         #$this->assertTrue(
         #    $this->verifyGradient($mo,$layer,$x));
     }

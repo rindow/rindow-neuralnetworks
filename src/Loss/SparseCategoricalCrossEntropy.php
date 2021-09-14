@@ -32,6 +32,9 @@ class SparseCategoricalCrossEntropy extends AbstractCrossEntropy
     {
         $K = $this->backend;
         // transrate one hot to categorical labels
+        if($this->fromLogits) {
+            $y_pred = $this->activationFunction($y_pred);
+        }
         $ndim = $c_true->ndim();
         if($ndim>1){
             $c_true = $c_true->reshape([$c_true->size()]);

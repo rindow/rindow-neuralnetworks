@@ -10,7 +10,7 @@ use PharData;
 class Cifar10
 {
     protected $mo;
-    protected $baseUrl = 'http://www.cs.toronto.edu/~kriz/';
+    protected $baseUrl = 'https://www.cs.toronto.edu/~kriz/';
     protected $downloadFile = 'cifar-10-binary.tar.gz';
     protected $keyFiles = [
         'data_file_1'=>'data_batch_1.bin',

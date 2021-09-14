@@ -158,21 +158,25 @@ class EngFraDataset
     }
 }
 
-class Encoder extends AbstractRNNLayer
+class Encoder extends AbstractModel
 {
     public function __construct(
         $backend,
         $builder,
         int $vocabSize,
         int $wordVectSize,
-        int $units
+        int $units,
+        int $inputLength
         )
     {
         $this->backend = $backend;
         $this->vocabSize = $vocabSize;
         $this->wordVectSize = $wordVectSize;
         $this->units = $units;
-        $this->embedding = $builder->layers()->Embedding($vocabSize,$wordVectSize);
+        $this->embedding = $builder->layers()->Embedding(
+            $vocabSize,$wordVectSize,
+            ['input_length'=>$inputLength]
+        );
         $this->rnn = $builder->layers()->GRU(
             $units,
             ['return_state'=>true,'return_sequences'=>true,
@@ -180,28 +184,8 @@ class Encoder extends AbstractRNNLayer
         );
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
-    {
-        $inputShape = $this->normalizeInputShape($inputShape);
-        $inputShape = $this->registerLayer($this->embedding,$inputShape);
-        [$outputShape,$statesShapes] = $this->registerLayer($this->rnn,$inputShape);
-        $this->outputShape = $outputShape;
-        $this->statesShapes = $statesShapes;
-        return [$outputShape,$statesShapes];
-    }
-
-    public function getConfig() : array
-    {
-        return [
-            'builder'=>true,
-            'vocab_size'=>$this->vocabSize,
-            'word_vec_size'=>$this->wordVecSize,
-            'units'=>$this->units,
-            ];
-    }
-
     protected function call(
-        NDArray $inputs,
+        object $inputs,
         bool $training,
         array $initial_state=null,
         array $options=null
@@ -214,21 +198,13 @@ class Encoder extends AbstractRNNLayer
         return [$outputs, $states];
     }
 
-    protected function differentiate(NDArray $dOutputs, array $dStates=null)
-    {
-        $K = $this->backend;
-        [$dWordvect,$dStates] = $this->rnn->backward($dOutputs,$dStates);
-        $dInputs = $this->embedding->backward($dWordvect);
-        return $dInputs;
-    }
-
     public function initializeHiddenState($batch_sz)
     {
         return $this->backend->zeros([$batch_sz, $this->units]);
     }
 }
 
-class Decoder extends AbstractRNNLayer
+class Decoder extends AbstractModel
 {
     protected $backend;
     protected $vocabSize;
@@ -258,7 +234,10 @@ class Decoder extends AbstractRNNLayer
         $this->units = $units;
         $this->inputLength = $inputLength;
         $this->targetLength = $targetLength;
-        $this->embedding = $builder->layers()->Embedding($vocabSize, $wordVectSize);
+        $this->embedding = $builder->layers()->Embedding(
+            $vocabSize, $wordVectSize,
+            ['input_length'=>$targetLength]
+        );
         $this->rnn = $builder->layers()->GRU($units,
             ['return_state'=>true,'return_sequences'=>true,
              'recurrent_initializer'=>'glorot_uniform']
@@ -268,36 +247,8 @@ class Decoder extends AbstractRNNLayer
         $this->dense = $builder->layers()->Dense($vocabSize);
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
-    {
-        $encOutputsShape = [$this->inputLength,$this->units];
-        $inputShape = $this->normalizeInputShape($inputShape);
-        $inputShape = $this->registerLayer($this->embedding,$inputShape);
-        [$rnnShape,$statesShapes] = $this->registerLayer($this->rnn,$inputShape);
-
-        $contextVectorShape = $this->registerLayer($this->attention,
-            [$rnnShape,$encOutputsShape]);
-
-        $outputShape = $this->registerLayer($this->concat,[$contextVectorShape,$rnnShape]);
-        $outputShape = $this->registerLayer($this->dense,$outputShape);
-        $this->outputShape = $outputShape;
-        $this->statesShapes = $statesShapes;
-        return [$outputShape,$statesShapes];
-    }
-
-    public function getConfig() : array
-    {
-        return [
-            'builder'=>true,
-            'rnn'=>$this->rnnName,
-            'vocab_size'=>$this->vocabSize,
-            'word_vec_size'=>$this->wordVecSize,
-            'units'=>$this->units,
-        ];
-    }
-
     protected function call(
-        NDArray $inputs,
+        object $inputs,
         bool $training,
         array $initial_state=null,
         array $options=null
@@ -328,18 +279,6 @@ class Decoder extends AbstractRNNLayer
     {
         return $this->attentionScores;
     }
-
-    protected function differentiate(NDArray $dOutputs, array $dNextStates=null)
-    {
-        $K = $this->backend;
-        $dOutputs = $this->dense->backward($dOutputs);
-        [$dContextVector,$dRnnSequence] = $this->concat->backward($dOutputs);
-        [$dRnnSequence2,$dEncOutputs] = $this->attention->backward($dContextVector);
-        $K->update_add($dRnnSequence,$dRnnSequence2);
-        [$dWordVect,$dStates]=$this->rnn->backward($dRnnSequence,$dNextStates);
-        $dInputs = $this->embedding->backward($dWordVect);
-        return [$dInputs,$dStates,['enc_outputs'=>$dEncOutputs]];
-    }
 }
 
 
@@ -366,7 +305,8 @@ class Seq2seq extends AbstractModel
             $builder,
             $inputVocabSize,
             $wordVectSize,
-            $units
+            $units,
+            $inputLength
         );
         $this->decoder = new Decoder(
             $backend,
@@ -378,7 +318,6 @@ class Seq2seq extends AbstractModel
             $outputLength
         );
         $this->out = $builder->layers()->Activation('softmax');
-        $this->setLastLayer($this->out);
         $this->mo = $mo;
         $this->backend = $backend;
         $this->startVocId = $startVocId;
@@ -389,13 +328,14 @@ class Seq2seq extends AbstractModel
         $this->plt = $plt;
     }
 
-    protected function buildLayers(array $options=null) : void
+    protected function call($inputs, $training, $trues)
     {
-        $shape = [$this->inputLength];
-        [$encOutputsShape,$encStatesShapes] = $this->registerLayer($this->encoder,$shape);
-        $shape = [$this->outputLength];
-        [$outputsShape,$statesShapes] = $this->registerLayer($this->decoder,$shape);
-        $this->registerLayer($this->out,$outputsShape);
+        $K = $this->backend;
+        [$encOutputs,$states] = $this->encoder->forward($inputs,$training);
+        $options = ['enc_outputs'=>$encOutputs];
+        [$outputs,$dmyStatus] = $this->decoder->forward($trues,$training,$states,$options);
+        $outputs = $this->out->forward($outputs,$training);
+        return $outputs;
     }
 
     public function shiftLeftSentence(
@@ -411,36 +351,9 @@ class Seq2seq extends AbstractModel
         return $result;
     }
 
-    protected function forwardStep(NDArray $inputs, NDArray $trues=null, bool $training=null) : NDArray
+    protected function trueValuesFilter(NDArray $trues) : NDArray
     {
-        $K = $this->backend;
-        [$encOutputs,$states] = $this->encoder->forward($inputs,$training);
-        $options = ['enc_outputs'=>$encOutputs];
-        [$outputs,$dmyStatus] = $this->decoder->forward($trues,$training,$states,$options);
-        $outputs = $this->out->forward($outputs,$training);
-        return $outputs;
-    }
-
-    protected function loss(NDArray $trues,NDArray $preds) : float
-    {
-        $trues = $this->shiftLeftSentence($trues);
-        return parent::loss($trues,$preds);
-    }
-
-    protected function accuracy(NDArray $trues,NDArray $preds) : float
-    {
-        $trues = $this->shiftLeftSentence($trues);
-        return parent::accuracy($trues,$preds);
-    }
-
-    protected function backwardStep(NDArray $dOutputs) : NDArray
-    {
-        $K = $this->backend;
-        $dOutputs = $this->out->backward($dOutputs);
-        [$dummy,$dStates,$dOptions] = $this->decoder->backward($dOutputs,null);
-        $dEncOutputs = $dOptions['enc_outputs'];
-        [$dInputs,$dStates] = $this->encoder->backward($dEncOutputs,$dStates);
-        return $dInputs;
+        return $this->shiftLeftSentence($trues);
     }
 
     public function predict(NDArray $inputs, array $options=null) : NDArray

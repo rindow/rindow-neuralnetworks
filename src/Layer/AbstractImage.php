@@ -9,9 +9,9 @@ use InvalidArgumentException;
  */
 abstract class AbstractImage extends AbstractLayer
 {
-    protected function normalizeInputShape(array $inputShape=null) : array
+    protected function normalizeInputShape($variable=null) : array
     {
-        $inputShape=parent::normalizeInputShape($inputShape);
+        $inputShape=parent::normalizeInputShape($variable);
         if($this->rank===null)
             return $inputShape;
         if(count($inputShape)!=$this->rank+1) {
@@ -20,7 +20,7 @@ abstract class AbstractImage extends AbstractLayer
         }
         return $inputShape;
     }
-    
+
     protected function getChannels()
     {
         $inputShape = $this->inputShape;
@@ -36,7 +36,7 @@ abstract class AbstractImage extends AbstractLayer
         }
         return $channels;
     }
-    
+
     protected function normalizeFilterSize(
         $size,
         string $sizename,
@@ -51,7 +51,7 @@ abstract class AbstractImage extends AbstractLayer
         if(is_array($size)) {
             if(count($size)!=$this->rank) {
                throw new InvalidArgumentException("$sizename does not mach rank.");
-                
+
             }
             return $size;
         }

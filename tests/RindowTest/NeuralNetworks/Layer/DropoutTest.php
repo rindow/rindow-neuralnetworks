@@ -6,6 +6,8 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Layer\Dropout;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 
 
 class Test extends TestCase
@@ -16,13 +18,21 @@ class Test extends TestCase
         return $builder->backend();
     }
 
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
+    }
+
     public function testNormal()
     {
         $mo = new MatrixOperator();
         $K = $backend = $this->newBackend($mo);
         $fn = $backend;
         $layer = new Dropout($backend,0.5);
-        $layer->build([]);
+        $layer->build($this->newInputShape([]));
+        $this->assertEquals([],$layer->outputShape());
 
         $x = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
         $y = $layer->forward($x,$training=true);
@@ -39,7 +49,7 @@ class Test extends TestCase
                           $fn->equalTest($y[4],0.0));
 
         $dout = $K->copy($x);
-        $dx = $layer->backward($dout);
+        [$dx] = $layer->backward([$dout]);
         $dx = $K->ndarray($dx);
         $this->assertTrue($fn->equalTest($dx[0],-1.0)||
                           $fn->equalTest($dx[0],0.0));

@@ -26,15 +26,17 @@ class Test extends TestCase
         $f = function($x) use ($mo,$K,$function,$t,$fromLogits){
             $x = $K->array($x);
             $t = $K->array($t);
-            if($fromLogits) {
-                $x = $function->forward($x,true);
-            }
-            $l = $function->loss($t,$x);
+            //if($fromLogits) {
+            //    $x = $function->forward($x,true);
+            //}
+            $l = $function->forward($t,$x);
             return $mo->array([$l]);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$x);
-        $outputs = $function->loss($K->array($t),$K->array($x));
-        $dInputs = $K->ndarray($function->differentiateLoss());
+        $outputs = $function->forward($K->array($t),$K->array($x));
+        $dInputs = $function->backward([$K->array(1.0)]);
+        $dInputs = $dInputs[0];
+        $dInputs = $K->ndarray($dInputs);
 //echo "\n";
 //echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
 //echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
@@ -61,7 +63,7 @@ class Test extends TestCase
         $y = [];
         foreach($x as $k => $xx) {
             $tt = $t[$k];
-            $y[] = $loss->loss($K->array([$tt]),$K->array([$xx]));
+            $y[] = $loss->forward($K->array([$tt]),$K->array([$xx]));
         }
         #$plt->plot($mo->array($y));
         $plt->show();
@@ -92,13 +94,14 @@ class Test extends TestCase
         $copyt = $mo->copy($t);
         $t = $K->array($t);
         $x = $K->array($x);
-        $loss = $func->loss($t,$x);
+        $loss = $func->forward($t,$x);
         $tt = $K->ndarray($t);
         $tx = $K->ndarray($x);
         $this->assertLessThan(0.001,abs($loss));
         $this->assertEquals($copyx->toArray(),$tx->toArray());
         $this->assertEquals($copyt->toArray(),$tt->toArray());
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $dx[0];
         $dx = $K->ndarray($dx);
         //$this->assertLessThan(0.00001,abs($mo->sum($dx)));
         //$this->assertLessThan(0.001,abs(1-$dx[0][0])/6);
@@ -114,9 +117,10 @@ class Test extends TestCase
         $t = $mo->array([1, 1]);
         $t = $K->array($t);
         $x = $K->array($x);
-        $loss = $func->loss($t,$x);
+        $loss = $func->forward($t,$x);
         $this->assertGreaterThan(10,abs($loss));
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $dx[0];
         $dx = $K->ndarray($dx);
 
         $x = $mo->array([
@@ -144,15 +148,16 @@ class Test extends TestCase
         $copyt = $mo->copy($t);
         $t = $K->array($t);
         $x = $K->array($x);
-        $y = $func->forward($x,true);
-        $loss = $func->loss($t,$y);
+        //$y = $func->forward($x,true);
+        $loss = $func->forward($t,$x);
         $tt = $K->ndarray($t);
         $tx = $K->ndarray($x);
         $this->assertLessThan(0.00001,abs($loss));
         $this->assertEquals($copyx->toArray(),$tx->toArray());
         $this->assertEquals($copyt->toArray(),$tt->toArray());
 
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx =  $dx[0];
         $tt = $K->ndarray($t);
         $tx = $K->ndarray($x);
         #$this->assertLessThan(0.00001,abs($mo->sum($dx)));
@@ -168,11 +173,12 @@ class Test extends TestCase
         $t = $mo->array([1, 1]);
         $t = $K->array($t);
         $x = $K->array($x);
-        $y = $func->forward($x,true);
-        $loss = $func->loss($t,$y);
+        //$y = $func->forward($x,true);
+        $loss = $func->forward($t,$x);
         $this->assertGreaterThan(10.0,abs($loss));
 
-        $dx = $func->differentiateLoss();
+        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $dx[0];
         $dx = $K->ndarray($dx);
         $this->assertLessThan(0.00001,abs($mo->sum($dx)));
 

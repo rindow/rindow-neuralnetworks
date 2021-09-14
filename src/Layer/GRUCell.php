@@ -61,7 +61,7 @@ class GRUCell extends AbstractRNNCell
         $this->resetAfter = $reset_after;
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($inputShape=null, array $options=null)
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
@@ -71,7 +71,7 @@ class GRUCell extends AbstractRNNCell
         $recurrentInitializer = $this->recurrentInitializer;
         $biasInitializer = $this->biasInitializer;
 
-        $inputShape = $this->normalizeInputShape($inputShape);
+        $inputShape = $this->normalizeCellInputShape($inputShape);
         //if(count($inputShape)!=1) {
         //    throw new InvalidArgumentException(
         ///        'Unsuppored input shape: ['.implode(',',$inputShape).']');

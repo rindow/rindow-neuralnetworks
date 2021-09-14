@@ -48,10 +48,11 @@ class Test extends TestCase
             [0.025, 0.025 , 0.95],
             [0.025, 0.95 , 0.025],
         ]);
-        $loss = $lossFunction->loss($trues,$predicts);
+        $loss = $lossFunction->forward($trues,$predicts);
         $this->assertTrue(0.01>abs(0.0-$loss));
 
-        $dx = $lossFunction->differentiateLoss();
+        $dx = $lossFunction->backward([$K->array(1.0)]);
+        $dx = $dx[0];
         $this->assertEquals($predicts->shape(),$dx->shape());
         $this->assertTrue($K->scalar($K->asum($dx))<0.1);
     }

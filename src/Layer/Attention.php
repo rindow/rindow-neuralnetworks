@@ -4,10 +4,18 @@ namespace Rindow\NeuralNetworks\Layer;
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
+use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
+use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use Rindow\NeuralNetworks\Model\BuildContext;
 
 class Attention extends AbstractLayerBase
 {
+    const RETURN_ATTENTION_SCORES = 'return_attention_scores';
     use GenericUtils;
+    use GradientUtils;
     protected $backend;
     //protected $returnAttentionScores;
     protected $query;
@@ -21,33 +29,31 @@ class Attention extends AbstractLayerBase
     {
         extract($this->extractArgs([
             'input_shapes'=>null,
-            //'return_attention_scores'=>false,
         ],$options));
         $this->backend = $K = $backend;
         $this->inputShape = $input_shapes;
-        //$this->returnAttentionScores = $return_attention_scores;
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variables=null, array $options=null)
     {
         $K = $this->backend;
-        $inputShape = $this->normalizeInputShape($inputShape);
-        if(count($inputShape)!=2&&count($inputShape)!=3) {
-            throw new InvalidArgumentException('num of inputs must be 2 or 3: inputs is '.count($inputShape));
+        $inputShapes = $this->normalizeInputShape($variables);
+        if(count($inputShapes)!=2&&count($inputShapes)!=3) {
+            throw new InvalidArgumentException('num of inputs must be 2 or 3: inputs is '.count($inputShapes));
         }
-        foreach ($inputShape as $shape) {
+        foreach ($inputShapes as $shape) {
             if(!is_array($shape)||count($shape)!=2) {
                 throw new InvalidArgumentException('input_shapes must be the list of shape:');
             }
         }
-        [$tq, $dim] = $inputShape[0];  // Query
-        [$tv, $tdim] = $inputShape[1]; // Value
+        [$tq, $dim] = $inputShapes[0];  // Query
+        [$tv, $tdim] = $inputShapes[1]; // Value
         if($dim!=$tdim) {
             throw new InvalidArgumentException('Unmatch query shape and value shape:'.
-            '['.implode(',',$inputShape[0]).'],['.implode(',',$inputShape[1]).']');
+            '['.implode(',',$inputShapes[0]).'],['.implode(',',$inputShapes[1]).']');
         }
-        if(count($inputShape)==3) {
-            if($inputShape[1]!=$inputShape[2]) {
+        if(count($inputShapes)==3) {
+            if($inputShapes[1]!=$inputShapes[2]) {
                 throw new InvalidArgumentException('value shape and key shape must be same.');
             }
         }
@@ -56,7 +62,7 @@ class Attention extends AbstractLayerBase
         //if($this->returnAttentionScores) {
         //    return [$this->outputShape,$this->scoresShape];
         //} else {
-            return $this->outputShape;
+            return $this->createOutputDefinition([$this->outputShape]);
         //}
     }
 
@@ -127,10 +133,14 @@ class Attention extends AbstractLayerBase
 
     public function forward(array $inputs, bool $training, array $options=null)
     {
+        if(BuildContext::$build) {
+            return $this->build($inputs,$options);
+        }
         $this->assertInputShapes($inputs,'forward');
         $outputs = $this->call($inputs,$training,$options);
-        if(array_key_exists('return_attention_scores',$options)&&
-            $options['return_attention_scores']) {
+        if($options!==null &&
+            array_key_exists(self::RETURN_ATTENTION_SCORES,$options)&&
+            $options[self::RETURN_ATTENTION_SCORES]) {
             $this->assertOutputShape($outputs[0],'forward');
             $this->assertScoresShape($outputs[1],'forward');
         } else {
@@ -139,8 +149,15 @@ class Attention extends AbstractLayerBase
         return $outputs;
     }
 
-    public function backward(NDArray $dOutputs) : array
+    public function backward(array $dOutputs) : array
     {
+        if(count($dOutputs)!=1) {
+            throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
+        }
+        $dOutputs = $dOutputs[0];
+        if(!($dOutputs instanceof NDArray)) {
+            throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
+        }
         $this->assertOutputShape($dOutputs,'backward');
         $dInputs = $this->differentiate($dOutputs);
         $this->assertInputShapes($dInputs,'backward');
@@ -170,8 +187,9 @@ class Attention extends AbstractLayerBase
         $this->attentionWeight = $attentionWeight;
         $this->query = $query;
         $this->key = $key;
-        if(array_key_exists('return_attention_scores',$options)&&
-            $options['return_attention_scores']) {
+        if($options!==null &&
+            array_key_exists(self::RETURN_ATTENTION_SCORES,$options) &&
+            $options[self::RETURN_ATTENTION_SCORES]) {
             return [$contextVector,$attentionWeight];
         } else {
             return $contextVector;
@@ -198,6 +216,54 @@ class Attention extends AbstractLayerBase
             return [$dQuery,$dValue];
         } else {
             return [$dQuery,$dValue,$dKey];
+        }
+    }
+
+    protected function numOfOutputs($options)
+    {
+        if(isset($options[self::RETURN_ATTENTION_SCORES]) &&
+                $options[self::RETURN_ATTENTION_SCORES]) {
+            return 2;
+        }
+        return 1;
+    }
+    /**
+    *  @param array<Variable>  $inputs
+    *  @return array<Variable>|Variable
+    */
+    public function __invoke($inputs, bool $training, array $options=null)
+    {
+        $outputs = null;
+        if(!is_array($inputs)) {
+            throw new InvalidArgumentException('inputs must be list of Variable');
+        }
+        if($this->outputShape==null) {
+            $outputs = $this->build($inputs);
+        }
+        $numOfOutputs = $this->numOfOutputs($options);
+        if($inputs[0] instanceof Undetermined) {
+            if($outputs===null) {
+                throw new InvalidArgumentException('Undetermined is found in second calling.');
+            }
+            if($numOfOutputs>1) {
+                $scoresShape = $this->scoresShape;
+                array_unshift($scoresShape,1);
+                $outputs = [$outputs, new UndeterminedNDArray($scoresShape)];
+            }
+            return $outputs;
+        }
+        $rawInputs = array_map(function($value){return $value->value();},$inputs);
+        $outputs = $this->forward($rawInputs,$training,$options);
+        if($numOfOutputs>1) {
+            [$outputs,$scores] = $outputs;
+        }
+        $outputs = $this->postGradientProcess(
+            $this->backend, $inputs, [$outputs]);
+        if($numOfOutputs>1) {
+            array_push($outputs,$scores);
+            return $outputs;
+        } else {
+            return $outputs[0];
         }
     }
 }

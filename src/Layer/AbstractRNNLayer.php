@@ -3,17 +3,43 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
+use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
+use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
+use Rindow\NeuralNetworks\Model\BuildContext;
 
 /**
  *
  */
 abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
 {
+    use GradientUtils;
     abstract protected function call(NDArray $inputs, bool $training, array $initialStates=null, array $options=null);
     abstract protected function differentiate(NDArray $dOutputs, array $dStates=null);
+    abstract protected function numOfOutputStates($options);
 
-    final public function forward(NDArray $inputs, bool $training, array $initialStates=null,array $options=null)
+    protected $enableInitialStates;
+
+    final public function forward(object $inputs, bool $training, array $initialStates=null,array $options=null)
     {
+        if(BuildContext::$build) {
+            $variables = null;
+            if($inputs!==null) {
+                $variables = [$inputs];
+            }
+            if($initialStates!==null) {
+                $variables = array_merge($variables,$initialStates);
+            }
+            $results = $this->build($variables,$options);
+            if(is_array($results)) {
+                $outputs = array_shift($results);
+                return [$outputs,$results];
+            } else {
+                return $outputs;
+            }
+        }
         $this->assertInputShape($inputs,'forward');
         $this->assertStatesShape($initialStates,'forward');
         $results = $this->call($inputs,$training,$initialStates,$options);
@@ -27,8 +53,20 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         return $results;
     }
 
-    final public function backward(NDArray $dOutputs, array $dStates=null)
+    /**
+    *  @param  array<NDArray> $dOutputs
+    *  @return array<NDArray>
+    */
+    final public function backward(array $dOutputs) : array
     {
+        $dStates = $dOutputs;
+        $dOutputs = array_shift($dStates);
+        if(!($dOutputs instanceof NDArray)) {
+            throw new InvalidArgumentException('dOutputs must be list of NDArray');
+        } elseif(count($dStates)==0) {
+            $dStates = null;
+        }
+
         $this->assertOutputShape($dOutputs,'backward');
         $this->assertStatesShape($dStates,'backward');
 
@@ -37,8 +75,10 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         if(is_array($results)) {
             [$dInputs,$dStates] = $results;
             $this->assertStatesShape($dStates,'backward');
+            $results = array_merge([$dInputs],$dStates);
         } elseif($results instanceof NDArray) {
             $dInputs = $results;
+            $results = [$results];
         }
         $this->assertInputShape($dInputs,'backward');
         return $results;
@@ -48,6 +88,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     protected function callCell(NDArray $inputs,bool $training, array $initialStates=null, array $options=null)
     {
         $K = $this->backend;
+        $this->enableInitialStates=($initialStates!==null)?true:false;
         [$batches,$timesteps,$feature]=$inputs->shape();
         if($initialStates===null&&
             $this->stateful) {
@@ -108,10 +149,66 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             $this->goBackwards
         );
         $this->calcStates = null;
-        if($this->returnState) {
+        if($this->enableInitialStates) {
             return [$dInputs, $dPrevStates];
         } else {
             return $dInputs;
+        }
+    }
+
+    /**
+    *  @param Variable  $inputs
+    *  @param bool      $training
+    *  @param array<Variable> $initialStates
+    *  @param array     $options
+    *  @return array<Variable>
+    *       outputs
+    */
+    public function __invoke($inputs, bool $training, array $initialStates=null, array $options=null)
+    {
+        $outputs = null;
+        if($this->outputShape==null) {
+            $inputShape = null;
+            $creator = $inputs->creator();
+            if($creator) {
+                $inputShape = [$inputs];
+            }
+            $outputs = $this->build($inputShape);
+        }
+        if($inputs instanceof Undetermined) {
+            if($outputs===null) {
+                throw new InvalidArgumentException('Undetermined is found in second calling.');
+            }
+            if(is_array($outputs)) {
+                $states = $outputs;
+                $outputs = array_shift($states);
+                return [$outputs,$states];
+            } else {
+                return $outputs;
+            }
+        }
+
+        $inputsVariables = [$inputs];
+        if($initialStates!==null) {
+            $rawStatus = array_map(function($stat){return $stat->value();},$initialStates);
+            $inputsVariables = array_merge($inputsVariables,$initialStates);
+        } else {
+            $rawStatus = null;
+        }
+        $outputs = $this->forward($inputs->value(),$training,$rawStatus,$options);
+        if(is_array($outputs)) {
+            [$o, $outputs] = $outputs;
+            array_unshift($outputs, $o);
+        } else {
+            $outputs = [$outputs];
+        }
+        $outputsVariables = $this->postGradientProcess(
+            $this->backend, $inputsVariables, $outputs);
+        if(count($outputsVariables)>1) {
+            $outputs = array_shift($outputsVariables);
+            return [$outputs,$outputsVariables];
+        } else {
+            return $outputsVariables[0];
         }
     }
 }

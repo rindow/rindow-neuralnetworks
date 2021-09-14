@@ -6,6 +6,8 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\GlobalMaxPooling1D;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use InvalidArgumentException;
 
 class Test extends TestCase
@@ -14,6 +16,13 @@ class Test extends TestCase
     {
         $builder = new NeuralNetworks($mo);
         return $builder->backend();
+    }
+
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
     public function testDefaultInitialize()
@@ -58,7 +67,7 @@ class Test extends TestCase
             $backend,
             [
             ]);
-        $layer->build($inputShape=[4,3]);
+        $layer->build($this->newInputShape([4,3]));
 
         $this->assertEquals([3],$layer->outputShape());
     }
@@ -105,7 +114,7 @@ class Test extends TestCase
 
         $copydOutputs = $K->copy(
             $dOutputs);
-        $dInputs = $layer->backward($dOutputs);
+        [$dInputs] = $layer->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2,2],$dOutputs->shape());
         $this->assertEquals([2,3,2],$dInputs->shape());

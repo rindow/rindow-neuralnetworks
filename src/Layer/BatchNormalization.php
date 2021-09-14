@@ -66,7 +66,7 @@ class BatchNormalization extends AbstractLayer implements Layer
         $this->movingVarianceInitializer = $K->getInitializer($moving_variance_initializer);
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variable=null, array $options=null)
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
@@ -77,17 +77,9 @@ class BatchNormalization extends AbstractLayer implements Layer
         $movingMeanInitializer = $this->movingMeanInitializer;
         $movingVarianceInitializer = $this->movingVarianceInitializer;
 
-        if($inputShape===null)
-            $inputShape = $this->inputShape;
-        if($this->inputShape===null)
-            $this->inputShape = $inputShape;
-        if($this->inputShape!==$inputShape) {
-            throw new InvalidArgumentException(
-                'Input shape is inconsistent: ['.implode(',',$this->inputShape).
-                '] and ['.implode(',',$inputShape).']');
-        } elseif($inputShape===null) {
-            throw new InvalidArgumentException('Input shape is not defined');
-        }
+        // ********* CAUTION ***********
+        //  if inappropriate, then Return old varsion shape normarization
+        $inputShape = $this->normalizeInputShape($variable);
         $axis = $this->axis;
         $ndim = count($inputShape);
         if($axis<0) {
@@ -134,7 +126,7 @@ class BatchNormalization extends AbstractLayer implements Layer
         }
         $this->inputShape = $inputShape;
         $this->outputShape = $inputShape;
-        return $this->outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

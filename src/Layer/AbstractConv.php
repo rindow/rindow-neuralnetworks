@@ -76,7 +76,7 @@ abstract class AbstractConv extends AbstractImage implements Layer
         $this->setActivation($activation);
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variable=null, array $options=null)
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
@@ -85,7 +85,7 @@ abstract class AbstractConv extends AbstractImage implements Layer
         $kernelInitializer = $this->kernelInitializer;
         $biasInitializer = $this->biasInitializer;
 
-        $inputShape = $this->normalizeInputShape($inputShape);
+        $inputShape = $this->normalizeInputShape($variable);
         $kernel_size = $this->kernel_size;
         $outputShape =
             $K->calcConvOutputShape(
@@ -121,7 +121,7 @@ abstract class AbstractConv extends AbstractImage implements Layer
             $this->dBias = $K->zerosLike($this->bias);
         }
         $this->outputShape = $outputShape;
-        return $this->outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

@@ -101,12 +101,12 @@ if(file_exists($modelFilePath)) {
             'kernel_initializer'=>'he_normal',
             'activation'=>'relu',
             ]),
-        $nn->layers()->Dense($units=10,
-            ['activation'=>'softmax']),
+        $nn->layers()->Dense($units=10
+            /*,['activation'=>'softmax']*/),
     ]);
 
     $model->compile([
-        'loss'=>'sparse_categorical_crossentropy',
+        'loss'=>$nn->losses()->SparseCategoricalCrossentropy(['from_logits'=>true]),
         'optimizer'=>'adam',
     ]);
     $model->summary();
@@ -124,6 +124,8 @@ if(file_exists($modelFilePath)) {
 $images = $test_img[[0,7]];
 $labels = $test_label[[0,7]];
 $predicts = $model->predict($images);
+// for from_logits
+$predicts = $nn->backend->softmax($predicts);
 
 if($inputShape[2]==1) {
     array_pop($inputShape);

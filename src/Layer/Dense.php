@@ -47,7 +47,7 @@ class Dense extends AbstractLayer implements Layer
         $this->setActivation($activation);
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variable=null, array $options=null)
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
@@ -56,7 +56,7 @@ class Dense extends AbstractLayer implements Layer
         $kernelInitializer = $this->kernelInitializer;
         $biasInitializer = $this->biasInitializer;
 
-        $inputShape = $this->normalizeInputShape($inputShape);
+        $inputShape = $this->normalizeInputShape($variable);
         //if(count($inputShape)!=1) {
         //    throw new InvalidArgumentException(
         ///        'Unsuppored input shape: ['.implode(',',$inputShape).']');
@@ -80,12 +80,12 @@ class Dense extends AbstractLayer implements Layer
         }
         array_push($shape,$this->units);
         $this->outputShape = $shape;
-        return $this->outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
     {
-        if($this->bias) {
+        if($this->useBias) {
             return [$this->kernel,$this->bias];
         } else {
             return [$this->kernel];
@@ -94,7 +94,7 @@ class Dense extends AbstractLayer implements Layer
 
     public function getGrads() : array
     {
-        if($this->bias) {
+        if($this->useBias) {
             return [$this->dKernel,$this->dBias];
         } else {
             return [$this->dKernel];

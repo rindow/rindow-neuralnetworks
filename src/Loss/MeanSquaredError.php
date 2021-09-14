@@ -5,11 +5,11 @@ use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 use DomainException;
 
-class MeanSquaredError implements Loss
+class MeanSquaredError extends AbstractGradient implements Loss
 {
     protected $backend;
-    protected $outputs;
     protected $trues;
+    protected $predicts;
 
     public function __construct($backend,array $options=null)
     {
@@ -24,7 +24,7 @@ class MeanSquaredError implements Loss
         ];
     }
 
-    public function loss(NDArray $trues, NDArray $predicts) : float
+    public function forward(NDArray $trues, NDArray $predicts) : float
     {
         $K = $this->backend;
         //$this->assertOutputShape($predicts);
@@ -39,10 +39,11 @@ class MeanSquaredError implements Loss
         return $this->loss;
     }
 
-    public function differentiateLoss() : NDArray
+    public function backward(array $dOutputs) : array
     {
         $K = $this->backend;
-        return $K->dMeanSquaredError($this->trues, $this->predicts);
+        $dInputs = $K->dMeanSquaredError($this->trues, $this->predicts);
+        return [$dInputs];
     }
 
     public function accuracy(

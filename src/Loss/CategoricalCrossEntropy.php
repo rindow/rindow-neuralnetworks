@@ -33,6 +33,9 @@ class CategoricalCrossEntropy extends AbstractCrossEntropy
         $K = $this->backend;
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
+        if($this->fromLogits) {
+            $predicts = $this->activationFunction($predicts);
+        }
         $ndim = $trues->ndim();
         if($ndim>2){
             $shape = $trues->shape();

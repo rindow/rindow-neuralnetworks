@@ -10,7 +10,8 @@ use Rindow\NeuralNetworks\Activation\Softmax;
 use Rindow\NeuralNetworks\Activation\Tanh;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
-
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 
 class Test extends TestCase
 {
@@ -23,6 +24,13 @@ class Test extends TestCase
     {
         $builder = new NeuralNetworks($mo);
         return $builder->backend();
+    }
+
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
     public function testResolveFunctions()
@@ -43,6 +51,9 @@ class Test extends TestCase
         $this->assertInstanceOf(Softmax::class,$activation->getActivation());
     }
 
+    /*
+        Loss Function has changed the function of Activation.
+
     public function testReplaceFunction()
     {
         $mo = $this->newMatrixOperator();
@@ -53,13 +64,14 @@ class Test extends TestCase
         $activation->setActivation($loss);
         $this->assertInstanceOf(SparseCategoricalCrossEntropy::class,$activation->getActivation());
     }
+    */
 
     public function testNormalwithReLU()
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
         $layer = new Activation($K,'relu');
-        $layer->build([5]);
+        $layer->build($this->newInputShape([5]));
 
         $inputs = $mo->array([
             [-1.0,-0.5,0.0,0.5,1.0],
@@ -88,7 +100,7 @@ class Test extends TestCase
         ]);
         $copydOutputs = $mo->copy($dOutputs);
         $dOutputs = $K->array($dOutputs);
-        $dInputs = $layer->backward($dOutputs);
+        [$dInputs] = $layer->backward([$dOutputs]);
         $dInputs = $K->ndarray($dInputs);
         $dOutputs = $K->ndarray($dOutputs);
         $this->assertEquals([4,5],$dInputs->shape());

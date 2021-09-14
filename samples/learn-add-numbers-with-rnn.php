@@ -149,7 +149,7 @@ $output_length = $DIGITS + 1;
 $dataset = new NumAdditionDataset($mo,$TRAINING_SIZE,$DIGITS);
 echo "Generating data...\n";
 [$questions,$answers] = $dataset->loadData();
-$corpus_size = $questions->shape()[0];
+$corpus_size = count($questions);
 echo "Total questions: ". $corpus_size."\n";
 [$input_voc,$target_voc,$input_dic,$target_dic]=$dataset->dicts();
 

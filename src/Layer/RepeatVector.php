@@ -24,16 +24,16 @@ class RepeatVector extends AbstractLayer implements Layer
         $this->inputShape = $input_shape;
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variable=null, array $options=null)
     {
         $K = $this->backend;
-        $inputShape = $this->normalizeInputShape($inputShape);
+        $inputShape = $this->normalizeInputShape($variable);
         if(count($inputShape)!=1) {
             throw new InvalidArgumentException('input shape must be 1D:'.implode(',',$inputShape));
         }
         array_unshift($inputShape,$this->repeats);
         $this->outputShape = $inputShape;
-        return $this->outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

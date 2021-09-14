@@ -6,6 +6,8 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Layer\BatchNormalization;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 
 
 class Test extends TestCase
@@ -16,13 +18,20 @@ class Test extends TestCase
         return $builder->backend();
     }
 
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
+    }
+
     public function testNormal()
     {
         $mo = new MatrixOperator();
         $K = $backend = $this->newBackend($mo);
         $layer = new BatchNormalization($backend);
 
-        $layer->build($inputShape=[3]);
+        $layer->build($this->newInputShape([3]));
         [$beta,$gamma] = $layer->getParams();
         $this->assertEquals([3],$beta->shape());
         $this->assertEquals([3],$gamma->shape());
@@ -32,7 +41,7 @@ class Test extends TestCase
 
         $gamma = $K->array([1.0, 1.0, 1.0]);
         $beta = $K->array([0.0, 0.0, 0.0]);
-        $layer->build($inputShape=[3],[
+        $layer->build($this->newInputShape([3]),[
             'sampleWeights'=>[$gamma,$beta],
         ]);
 
@@ -53,7 +62,7 @@ class Test extends TestCase
             [0.0, 0.0, -0.5],
             [0.0, 0.0, -0.5],
         ]);
-        $dx = $layer->backward($dout);
+        [$dx] = $layer->backward([$dout]);
         // 3 input x 4 batch
         $this->assertEquals([4,3],$dx->shape());
     }
@@ -64,7 +73,7 @@ class Test extends TestCase
         $K = $backend = $this->newBackend($mo);
         $layer = new BatchNormalization($backend);
 
-        $layer->build($inputShape=[2,2,3]);
+        $layer->build($this->newInputShape([2,2,3]));
         [$beta,$gamma] = $layer->getParams();
         $this->assertEquals([3],$beta->shape());
         $this->assertEquals([3],$gamma->shape());
@@ -89,7 +98,7 @@ class Test extends TestCase
             [[[0.5,0.5,0.5],[0.5,0.5,0.5]],[[0.5,0.5,0.5],[0.5,0.5,0.5]]],
             [[[0.5,0.5,0.5],[0.5,0.5,0.5]],[[0.5,0.5,0.5],[0.5,0.5,0.5]]],
         ]);
-        $dx = $layer->backward($dout);
+        [$dx] = $layer->backward([$dout]);
         // 4 batch x 2x2 image x 3 input x
         $this->assertEquals([4,2,2,3],$dx->shape());
     }
@@ -103,7 +112,7 @@ class Test extends TestCase
             'axis'=>1,
         ]);
 
-        $layer->build($inputShape=[3,2,2]);
+        $layer->build($this->newInputShape([3,2,2]));
         [$beta,$gamma] = $layer->getParams();
         $this->assertEquals([3],$beta->shape());
         $this->assertEquals([3],$gamma->shape());
@@ -131,7 +140,7 @@ class Test extends TestCase
             [[[1.0,0.5],[1.5,1.0]],[[2.0,1.5],[2.5,2.0]],[[3.0,2.5],[3.5,3.0]]],
             [[[1.0,0.5],[1.5,1.0]],[[2.0,1.5],[2.5,2.0]],[[3.0,2.5],[3.5,3.0]]],
         ]);
-        $dx = $layer->backward($dout);
+        [$dx] = $layer->backward([$dout]);
         // 4 batch x 2x2 image x 3 input x
         $this->assertEquals([4,3,2,2],$dx->shape());
     }

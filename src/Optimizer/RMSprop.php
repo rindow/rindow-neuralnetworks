@@ -37,12 +37,29 @@ class SGD implements Optimizer
     {
     }
 
+    protected function extractVariable($params)
+    {
+        $params2 = [];
+        foreach($params as $p) {
+            if($p instanceof Variable) {
+                $p = $p->value();
+            }
+            $params2[] = $p;
+        }
+        return $params2;
+    }
+
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;
+        $params = $this->extractVariable($params);
         foreach(array_keys($params) as $key) {
+            $p = $params[$key];
+            if($p instanceof Variable) {
+                $p = $p->value();
+            }
             // PARAM -=  lr * GRAD
-            $K->update_sub($params[$key],$K->scale($this->lr,$grads[$key]));
+            $K->update_sub($p,$K->scale($this->lr,$grads[$key]));
         }
     }
 }

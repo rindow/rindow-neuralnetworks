@@ -54,8 +54,8 @@ class Test extends TestCase
         ]);
         $modelcl->compile();
 
-        $weights = $model->weights();
-        $weightsCL = $modelcl->weights();
+        $weights = $model->params();
+        $weightsCL = $modelcl->params();
         foreach ($weights as $key => $w) {
             $wcl = $weightsCL[$key];
             $backendCL->copy($backendCL->array($w),$wcl);
@@ -171,8 +171,8 @@ class Test extends TestCase
         ]);
         $modelcl->compile();
 
-        $weights = $model->weights();
-        $weightsCL = $modelcl->weights();
+        $weights = $model->params();
+        $weightsCL = $modelcl->params();
         foreach ($weights as $key => $w) {
             $wcl = $weightsCL[$key];
             $backendCL->copy($backendCL->array($w),$wcl);

@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Optimizer;
 
 use Rindow\NeuralNetworks\Support\GenericUtils;
+use Rindow\NeuralNetworks\Gradient\Core\Variable;
 use UnexpectedValueException;
 
 class Adam implements Optimizer
@@ -64,9 +65,22 @@ class Adam implements Optimizer
         }
     }
 
+    protected function extractVariable($params)
+    {
+        $params2 = [];
+        foreach($params as $p) {
+            if($p instanceof Variable) {
+                $p = $p->value();
+            }
+            $params2[] = $p;
+        }
+        return $params2;
+    }
+
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;
+        $params = $this->extractVariable($params);
         if($this->m === null) {
             $this->build($params);
         }

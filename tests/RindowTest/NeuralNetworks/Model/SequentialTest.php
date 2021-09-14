@@ -27,7 +27,7 @@ class WeightLog extends AbstractCallback
         #echo "\n";
         $model = $this->getModel();
         $K = $model->backend();
-        $weights = $model->weights();
+        $weights = $model->params();
         if($this->prev_w==null) {
             $this->prev_w = $weights;
             return;
@@ -142,7 +142,7 @@ class Test extends TestCase
         $model->compile();
         $layers = $model->layers();
         $lossFunction = $model->lossFunction();
-        $weights = $model->weights();
+        $weights = $model->params();
         $grads = $model->grads();
 
         $this->assertCount(2,$layers);
@@ -153,11 +153,15 @@ class Test extends TestCase
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Layer\Dense',$layers[1]);
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy',$layers[1]->getActivation());
+            'Rindow\NeuralNetworks\Activation\Softmax',$layers[1]->getActivation());
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy',$lossFunction);
-        $this->assertTrue($layers[1]->getActivation()->fromLogits());
-        $this->assertTrue($lossFunction->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Softmax::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy::class,
+            $model->lossFunction());
 
         $this->assertCount(4,$weights);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$weights[0]);
@@ -211,8 +215,12 @@ class Test extends TestCase
         ]);
 
         $model->compile();
-        $this->assertTrue($model->layers()[1]->getActivation()->fromLogits());
-        $this->assertTrue($model->lossFunction()->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Softmax::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy::class,
+            $model->lossFunction());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -242,8 +250,12 @@ class Test extends TestCase
         ]);
 
         $model->compile();
-        $this->assertTrue($model->layers()[1]->getActivation()->fromLogits());
-        $this->assertTrue($model->lossFunction()->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Softmax::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy::class,
+            $model->lossFunction());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -278,8 +290,12 @@ class Test extends TestCase
         ]);
 
         $model->compile();
-        $this->assertTrue($model->layers()[1]->getActivation()->fromLogits());
-        $this->assertTrue($model->lossFunction()->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Softmax::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy::class,
+            $model->lossFunction());
 
         // training greater or less
         //$x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -450,8 +466,12 @@ class Test extends TestCase
         $model->compile([
             'optimizer'=>$nn->optimizers()->Adam()
         ]);
-        $this->assertTrue($model->layers()[1]->getActivation()->fromLogits());
-        $this->assertTrue($model->lossFunction()->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Softmax::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy::class,
+            $model->lossFunction());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -610,8 +630,12 @@ class Test extends TestCase
             #'optimizer'=>'adam',
         ]);
         //$model->summary();
-        $this->assertTrue( $model->layers()[1]->getActivation()->fromLogits());
-        $this->assertTrue( $model->lossFunction()->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Sigmoid::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\BinaryCrossEntropy::class,
+            $model->lossFunction());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -650,8 +674,12 @@ class Test extends TestCase
         $model->compile([
             'loss'=>$nn->losses()->CategoricalCrossEntropy(),
         ]);
-        $this->assertTrue( $model->layers()[1]->getActivation()->fromLogits());
-        $this->assertTrue( $model->lossFunction()->fromLogits());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Activation\Softmax::class,
+            $model->layers()[1]->getActivation());
+        $this->assertInstanceof(
+            \Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy::class,
+            $model->lossFunction());
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
@@ -1097,7 +1125,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         //$model->summary();
-        //foreach($model->weights() as $w) {
+        //foreach($model->params() as $w) {
         //    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         //}
 
@@ -1172,7 +1200,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
 
@@ -1244,7 +1272,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
 
@@ -1330,7 +1358,7 @@ class Test extends TestCase
             #'optimizer'=>'sgd',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
         #return;
@@ -1529,7 +1557,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
 
@@ -1596,7 +1624,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
 
@@ -1667,7 +1695,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
 
@@ -1749,7 +1777,7 @@ class Test extends TestCase
             'optimizer'=>'adam',
         ]);
         #$model->summary();
-        #foreach($model->weights() as $w) {
+        #foreach($model->params() as $w) {
         #    echo '('.implode(',',$w->shape()).'):'.$mo->la()->amax($w)."\n";
         #}
 

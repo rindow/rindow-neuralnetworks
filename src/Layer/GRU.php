@@ -78,14 +78,16 @@ class GRU extends AbstractRNNLayer
             ]);
     }
 
-    public function build(array $inputShape=null, array $options=null) : array
+    public function build($variables=null, array $options=null)
     {
         extract($this->extractArgs([
             'sampleWeights'=>null,
         ],$options));
         $K = $this->backend;
-
-        $inputShape = $this->normalizeInputShape($inputShape);
+        if(is_object($variables)) {
+            $variables = [$variables];
+        }
+        $inputShape = $this->normalizeInputShape(($variables===null)?null:$variables[0]);
         //if(count($inputShape)!=1) {
         //    throw new InvalidArgumentException(
         ///        'Unsuppored input shape: ['.implode(',',$inputShape).']');
@@ -99,15 +101,17 @@ class GRU extends AbstractRNNLayer
         $this->statesShapes = [
             [$this->units],
         ];
+
         if($this->returnSequences){
             $this->outputShape = [$this->timesteps,$this->units];
         }else{
             $this->outputShape = [$this->units];
         }
+        $this->normalizeInitialStatesShape($variables,$this->statesShapes);
         if($this->returnState) {
-            return [$this->outputShape,$this->statesShapes];
+            return $this->createOutputDefinition(array_merge([$this->outputShape],$this->statesShapes));
         } else {
-            return $this->outputShape;
+            return $this->createOutputDefinition([$this->outputShape]);
         }
     }
 
@@ -156,5 +160,12 @@ class GRU extends AbstractRNNLayer
     protected function differentiate(NDArray $dOutputs, array $dStates=null)
     {
         return $this->differentiateCell($dOutputs,$dStates);
+    }
+
+    protected function numOfOutputStates($options)
+    {
+        if($this->returnState)
+            return 1;
+        return 0;
     }
 }

@@ -8,7 +8,7 @@ use Interop\Polite\Math\Matrix\NDArray;
  */
 interface LayerBase
 {
-    public function build(array $inputShape=null,array $options=null) : array;
+    public function build($variable=null,array $options=null);
     public function outputShape() : array;
     public function getParams() : array;
     public function getGrads() : array;
