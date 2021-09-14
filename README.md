@@ -1,6 +1,6 @@
 Rindow Neural networks
 ======================
-Master: [![Build Status](https://travis-ci.com/rindow/rindow-neuralnetworks.png?branch=master)](https://travis-ci.com/rindow/rindow-neuralnetworks)
+Master: [![Build Status](https://app.travis-ci.com/rindow/rindow-neuralnetworks.svg?branch=master)](https://app.travis-ci.com/github/rindow/rindow-neuralnetworks)
 
 The Rindow Neural networks is a high-level neural networks library for deep learning.
 
