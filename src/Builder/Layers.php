@@ -7,6 +7,7 @@ use Rindow\NeuralNetworks\Layer\Embedding;
 use Rindow\NeuralNetworks\Layer\Dense;
 use Rindow\NeuralNetworks\Layer\Input;
 use Rindow\NeuralNetworks\Layer\Flatten;
+use Rindow\NeuralNetworks\Layer\ExpandDims;
 use Rindow\NeuralNetworks\Layer\RepeatVector;
 use Rindow\NeuralNetworks\Layer\Concatenate;
 use Rindow\NeuralNetworks\Layer\Conv1D;
@@ -61,6 +62,13 @@ class Layers
         array $options=null)
     {
         return new Flatten($this->backend, $options);
+    }
+
+    public function ExpandDims(
+        int $axis,
+        array $options=null)
+    {
+        return new ExpandDims($this->backend, $axis, $options);
     }
 
     public function RepeatVector(

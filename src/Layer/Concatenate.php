@@ -67,7 +67,7 @@ class Concatenate extends AbstractLayerBase
             } else {
                 if($baseShape != array_merge($shapestack,$shape)) {
                     $msg = '';
-                    foreach($inputShape as $shape) {
+                    foreach($inputShapes as $shape) {
                         $msg .= '['.implode(',',$shape).'] ';
                     }
                     throw new InvalidArgumentException('Unmatch input_shapes:'.$msg);

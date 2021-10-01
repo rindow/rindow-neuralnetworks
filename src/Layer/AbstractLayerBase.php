@@ -96,17 +96,17 @@ abstract class AbstractLayerBase implements LayerBase
             $variables = [$variables];
         } elseif(is_array($variables)) {
             $inputShape = [];
-            foreach($variables as $v) {
+            foreach($variables as $idx => $v) {
                 //if($v instanceof UndeterminedNDArray) {
                 //    $v = new Undetermined($v);
                 //}
                 if(!($v instanceof Variable)) {
-                    throw new InvalidArgumentException('variable list must contain Variables: '.gettype($v).' included');
+                    throw new InvalidArgumentException('variable list must contain Variables: "'.$this->typename($v).'" included in #'.$idx.'.');
                 }
                 $inputShape[] = $v->valueShape();
             }
         } else {
-            throw new InvalidArgumentException('variable must be Variable type or null');
+            throw new InvalidArgumentException('variable must be Variable type or null. "'.$this->typename($v).'" given.');
         }
         $this->inputsVariables = $variables;
         $this->generation = array_reduce(
@@ -378,5 +378,14 @@ abstract class AbstractLayerBase implements LayerBase
     {
         $classname = get_class($object);
         return substr($classname,strrpos($classname,'\\')+1);
+    }
+
+    protected function typename($object) : string
+    {
+        if(is_object($object)) {
+            return get_class($object);
+        } else {
+            return gettype($object);
+        }
     }
 }

@@ -285,15 +285,17 @@ class Tokenizer
 
     public function wordToIndex(string $word) : int
     {
-        if(!array_key_exists($word,$this->wordToIndex))
-            return null;
+        if(!array_key_exists($word,$this->wordToIndex)) {
+            throw new InvalidArgumentException("No matching word found");
+        }
         return $this->wordToIndex[$word];
     }
 
     public function indexToWord(int $index) : string
     {
-        if(!array_key_exists($index,$this->indexToWord))
-            return null;
+        if(!array_key_exists($index,$this->indexToWord)) {
+            throw new InvalidArgumentException("No matching word found");
+        }
         return $this->indexToWord[$index];
     }
 

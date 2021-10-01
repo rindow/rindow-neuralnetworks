@@ -41,9 +41,14 @@ class Attention extends AbstractLayerBase
         if(count($inputShapes)!=2&&count($inputShapes)!=3) {
             throw new InvalidArgumentException('num of inputs must be 2 or 3: inputs is '.count($inputShapes));
         }
-        foreach ($inputShapes as $shape) {
+        foreach ($inputShapes as $idx => $shape) {
             if(!is_array($shape)||count($shape)!=2) {
-                throw new InvalidArgumentException('input_shapes must be the list of shape:');
+                if(is_array($shape)) {
+                    $type = '['.implode(',',$shape).']';
+                } else {
+                    $type = gettype($shape);
+                }
+                throw new InvalidArgumentException('input_shapes must be the list of shape: '.$type.' included in #'.$idx.'.');
             }
         }
         [$tq, $dim] = $inputShapes[0];  // Query

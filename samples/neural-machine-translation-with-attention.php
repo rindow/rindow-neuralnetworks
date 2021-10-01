@@ -60,11 +60,6 @@ class EngFraDataset
         return $path;
     }
 
-    # Converts the unicode file to ascii
-    #def unicode_to_ascii(self,s):
-    #    return ''.join(c for c in unicodedata.normalize('NFD', s)
-    #    if unicodedata.category(c) != 'Mn')
-
     public function preprocessSentence($w)
     {
         $w = '<start> '.$w.' <end>';
@@ -197,11 +192,6 @@ class Encoder extends AbstractModel
             $wordVect,$training,$initial_state);
         return [$outputs, $states];
     }
-
-    public function initializeHiddenState($batch_sz)
-    {
-        return $this->backend->zeros([$batch_sz, $this->units]);
-    }
 }
 
 class Decoder extends AbstractModel
@@ -270,8 +260,6 @@ class Decoder extends AbstractModel
         $outputs = $this->concat->forward([$contextVector, $rnnSequence],$training);
 
         $outputs = $this->dense->forward($outputs,$training);
-        $this->contextVectorShape = $contextVector->shape();
-        $this->rnnSequenceShape = $rnnSequence->shape();
         return [$outputs,$states];
     }
 
@@ -383,21 +371,25 @@ class Seq2seq extends AbstractModel
 
             # storing the attention weights to plot later on
             $scores = $this->decoder->getAttentionScores();
-            $this->mo->la()->copy($K->ndarray($scores->reshape([$this->inputLength])),$attentionPlot[$t]);
+            $this->mo->la()->copy(
+                $K->ndarray($scores->reshape([$this->inputLength])),
+                $attentionPlot[$t]);
 
             $predictedId = $K->scalar($K->argmax($predictions[0][0]));
 
             $result[] = $predictedId;
 
-            if($this->endVocId == $predictedId)
+            if($this->endVocId == $predictedId) {
+                $t++;
                 break;
+            }
 
             # the predicted ID is fed back into the model
             $decInputs = $K->array([[$predictedId]],$inputs->dtype());
         }
+
         $this->setShapeInspection(true);
         $result = $K->array([$result],NDArray::int32);
-        #return result, sentence, attention_plot
         return $K->ndarray($result);
     }
 
@@ -405,11 +397,24 @@ class Seq2seq extends AbstractModel
         $attention, $sentence, $predictedSentence)
     {
         $plt = $this->plt;
-        $plt->figure();
-        #attention = attention[:len(predicted_sentence), :len(sentence)]
-        $plt->imshow($attention, $cmap='viridis');
+        $config = [
+            'frame.xTickPosition'=>'up',
+            'frame.xTickLabelAngle'=>90,
+            'figure.topMargin'=>100,
+        ];
+        $plt->figure(null,null,$config);
+        $sentenceLen = count($sentence);
+        $predictLen = count($predictedSentence);
+        $image = $this->mo->zeros([$predictLen,$sentenceLen],$attention->dtype());
+        for($y=0;$y<$predictLen;$y++) {
+            for($x=0;$x<$sentenceLen;$x++) {
+                $image[$y][$x] = $attention[$y][$x];
+            }
+        }
+        $plt->imshow($image, $cmap='viridis',null,null,$origin='upper');
 
         $plt->xticks($this->mo->arange(count($sentence)),$sentence);
+        $predictedSentence = array_reverse($predictedSentence);
         $plt->yticks($this->mo->arange(count($predictedSentence)),$predictedSentence);
     }
 }
@@ -418,16 +423,13 @@ $numExamples=20000;#30000
 $numWords=null;
 $epochs = 10;
 $batchSize = 64;
-$wordVectSize=256;#256
+$wordVectSize=256;
 $units=1024;
 
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
-$pltConfig = [
-    'figure.bottomMargin'=>100,
-    'frame.xTickLabelAngle'=>90,
-];
+$pltConfig = [];
 $plt = new Plot($pltConfig,$mo);
 
 $dataset = new EngFraDataset($mo);
@@ -460,7 +462,6 @@ echo "Target word dictionary: $targetVocabSize(".$targLang->numWords(true).")\n"
 echo "Input length: $inputLength\n";
 echo "Output length: $outputLength\n";
 
-
 $seq2seq = new Seq2seq(
     $mo,
     $nn->backend(),
@@ -482,6 +483,7 @@ $seq2seq->compile([
     'optimizer'=>'adam',
     'metrics'=>['accuracy','loss'],
 ]);
+$seq2seq->summary();
 
 $modelFilePath = __DIR__."/neural-machine-translation-with-attention.model";
 
@@ -525,7 +527,18 @@ foreach($choice as $idx)
     echo "Predict: $predictedSentence\n";
     echo "Target:  $targetSentence\n";
     echo "\n";
-    #attention_plot = attention_plot[:len(predicted_sentence.split(' ')), :len(sentence.split(' '))]
-    $seq2seq->plotAttention($attentionPlot,  explode(' ',$sentence), explode(' ',$predictedSentence));
+    $q = [];
+    foreach($question[0] as $n) {
+        if($n==0)
+            break;
+        $q[] = $inpLang->indexToWord($n);
+    }
+    $p = [];
+    foreach($predict[0] as $n) {
+        if($n==0)
+            break;
+        $p[] = $targLang->indexToWord($n);
+    }
+    $seq2seq->plotAttention($attentionPlot,  $q, $p);
 }
 $plt->show();
