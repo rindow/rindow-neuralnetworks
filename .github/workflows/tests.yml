@@ -27,6 +27,6 @@ jobs:
           configuration: tests/phpunit.xml
           version: 8.5
           php_version: ${{ matrix.php }}
-          php_extensions: pdo sqlite pdo_sqlite gd
+          php_extensions: pdo pdo_sqlite gd
         env:
           TRAVIS_PHP_VERSION: true
