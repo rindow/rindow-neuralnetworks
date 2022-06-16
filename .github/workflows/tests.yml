@@ -1,0 +1,29 @@
+name: tests
+
+on: [push]
+
+jobs:
+  no_ext_tests:
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: true
+      matrix:
+        php: ['7.2','7.3','7.4','8.0']
+  
+    steps:
+      - name: Checkout codes
+        uses: "actions/checkout@v2"
+
+      - name: Composer
+        uses: php-actions/composer@v6
+        with:
+          php_version: ${{ matrix.php }}
+
+      - name: PHPUnit Tests
+        uses: php-actions/phpunit@v3
+        with:
+          bootstrap: vendor/autoload.php
+          configuration: tests/phpunit.xml
+          version: 8.5
+          php_version: ${{ matrix.php }}

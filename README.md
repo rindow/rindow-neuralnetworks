@@ -1,6 +1,11 @@
 Rindow Neural networks
 ======================
-Master: [![Build Status](https://app.travis-ci.com/rindow/rindow-neuralnetworks.svg?branch=master)](https://app.travis-ci.com/github/rindow/rindow-neuralnetworks)
+Status:
+[![Build Status](https://github.com/rindow/rindow-neuralnetworks/workflows/tests/badge.svg)](https://github.com/rindow/rindow-neuralnetworks/actions)
+[![Downloads](https://img.shields.io/packagist/dt/rindow/rindow-neuralnetworks)](https://packagist.org/packages/rindow/rindow-neuralnetworks)
+[![Latest Stable Version](https://img.shields.io/packagist/v/rindow/rindow-neuralnetworks)](https://packagist.org/packages/rindow/rindow-neuralnetworks)
+[![License](https://img.shields.io/packagist/l/rindow/rindow-neuralnetworks)](https://packagist.org/packages/rindow/rindow-neuralnetworks)
+
 
 The Rindow Neural networks is a high-level neural networks library for deep learning.
 
