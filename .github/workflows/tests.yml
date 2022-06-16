@@ -27,3 +27,4 @@ jobs:
           configuration: tests/phpunit.xml
           version: 8.5
           php_version: ${{ matrix.php }}
+          php_extensions: gd
