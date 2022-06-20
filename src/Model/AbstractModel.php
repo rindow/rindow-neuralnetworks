@@ -352,7 +352,7 @@ abstract class AbstractModel implements Model
         $elapsed = time() - $startTime;
         if($batchIndexCount) {
             $completion = $batchIndex/$batchIndexCount;
-            $estimated = $elapsed / $completion;
+            $estimated = (int)floor($elapsed / $completion);
             $remaining = $estimated - $elapsed;
             $dot = (int)ceil($maxDot*$completion);
             $sec = $remaining % 60;
