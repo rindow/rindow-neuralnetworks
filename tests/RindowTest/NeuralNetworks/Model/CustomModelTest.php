@@ -159,6 +159,37 @@ class TestRNNModel extends AbstractModel
     }
 }
 
+class TestMultiInputModel extends AbstractModel
+{
+    public function __construct($backend,$builder)
+    {
+        parent::__construct(
+            $backend,
+            $builder,
+            $builder->utils()->HDA());
+        $this->inp1 = $builder->layers()->Flatten(['input_shape'=>[2]]);
+        $this->inp2 = $builder->layers()->Flatten(['input_shape'=>[2]]);
+        $this->concat = $builder->layers()->Concatenate();
+        $this->fc = $builder->layers()->Dense(5,['activation'=>'softmax']);
+    }
+
+    protected function call($inputs,bool $training)
+    {
+        [$inp1,$inp2] = $inputs;
+        $inp1 = $this->inp1->forward($inp1,$training);
+        $inp2 = $this->inp2->forward($inp2,$training);
+        $x = $this->concat->forward([$inp1,$inp2],$training);
+        $out = $this->fc->forward($x,$training);
+        return $out;
+    }
+
+    protected function differentiate(NDArray $dOutputs) : NDArray
+    {
+        $din = $this->fc->backward($dOutputs);
+        return $din;
+    }
+}
+
 class Test extends TestCase
 {
     public function setUp() : void
@@ -378,5 +409,79 @@ class Test extends TestCase
         foreach ($model->optimizer()->getWeights() as $key => $value) {
             $this->assertEquals($value->toArray(),$weightsOriginal['optimizer'][$key]->toArray());
         }
+    }
+
+    public function testCloneNest()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $backend = $this->newBackend($nn);
+
+        $origModel = new TestModel($backend,$nn);
+
+        $model = clone $origModel;
+        $origModel->compile();
+        $model->compile();
+
+        $origParams = $origModel->params();
+        $params = $model->params();
+        $this->assertCount(2+2,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+        $origParams = $origModel->grads();
+        $params = $model->grads();
+        $this->assertCount(2+2,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+    }
+
+    public function testCloneRNN()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $backend = $this->newBackend($nn);
+
+        $origModel = new TestRNNModel($backend,$nn);
+
+        $model = clone $origModel;
+        $origModel->compile();
+        $model->compile();
+
+        $origParams = $origModel->params();
+        $params = $model->params();
+        $this->assertCount(1+3+1+3+2,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+        $origParams = $origModel->grads();
+        $params = $model->grads();
+        $this->assertCount(1+3+1+3+2,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+    }
+
+    public function testMultiInput()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $backend = $this->newBackend($nn);
+
+        $model = new TestMultiInputModel($backend,$nn);
+        $model->compile(['numInputs'=>2]);
+        //$model->summary();
+        $a = $mo->zeros([3,2]);
+        $b = $mo->ones([3,2]);
+        $t = $mo->zeros([3],NDArray::int32);
+        $model->fit([$a,$b],$t,['epochs'=>1,'verbose'=>0]);
+        $out = $model->predict([$a,$b]);
+        $this->assertEquals([3,5],$out->shape());
+        $model->evaluate([$a,$b],$t);
     }
 }

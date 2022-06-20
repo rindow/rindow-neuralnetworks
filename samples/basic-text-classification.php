@@ -78,7 +78,7 @@ $val_labels = $train_labels[[$train_size,$total_size-1]];
 $train_inputs = $train_inputs[[0,$train_size-1]];
 $train_labels = $train_labels[[0,$train_size-1]];
 
-$modelFilePath = __DIR__."/imdb.model";
+$modelFilePath = __DIR__."/basic-text-classification.model";
 
 if(file_exists($modelFilePath)) {
     echo "loading model ...\n";

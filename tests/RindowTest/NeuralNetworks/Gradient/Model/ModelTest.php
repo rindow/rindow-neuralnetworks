@@ -290,7 +290,7 @@ class TestRNNMain extends DynamicModel
         return parent::accuracy($trues,$preds);
     }
 
-    public function predict(NDArray $inputs, array $options=null) : NDArray
+    public function predict($inputs, array $options=null) : NDArray
     {
         $K = $this->backend;
         $g = $this->builder->gradient();

@@ -5,19 +5,19 @@
     "keywords": ["rindow","neural","networks","deep learning","deep","learning","machine learning"],
     "license": "BSD-3-Clause",
     "require": {
-        "php": ">=7.2",
-        "rindow/rindow-math-matrix": "~1.0.13"
+        "php": "^7.2|^7.3|^7.4|^8.0",
+        "rindow/rindow-math-matrix": "~1.1.0"
     },
     "require-dev": {
-        "rindow/rindow-math-plot": "~1.0.5",
+        "rindow/rindow-math-plot": "~1.0.6",
         "ext-pdo_sqlite": "*"
     },
     "suggest": {
         "rindow/rindow-math-plot": "when visualize machine learning results",
         "ext-pdo_sqlite": "for save model",
-        "ext-rindow_openblas": "0.2.4 strongly recommended for speed",
-        "ext-rindow_opencl": "0.1.3 GPU/OpenCL support",
-        "ext-rindow_clblast": "0.1.2 GPU/OpenCL support"
+        "ext-rindow_openblas": "0.3.0 strongly recommended for speed",
+        "ext-rindow_opencl": "0.1.4 GPU/OpenCL support",
+        "ext-rindow_clblast": "0.1.2 GPU/CLBlast support"
     },
     "autoload": {
         "psr-4": {

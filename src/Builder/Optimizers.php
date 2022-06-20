@@ -3,6 +3,7 @@ namespace Rindow\NeuralNetworks\Builder;
 
 use Rindow\NeuralNetworks\Optimizer\SGD;
 use Rindow\NeuralNetworks\Optimizer\Adam;
+use Rindow\NeuralNetworks\Optimizer\RMSprop;
 
 class Optimizers
 {
@@ -21,5 +22,10 @@ class Optimizers
     public function Adam(array $options=null)
     {
         return new Adam($this->backend, $options);
+    }
+
+    public function RMSprop(array $options=null)
+    {
+        return new RMSprop($this->backend, $options);
     }
 }

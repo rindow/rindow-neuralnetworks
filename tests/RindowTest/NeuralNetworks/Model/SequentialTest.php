@@ -6,6 +6,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Model\ModelLoader;
+use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\NeuralNetworks\Callback\AbstractCallback;
 use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
 use Rindow\Math\Plot\Plot;
@@ -92,6 +93,24 @@ class TestFilter implements DatasetFilter
         return [$inputsNDArray,$testsNDArray->reshape([count($testsNDArray)])];
     }
 }
+
+
+class TestCustomModel extends AbstractModel
+{
+    protected $seq;
+    public function __construct($backend,$builder,$seq)
+    {
+        parent::__construct($backend,$builder);
+        $this->seq = $seq;
+    }
+
+    public function call(object $inputs, bool $training=null, object $trues=null)
+    {
+        $outputs = $this->seq->forward($inputs, $training, $trues);
+        return $outputs;
+    }
+}
+
 
 class Test extends TestCase
 {
@@ -1876,5 +1895,62 @@ class Test extends TestCase
         //$y = $model->predict($x);
         //$this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
 
+    }
+
+    public function testClone()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+
+        $origModel = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,['input_shape'=>[2]]),
+            $nn->layers()->BatchNormalization(),
+            $nn->layers()->Activation('sigmoid'),
+            $nn->layers()->Dense($units=2,['activation'=>'softmax']),
+        ]);
+
+        $model = clone $origModel;
+        $origModel->compile();
+        $model->compile();
+
+        $origParams = $origModel->params();
+        $params = $model->params();
+        $this->assertCount(2+2+2,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+        $origParams = $origModel->grads();
+        $params = $model->grads();
+        $this->assertCount(2+2+2,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+    }
+
+    public function testUseInCustomModel()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $nn = new NeuralNetworks($mo,$backend);
+
+        $seq = $nn->models->Sequential();
+        $seq->add($nn->layers->Dense(2,
+            ['input_shape'=>[3],'activation'=>'softmax']));
+        $model = new TestCustomModel($backend,$nn,$seq);
+        $model->compile();
+        //$model->summary();
+        $parms = $model->params();
+        $this->assertCount(2,$parms);
+        $this->assertEquals([3,2],$parms[0]->shape());
+        $this->assertEquals([2],$parms[1]->shape());
+        $model->fit($mo->zeros([5,3]),$mo->zeros([5],NDArray::int32),
+            ['epochs'=>1,'verbose'=>0]);
+        $predicts = $model->predict($mo->zeros([5,3]));
+        $this->assertEquals([5,2],$predicts->shape());
+        $res = $model->evaluate($mo->zeros([5,3]),$mo->zeros([5]));
+        $this->assertTrue(true);
     }
 }

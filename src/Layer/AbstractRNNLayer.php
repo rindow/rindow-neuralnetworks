@@ -211,4 +211,11 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             return $outputsVariables[0];
         }
     }
+
+    public function __clone()
+    {
+        if(isset($this->cell)) {
+            $this->cell = clone $this->cell;
+        }
+    }
 }

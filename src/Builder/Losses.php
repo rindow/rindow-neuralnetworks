@@ -6,6 +6,7 @@ use Rindow\NeuralNetworks\Loss\MeanSquaredError;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
+use Rindow\NeuralNetworks\Loss\Huber;
 
 class Losses
 {
@@ -34,5 +35,10 @@ class Losses
     public function BinaryCrossEntropy(array $options=null)
     {
         return new BinaryCrossEntropy($this->backend,$options);
+    }
+
+    public function Huber(array $options=null)
+    {
+        return new Huber($this->backend,$options);
     }
 }

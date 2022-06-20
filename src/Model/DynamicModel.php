@@ -244,7 +244,12 @@ abstract class DynamicModel extends AbstractModel
 
     public function summary()
     {
-        throw new LogicException('"Unsupported function');
+        throw new LogicException('Unsupported function');
+    }
+
+    public function __clone()
+    {
+        throw new LogicException('Dynamic Models cannot be cloned');
     }
 
     //public function save($filepath,$portable=null) : void

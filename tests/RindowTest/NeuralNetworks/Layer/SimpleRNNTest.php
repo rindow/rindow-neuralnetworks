@@ -479,4 +479,35 @@ class Test extends TestCase
         $this->assertTrue(
             $this->verifyGradient($mo,$K,$layer,$x));
     }
+
+    public function testClone()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $origLayer = new SimpleRNN(
+            $backend,
+            $units=4,
+            [
+                'input_shape'=>[5,3],
+            ]);
+
+        $origLayer->build();
+        $layer = clone $origLayer;
+        $layer->build();
+
+        $origParams = $origLayer->getParams();
+        $params = $layer->getParams();
+        $this->assertCount(3,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+        $origParams = $origLayer->getGrads();
+        $params = $layer->getGrads();
+        $this->assertCount(3,$params);
+        foreach (array_map(null,$origParams,$params) as $data) {
+            [$orig,$dest] = $data;
+            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
+        }
+    }
 }

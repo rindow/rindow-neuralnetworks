@@ -10,6 +10,8 @@ use Rindow\NeuralNetworks\Layer\Flatten;
 use Rindow\NeuralNetworks\Layer\ExpandDims;
 use Rindow\NeuralNetworks\Layer\RepeatVector;
 use Rindow\NeuralNetworks\Layer\Concatenate;
+use Rindow\NeuralNetworks\Layer\Max;
+use Rindow\NeuralNetworks\Layer\Gather;
 use Rindow\NeuralNetworks\Layer\Conv1D;
 use Rindow\NeuralNetworks\Layer\Conv2D;
 use Rindow\NeuralNetworks\Layer\Conv3D;
@@ -82,6 +84,18 @@ class Layers
         array $options=null)
     {
         return new Concatenate($this->backend, $options);
+    }
+
+    public function Max(
+        array $options=null)
+    {
+        return new Max($this->backend, $options);
+    }
+
+    public function Gather(
+        array $options=null)
+    {
+        return new Gather($this->backend, $options);
     }
 
     public function Conv1D(

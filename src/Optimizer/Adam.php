@@ -12,7 +12,7 @@ class Adam implements Optimizer
     protected $lr;
     protected $beta1;
     protected $beta2;
-    protected $iter = 0;
+    protected $iter;
     protected $m;
     protected $v;
     protected $epsilon;
@@ -41,7 +41,7 @@ class Adam implements Optimizer
             return [];
         }
 
-        return array_merge($this->m,$this->v);
+        return array_merge([$this->iter],$this->m,$this->v);
     }
 
     public function getConfig() : array
@@ -63,6 +63,7 @@ class Adam implements Optimizer
             $this->m[$key] = $K->zerosLike($value);
             $this->v[$key] = $K->zerosLike($value);
         }
+        $this->iter = $K->zeros([]);
     }
 
     protected function extractVariable($params)
@@ -85,13 +86,13 @@ class Adam implements Optimizer
             $this->build($params);
         }
 
-        $this->iter++;
-
+        $K->update_increment($this->iter,1.0);
+        $iter = $this->iter->toArray();
         // t = K.cast(self.iterations, K.floatx()) + 1
         // lr_t = lr * sqrt( 1 - beta_2**t ) /
         //                 ( 1 - beta_1**t )
-        $lr_t = $this->lr * sqrt(1.0 - ($this->beta2**$this->iter)) /
-                                (1.0 - ($this->beta1**$this->iter)) ;
+        $lr_t = $this->lr * sqrt(1.0 - ($this->beta2**$iter)) /
+                                (1.0 - ($this->beta1**$iter)) ;
 
         foreach (array_keys($params) as $key) {
             $p = $params[$key];
@@ -115,6 +116,27 @@ class Adam implements Optimizer
             $K->update_add($m, $K->sub($g, $m), (1 - $this->beta1));
             $K->update_add($v, $K->sub($K->square($g),$v), (1 - $this->beta2));
             $K->update_sub($p, $K->mul($m, $K->rsqrt($v,$this->epsilon)), $lr_t);
+        }
+    }
+
+    public function __clone()
+    {
+        if($this->m!=null) {
+            $m = [];
+            foreach ($this->m as $key => $value) {
+                $m[] = clone $value;
+            }
+            $this->m = $m;
+        }
+        if($this->v!=null) {
+            $v = [];
+            foreach ($this->v as $key => $value) {
+                $v[] = clone $value;
+            }
+            $this->v = $v;
+        }
+        if($this->iter!=null) {
+            $this->iter = clone $this->iter;
         }
     }
 }

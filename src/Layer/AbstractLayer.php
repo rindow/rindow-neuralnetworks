@@ -80,4 +80,5 @@ abstract class AbstractLayer extends AbstractLayerBase
             $this->backend, [$inputs], [$outputs]);
         return $outputs[0];
     }
+
 }

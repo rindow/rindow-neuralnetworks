@@ -365,19 +365,31 @@ class Backend
         }
     }
 
+    public function reciprocal(
+        NDArray $x,
+        float $beta=null,
+        float $alpha=null)
+    {
+        $la = $this->la;
+        $x = $la->copy($x);
+        return $la->reciprocal($x,$beta,$alpha);
+    }
+
     public function update(NDArray $x, NDArray $newX) : NDArray
     {
         $this->la->copy($newX,$x);
         return $x;
     }
 
-    public function update_add(NDArray $x, NDArray $increment, float $alpha=null) : NDArray
+    public function update_add(NDArray $x, NDArray $increment,
+        float $alpha=null) : NDArray
     {
         $this->la->axpy($increment,$x,$alpha);
         return $x;
     }
 
-    public function update_sub(NDArray $x, NDArray $decrement, float $alpha=null) : NDArray
+    public function update_sub(NDArray $x, NDArray $decrement,
+        float $alpha=null) : NDArray
     {
         if($alpha===null) {
             $alpha = 1.0;
@@ -397,9 +409,25 @@ class Backend
         return $this->la->scal($a, $x);
     }
 
+    public function update_scale(NDArray $x,float $a)
+    {
+        return $this->la->scal($a, $x);
+    }
+
+    /**
+    *    Y := a*X + b
+    */
     public function increment(NDArray $x, float $b, float $a=null)
     {
         $x = $this->la->copy($x);
+        return $this->la->increment($x, $b, $a);
+    }
+
+    /**
+    *    X := a*X + b
+    */
+    public function update_increment(NDArray $x, float $b, float $a=null) : NDArray
+    {
         return $this->la->increment($x, $b, $a);
     }
 
@@ -429,31 +457,55 @@ class Backend
 
     public function abs(NDArray $x)
     {
-        return $this->matrixOperator->f('abs',$x);
+        $la = $this->la;
+        $minus = $la->less($la->copy($x),0);
+        $y = $la->axpy($la->multiply($x,$minus),$la->copy($x),-2);
+        return $y;
+    }
+
+    public function sign(NDArray $x)
+    {
+        $la = $this->la;
+        $plus = $la->greater($la->copy($x),0);
+        $minus = $la->less($la->copy($x),0);
+        $y = $la->axpy($minus,$plus,-1);
+        return $y;
     }
 
     public function maximum(NDArray $x, float $a)
     {
         $x = $this->la->copy($x);
-        return $this->la->maximum($a,$x);
+        return $this->la->maximum($x,$a);
     }
 
     public function minimum(NDArray $x, float $a)
     {
         $x = $this->la->copy($x);
-        return $this->la->minimum($a,$x);
+        return $this->la->minimum($x,$a);
     }
 
     public function greater(NDArray $x, float $a)
     {
         $x = $this->la->copy($x);
-        return $this->la->greater($a,$x);
+        return $this->la->greater($x,$a);
+    }
+
+    public function greaterEqual(NDArray $x, float $a)
+    {
+        $x = $this->la->copy($x);
+        return $this->la->greaterEqual($x,$a);
     }
 
     public function less(NDArray $x, float $a)
     {
         $x = $this->la->copy($x);
-        return $this->la->less($a,$x);
+        return $this->la->less($x,$a);
+    }
+
+    public function lessEqual(NDArray $x, float $a)
+    {
+        $x = $this->la->copy($x);
+        return $this->la->lessEqual($x,$a);
     }
 
     public function exp(NDArray $x)
@@ -539,6 +591,11 @@ class Backend
     {
         $mo = $this->matrixOperator;
         return $mo->argMin($x,$axis);
+    }
+
+    public function nrm2(NDArray $x)
+    {
+        return $this->la->nrm2($x);
     }
 
     public function rand($shape)
@@ -1475,8 +1532,8 @@ class Backend
             $tmp)) / $batchSize;
 
         // way for clip
-        //$predicts = $this->la->maximum($this->epsilon,
-        //    $this->la->minimum(1-$this->epsilon,$this->la->copy($predicts)));
+        //$predicts = $this->la->maximum($this->la->minimum(
+        //    $this->la->copy($predicts),1-$this->epsilon),$this->epsilon);
         //return -1.0 * $this->la->sum($this->la->multiply($trues,
         //    $this->la->log($predicts))) / $batchSize;
     }
@@ -1515,8 +1572,8 @@ class Backend
             #$predicts = $this->log($la->multiply($predicts,
             #    $la->reciprocal($this->copy($predicts),1,-1)));
         #} else {
-        $predicts = $la->minimum(1-$this->epsilon, $la->maximum($this->epsilon,
-                $la->copy($predicts)));
+        $predicts = $la->minimum($la->maximum($la->copy($predicts),
+                $this->epsilon), 1-$this->epsilon);
         #}
         // E =  t      * -log( p ) +
         //     (1 - t) * -log( 1 - p )

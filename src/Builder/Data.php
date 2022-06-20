@@ -32,7 +32,7 @@ class Data
         throw new LogicException('Invalid operation to set');
     }
 
-    public function NDArrayDataset(NDArray $inputs, array $options=null)
+    public function NDArrayDataset($inputs, array $options=null)
     {
         return new NDArrayDataset($this->matrixOperator, $inputs, $options);
     }

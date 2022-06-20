@@ -4,6 +4,7 @@ namespace Rindow\NeuralNetworks\Model;
 use InvalidArgumentException;
 use UnexpectedValueException;
 use LogicException;
+use ReflectionClass;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 use Rindow\NeuralNetworks\Optimizer\Optimizer;
 use Rindow\NeuralNetworks\Layer\LayerBase;
@@ -30,7 +31,7 @@ abstract class AbstractModel implements Model
     protected $hda;
     protected $name;
     protected $layers = [];
-    protected $lastLayer;
+    //protected $lastLayer;
     protected $optimizer;
     protected $metrics;
     protected $lossFunction;
@@ -38,6 +39,7 @@ abstract class AbstractModel implements Model
     protected $grads = [];
     protected $built = false;
     protected $shapeInspection=true;
+    protected $backupShapeInspection;
     protected $inputsVariables;
     protected $outputsVariables;
 
@@ -115,6 +117,7 @@ abstract class AbstractModel implements Model
             'optimizer'=>'SGD',
             'loss'=>'SparseCategoricalCrossEntropy',
             'metrics'=>['loss','accuracy'],
+            'numInputs'=>1,
         ],$options));
 
         // resolve optimizer
@@ -187,6 +190,11 @@ abstract class AbstractModel implements Model
         $this->built = true;
     }
 
+    public function shapeInspection() : bool
+    {
+        return $this->shapeInspection;
+    }
+
     public function setShapeInspection(bool $enable)
     {
         if($this->shapeInspection==$enable)
@@ -214,7 +222,7 @@ abstract class AbstractModel implements Model
             'shuffle'=>true,
             'filter'=>null,
         ],$options,$leftargs));
-        if($inputs instanceof NDArray) {
+        if($inputs instanceof NDArray||is_array($inputs)) {
             $options = [
                 'batch_size'=>$batch_size,
                 'shuffle'=>$shuffle,
@@ -224,7 +232,7 @@ abstract class AbstractModel implements Model
                 $options['tests'] = $tests;
             }
             $dataset = new NDArrayDataset($K->localMatrixOperator(),$inputs,$options);
-            $inputCount = count($inputs);
+            $inputCount = $dataset->datasetSize();
         } elseif($inputs instanceof Dataset) {
             if($tests!=null) {
                 throw new InvalidArgumentException('The tests must be specified in the Dataset.');
@@ -267,6 +275,7 @@ abstract class AbstractModel implements Model
             $this->console("\n");
         }
         $totalSteps = count($dataset);
+        $this->backupShapeInspection = $this->shapeInspection;
         $callbacks->onTrainBegin();
         for($epoch=0;$epoch<$epochs;$epoch++) {
             $callbacks->onEpochBegin($epoch);
@@ -304,7 +313,9 @@ abstract class AbstractModel implements Model
             }
             $callbacks->onEpochEnd($epoch,$logs);
         }
-        $this->setShapeInspection(true);
+        if($this->backupShapeInspection) {
+            $this->setShapeInspection(true);
+        }
         return $history;
     }
 
@@ -340,7 +351,16 @@ abstract class AbstractModel implements Model
             $callbacks->onTrainBatchBegin($batchIndex);
             ////
             [$inputs,$trues] = $data;
-            $inputs = $K->array($inputs);
+            if(!is_array($inputs)) {
+                $inputs = $K->array($inputs);
+            } else {
+                $newInputs = [];
+                foreach ($inputs as $value) {
+                    $newInputs[] = $K->array($value);
+                }
+                $inputs = $newInputs;
+                unset($newInputs);
+            }
             $trues = $K->array($trues);
 
             [$loss, $accuracy] = $this->trainStep($inputs, $trues);
@@ -439,7 +459,7 @@ abstract class AbstractModel implements Model
         if($verbose>=1) {
             $startTime = time();
         }
-        if($x instanceof NDArray) {
+        if($x instanceof NDArray||is_array($x)) {
             $options = ['tests'=>$t,'batch_size'=>$batch_size];
             $dataset = new NDArrayDataset($K->localMatrixOperator(),$x,$options);
         } elseif($x instanceof Dataset) {
@@ -457,7 +477,16 @@ abstract class AbstractModel implements Model
             }
             $callbacks->onTestBatchBegin($batchIndex);
             [$inputs,$trues] = $data;
-            $inputs = $K->array($inputs);
+            if(!is_array($inputs)) {
+                $inputs = $K->array($inputs);
+            } else {
+                $newInputs = [];
+                foreach ($inputs as $value) {
+                    $newInputs[] = $K->array($value);
+                }
+                $inputs = $newInputs;
+                unset($newInputs);
+            }
             $trues = $K->array($trues);
 
             [$loss,$accuracy] = $this->evaluateStep($inputs,$trues);
@@ -493,8 +522,11 @@ abstract class AbstractModel implements Model
         return [$loss,$accuracy];
     }
 
-    public function predict(NDArray $inputs, array $options=null) : NDArray
+    public function predict($inputs, array $options=null) : NDArray
     {
+        //if(!$this->built) {
+        //    throw new LogicException('Not yet built');
+        //}
         extract($this->extractArgs([
             'callbacks'=>null,
         ],$options));
@@ -502,7 +534,16 @@ abstract class AbstractModel implements Model
         if(!($callbacks instanceof CallbackList)) {
             $callbacks = new CallbackList($this,$callbacks);
         }
-        $inputs = $this->backend->array($inputs);
+        if(!is_array($inputs)) {
+            $inputs = $this->backend->array($inputs);
+        } else {
+            $newInputs = [];
+            foreach ($inputs as $value) {
+                $newInputs[] = $this->backend->array($value);
+            }
+            $inputs = $newInputs;
+            unset($newInputs);
+        }
         $callbacks->onPredictBegin();
         $outputs = $this->predictStep($inputs,$options);
         $callbacks->onPredictEnd();
@@ -565,7 +606,15 @@ abstract class AbstractModel implements Model
     protected function buildLayers(array $options=null) : void
     {
         $nn = $this->builder;
-        $inputs = new Undetermined();
+        if(isset($options['numInputs'])) {
+            $numInputs = $options['numInputs'];
+            $inputs = [];
+            for($i=0;$i<$numInputs;$i++) {
+                $inputs[] = new Undetermined();
+            }
+        } else {
+            $inputs = new Undetermined();
+        }
         $trues = new Undetermined();
         $model = $this;
         $outputs = $nn->with($ctx=new BuildContext(),
@@ -708,7 +757,7 @@ abstract class AbstractModel implements Model
             $type = $this->basename($layer);
             echo substr(str_pad($layer->getName().'('.$type.')',29),0,29);
             $outputShape = $layer->outputShape();
-            if(is_array($outputShape[0])) {
+            if(count($outputShape)>0 && is_array($outputShape[0])) {
                 $outputShape = $outputShape[0];
             }
             echo str_pad('('.implode(',',$outputShape).')',27);
@@ -816,9 +865,11 @@ abstract class AbstractModel implements Model
         $optimizer = $this->optimizer();
         $optimizer->build($this->params());
         foreach ($optimizer->getWeights() as $idx => $weights) {
-            $data = unserialize($modelWeights['optimizer'][$idx]);
-            $data = $K->array($data);
-            $K->copy($data,$weights);
+            if(isset($modelWeights['optimizer'][$idx])) {
+                $data = unserialize($modelWeights['optimizer'][$idx]);
+                $data = $K->array($data);
+                $K->copy($data,$weights);
+            }
         }
     }
 /*
@@ -862,5 +913,26 @@ abstract class AbstractModel implements Model
     {
         $f = $this->hda->open($filepath,'r');
         $this->loadWeights($f['modelWeights']);
+    }
+
+    public function __clone()
+    {
+        $props = get_object_vars($this);
+        foreach ($props as $name => $value) {
+            if($value instanceof LayerBase) {
+                $this->$name = clone $value;
+            } elseif($value instanceof Model) {
+                $this->$name = clone $value;
+            }
+        }
+        $this->built = false;
+        $this->params = [];
+        $this->grads = [];
+        $this->pipeline = [];
+        $this->layers = [];
+        $this->outputsVariables = null;
+        $this->optimizer = null;
+        $this->lossFunction = null;
+        $this->metrics = null;
     }
 }

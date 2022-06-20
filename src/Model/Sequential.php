@@ -109,4 +109,19 @@ class Sequential extends AbstractModel
         $f['modelWeights'] = [];
         $this->saveWeights($f['modelWeights'],$portable);
     }
+
+    public function __clone()
+    {
+        $newLayers = [];
+        foreach ($this->layers as $layer) {
+            $newLayers[] = clone $layer;
+        }
+        $this->layers = $newLayers;
+        $this->built = false;
+        $this->params = [];
+        $this->grads = [];
+        $this->optimizer = null;
+        $this->lossFunction = null;
+        $this->metrics = null;
+    }
 }
