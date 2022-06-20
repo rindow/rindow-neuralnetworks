@@ -40,7 +40,5 @@ class Test extends TestCase
         $this->assertTrue($mo->la()->isclose($mo->array(3.0),$K->ndarray($y->value())));
         $this->assertTrue($mo->la()->isclose($mo->array(1.0/(2.0*sqrt(9.0))),$K->ndarray($tape->gradient($y,$x))));
 
-        #echo $mo->toString($y->value())."\n";
-        #echo $mo->toString($tape->gradient($y,$x))."\n";
     }
 }

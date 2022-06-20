@@ -5,7 +5,7 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-abstract class AbstractPooling extends AbstractImage implements Layer
+abstract class AbstractPooling extends AbstractImage
 {
     abstract protected function call(NDArray $inputs, bool $training) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
@@ -17,19 +17,31 @@ abstract class AbstractPooling extends AbstractImage implements Layer
     protected $padding;
     protected $data_format;
     protected $dilation_rate;
-    protected $status;
+    protected $defaultLayerName;
 
-    public function __construct($backend,array $options=null)
+    //protected $status;
+
+    public function __construct(
+        object $backend,
+        int|array $pool_size=null,
+        int|array $strides=null,
+        string $padding=null,
+        string $data_format=null,
+        int|array $dilation_rate=null,
+        array $input_shape=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'pool_size'=>2,
-            'strides'=>null,
-            'padding'=>"valid",
-            'data_format'=>null,
-            'dilation_rate'=>1,
-            'input_shape'=>null,
-        ],$options));
+        // defaults
+        $pool_size = $pool_size ?? 2;
+        $strides = $strides ?? null;
+        $padding = $padding ?? "valid";
+        $data_format = $data_format ?? null;
+        $dilation_rate = $dilation_rate ?? 1;
+        $input_shape = $input_shape ?? null;
+
         $this->backend = $backend;
+        $this->initName($name,$this->defaultLayerName);
         $pool_size=$this->normalizeFilterSize($pool_size,'pool_size',2);
         $strides=$this->normalizeFilterSize($strides,'strides',$pool_size);
         $dilation_rate=$this->normalizeFilterSize($dilation_rate,'dilation_rate',1);
@@ -41,7 +53,7 @@ abstract class AbstractPooling extends AbstractImage implements Layer
         $this->inputShape = $input_shape;
     }
 
-    public function build($variable=null, array $options=null)
+    public function build($variable=null, array $sampleWeights=null)
     {
         $K = $this->backend;
 
@@ -58,7 +70,6 @@ abstract class AbstractPooling extends AbstractImage implements Layer
             );
         array_push($outputShape,$channels);
         $this->outputShape = $outputShape;
-        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

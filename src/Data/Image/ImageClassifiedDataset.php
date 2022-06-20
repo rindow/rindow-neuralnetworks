@@ -18,24 +18,30 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
     protected $dtypeClassId;
 
     public function __construct(
-        $mo, string $path, array $options=null
+        object $mo,
+        string $path,
+        int $height=null,
+        int $width=null,
+        int $channels=null,
+        bool $fit=null,
+        int $dtype=null,
+        int $dtype_class_id=null,
+        array $classnames=null,
+        int $verbose=null,
+        ...$options
         )
     {
-        $leftargs = [];
-        parent::__construct($mo,$path,$options,$leftargs);
-        extract($this->extractArgs([
-            'height'=>32,
-            'width'=>32,
-            'channels'=>3,
-            'fit'=>true,
-            'dtype'=>NDArray::uint8,
-            'dtype_class_id'=>NDArray::int32,
-            'classnames'=>[],
-        ],$options,$leftargs));
-        if(array_key_exists('verbose',$leftargs)) {
-            $this->verbose = $leftargs['verbose'];
-            unset($leftargs['verbose']);
-        }
+        parent::__construct($mo, $path, ...$options);
+        // defaults
+        $height = $height ?? 32;
+        $width = $width ?? 32;
+        $channels = $channels ?? 3;
+        $fit = $fit ?? true;
+        $dtype = $dtype ?? NDArray::uint8;
+        $dtype_class_id = $dtype_class_id ?? NDArray::int32;
+        $classnames = $classnames ?? [];
+        $verbose = $verbose ?? null;
+
         $this->height = $height;
         $this->width = $width;
         $this->channels = $channels;
@@ -44,6 +50,7 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         $this->maxClassId = array_reduce($this->classnames,'max',-1);
         $this->dtype = $dtype;
         $this->dtypeClassId = $dtype_class_id;
+        $this->verbose = $verbose;
     }
 
     protected function console($message)

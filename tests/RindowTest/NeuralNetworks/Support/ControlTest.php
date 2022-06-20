@@ -52,7 +52,7 @@ class Test extends TestCase
         return new NeuralNetworks($mo);
     }
 
-    public function testWith()
+    public function testWithBasic()
     {
         /// success
         $results = new \stdClass();
@@ -88,6 +88,42 @@ class Test extends TestCase
         $this->assertEquals('opened',$results->session);
         $this->assertEquals('closed',$results->context->session());
         $this->assertEquals('success',$results->context->lasterror());
+    }
+
+    public function testWithOptional()
+    {
+        $results = new \stdClass();
+        [$context,$a,$b,$opt1,$opt2] = Execute::with($ctx=new TestContext(),
+            args:[1,2,'opt2'=>4,'opt1'=>3],
+            func:function($context,$a,$b,$opt1='def1',$opt2='def2') use ($results) {
+                $results->session = $context->session();
+                $results->context = $context;
+                return [$context,$a,$b,$opt1,$opt2];
+            }
+        );
+        $this->assertEquals(1,$a);
+        $this->assertEquals(2,$b);
+        $this->assertEquals(3,$opt1);
+        $this->assertEquals(4,$opt2);
+        $this->assertTrue($results->context===$ctx);
+    }
+
+    public function testWithoutCtx()
+    {
+        $ctx = 'DUMMY';
+        $results = new \stdClass();
+        [$a,$b,$opt1,$opt2] = Execute::with($ctx=new TestContext(),
+            args:[1,2,'opt2'=>4,'opt1'=>3],
+            without_ctx:true,
+            func:function($a,$b,$opt1='def1',$opt2='def2') use ($results) {
+                return [$a,$b,$opt1,$opt2];
+            }
+        );
+        $this->assertEquals(1,$a);
+        $this->assertEquals(2,$b);
+        $this->assertEquals(3,$opt1);
+        $this->assertEquals(4,$opt2);
+        $this->assertInstanceof(Context::class,$ctx);
     }
 
     public function testBuilder()

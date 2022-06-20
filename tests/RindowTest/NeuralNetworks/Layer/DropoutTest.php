@@ -6,37 +6,42 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Layer\Dropout;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
-use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
-use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 
 
 class Test extends TestCase
 {
-    public function newBackend($mo)
+    public function newMatrixOperator()
     {
-        $builder = new NeuralNetworks($mo);
-        return $builder->backend();
+        return new MatrixOperator();
     }
 
-    public function newInputShape($inputShape)
+    public function newNeuralNetworks($mo)
     {
-        array_unshift($inputShape,1);
-        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
-        return $variable;
+        return new NeuralNetworks($mo);
     }
 
     public function testNormal()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $fn = $backend;
-        $layer = new Dropout($backend,0.5);
-        $layer->build($this->newInputShape([]));
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $layer = new Dropout($K,0.5);
+        $x = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
+
+        $inputs = $g->Variable($x);
+        $layer->build($inputs);
         $this->assertEquals([],$layer->outputShape());
 
-        $x = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
-        $y = $layer->forward($x,$training=true);
-        $y = $K->ndarray($y);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$x) {
+                $outputsVariable = $layer->forward($x, $training=true);
+                return $outputsVariable;
+            }
+        );
+        $y = $K->ndarray($outputsVariable);
+        $fn = $K;
         $this->assertTrue($fn->equalTest($y[0],-1.0)||
                           $fn->equalTest($y[0],0.0));
         $this->assertTrue($fn->equalTest($y[1],-0.5)||
@@ -49,7 +54,7 @@ class Test extends TestCase
                           $fn->equalTest($y[4],0.0));
 
         $dout = $K->copy($x);
-        [$dx] = $layer->backward([$dout]);
+        [$dx] = $outputsVariable->creator()->backward([$dout]);
         $dx = $K->ndarray($dx);
         $this->assertTrue($fn->equalTest($dx[0],-1.0)||
                           $fn->equalTest($dx[0],0.0));

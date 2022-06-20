@@ -26,10 +26,8 @@ class Test extends TestCase
 
         $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
-            [
-                'pattern'=>'@.*\\.png@',
-                'batch_size'=>2,
-            ]
+            pattern: '@.*\\.png@',
+            batch_size: 2,
         );
         $steps = 0;
         $totalsize = 0;
@@ -59,10 +57,8 @@ class Test extends TestCase
 
         $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
-            [
-                'pattern'=>'@.*\\.png@',
-                'batch_size'=>0,
-            ]
+            pattern: '@.*\\.png@',
+            batch_size: 0,
         );
         $totalsize = 0;
         [$fig,$axes] = $plt->subplots(2,2);
@@ -91,11 +87,9 @@ class Test extends TestCase
 
         $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
-            [
-                'pattern'=>'@.*\\.png@',
-                'batch_size'=>0,
-                'unclassified'=>true,
-            ]
+            pattern: '@.*\\.png@',
+            batch_size: 0,
+            unclassified: true,
         );
         $totalsize = 0;
         [$fig,$axes] = $plt->subplots(2,2);
@@ -122,10 +116,8 @@ class Test extends TestCase
 
         $dataset = $nn->data()->ImageClassifiedDataset(
             __DIR__.'/image',
-            [
-                'pattern'=>'@.*\\.png@',
-                'batch_size'=>2,
-            ]
+            pattern: '@.*\\.png@',
+            batch_size: 2,
         );
         [$inputs,$tests] = $dataset->loadData();
         $this->assertInstanceof(NDArray::class,$inputs);

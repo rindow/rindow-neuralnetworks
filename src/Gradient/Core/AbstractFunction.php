@@ -1,12 +1,14 @@
 <?php
+declare(strict_types=1);
 namespace Rindow\NeuralNetworks\Gradient\Core;
 
 use InvalidArgumentException;
+use stdClass;
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 
 abstract class AbstractFunction
 {
+    use GradientUtils;
     /**
     *  @param array<NDArray>  $inputs
     *       inputs
@@ -24,6 +26,7 @@ abstract class AbstractFunction
     abstract protected function differentiate(array $dOutputs) : array;
 
     protected $backend;
+
     /**
     *  @var array<Variable>   inputs
     */
@@ -49,9 +52,12 @@ abstract class AbstractFunction
     */
     protected $numOfOutputs = 1;
 
-    public function __construct($backend, array $options=null)
+    protected $container;
+
+    public function __construct(object $backend)
     {
         $this->backend = $backend;
+        $this->container = new stdClass();
     }
 
     /**
@@ -61,6 +67,15 @@ abstract class AbstractFunction
     public function inputs() : array
     {
         return $this->inputsVariables;
+    }
+
+    /**
+    *  @return Dict<Variable>
+    *       options
+    */
+    public function options() : array
+    {
+        return [];
     }
 
     /**
@@ -81,6 +96,19 @@ abstract class AbstractFunction
     }
 
     /**
+     * Call from SessionFunc in compiled graph
+     */
+    public function _rawCall(array $inputs,array $options)
+    {
+        return $this->call($inputs);
+    }
+
+    public function className() : string
+    {
+        return get_class($this);
+    }
+
+    /**
     *  @param array<Variable>  $inputs
     *       inputs
     *  @return array<Variable>
@@ -91,28 +119,20 @@ abstract class AbstractFunction
         if(count($inputs)!=$this->numOfInputs) {
             throw new InvalidArgumentException($this->numOfInputs.' arguments are required.');
         }
-
+        if(GraphFunction::$mode==GraphFunction::EXECUTING) {
+            $outputs = $this->call($inputs);
+            if(count($outputs)==1) {
+                return $outputs[0];
+            }
+            return $outputs;
+        }
         if(GradientTape::$autoBackProp) {
             $this->inputsVariables = $inputs;
         }
-        if($inputs[0] instanceof Undetermined) {
-            for($i=0;$i<$this->numOfOutputs;$i++) {
-                $outputs[] = new Undetermined();
-            }
-        } else {
-            $values = array_map(function($input){return $input->value();},$inputs);
-            $outValues = $this->call($values);
-            $outputs = array_map(function($value){return new Variable($this->backend,$value);},$outValues);
-        }
+        $values = array_map(function($input){return $input->value();},$inputs);
+        $outValues = $this->call($values);
+        $outputs = $this->postGradientProcess($this->backend,$inputs,$outValues);
 
-        if(GradientTape::$autoBackProp) {
-            $this->generation = array_reduce(
-                $inputs,function($max,$x){return max($max,$x->generation());},-1);
-            foreach ($outputs as $key => $output) {
-                $output->setCreator($this);
-            }
-            $this->outputsVariables = array_map(function($o){return $o->reference();},$outputs);
-        }
         if(count($outputs)==1) {
             return $outputs[0];
         }

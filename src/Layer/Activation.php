@@ -5,18 +5,25 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Activation extends AbstractLayer implements Layer
+class Activation extends AbstractLayer
 {
     use GenericUtils;
     protected $backend;
 
-    public function __construct($backend, $activation,array $options=null)
+    public function __construct(
+        object $backend,
+        string|object $activation,
+        array $input_shape=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'input_shape'=>null,
-        ],$options));
+        // defaults
+        $input_shape = $input_shape ?? null;
+        $name = $name ?? null;
+
         $this->backend = $K = $backend;
         $this->inputShape = $input_shape;
+        $this->initName($name,'activation');
         $this->setActivation($activation);
     }
 
@@ -24,24 +31,27 @@ class Activation extends AbstractLayer implements Layer
     {
         return [
             'activation'=>$this->activationName,
-            'options' => [
-                'input_shape'=>$this->inputShape,
-            ],
+            'input_shape'=>$this->inputShape,
         ];
     }
 
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $outputs = $inputs;
-        if($this->activation)
-            $outputs = $this->activation->forward($outputs,$training);
+        if($this->activation) {
+            $container = $this->container();
+            $outputs = $this->activation->forward($container,$outputs,$training);
+        }
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
-        if($this->activation)
-            $dOutputs = $this->activation->backward($dOutputs);
-        return $dOutputs;
+        $dInputs = $dOutputs;
+        if($this->activation) {
+            $container = $this->container();
+            $dInputs = $this->activation->backward($container,$dOutputs);
+        }
+        return $dInputs;
     }
 }

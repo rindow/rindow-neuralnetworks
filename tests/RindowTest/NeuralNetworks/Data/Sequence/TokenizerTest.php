@@ -59,7 +59,7 @@ class Test extends TestCase
     public function testWithNumWords()
     {
         $mo = new MatrixOperator();
-        $tok = new Tokenizer($mo,['num_words'=>8]);
+        $tok = new Tokenizer($mo, num_words: 8);
         $x = [
             "Hello.\n",
             "I am Tom.\n",
@@ -106,7 +106,7 @@ class Test extends TestCase
     public function testWithFilter()
     {
         $mo = new MatrixOperator();
-        $tok = new Tokenizer($mo,['filters'=>"\n"]);
+        $tok = new Tokenizer($mo, filters: "\n");
         $x = [
             "Hello.\n",
             "I am Tom.\n",
@@ -154,7 +154,7 @@ class Test extends TestCase
     public function testWithSpecials()
     {
         $mo = new MatrixOperator();
-        $tok = new Tokenizer($mo,['specials'=>"?."]);
+        $tok = new Tokenizer($mo, specials: "?.");
         $x = [
             "Hello.\n",
             "I am Tom.\n",

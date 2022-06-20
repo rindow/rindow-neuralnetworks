@@ -80,6 +80,17 @@ function formatingImage($mo,$train_img) {
     return $mo->scale(1.0/255.0,$mo->astype($train_img,NDArray::float32));
 }
 
+//echo "slice images ...\n";
+//$samples = 1000;
+//$testSamples = (int)min(ceil($samples/10),count($test_img));
+//$train_img = $train_img[[0,$samples-1]];
+//$train_label = $train_label[[0,$samples-1]];
+//$test_img = $test_img[[0,$testSamples-1]];
+//$test_label = $test_label[[0,$testSamples-1]];
+//echo "Truncated train=[".implode(',',$train_img->shape())."]\n";
+//echo "Truncated test=[".implode(',',$test_img->shape())."]\n";
+
+
 echo "formating train images ...\n";
 $train_img = formatingImage($mo,$train_img);
 $train_label = $mo->la()->astype($train_label,NDArray::int32);
@@ -97,22 +108,22 @@ if(file_exists($modelFilePath)) {
     echo "creating model ...\n";
     $model = $nn->models()->Sequential([
         $nn->layers()->Dense($units=128,
-            ['input_shape'=>[(int)array_product($inputShape)],
-            'kernel_initializer'=>'he_normal',
-            'activation'=>'relu',
-            ]),
+            input_shape:[(int)array_product($inputShape)],
+            kernel_initializer:'he_normal',
+            activation:'relu',
+            ),
         $nn->layers()->Dense($units=10
             /*,['activation'=>'softmax']*/),
     ]);
 
-    $model->compile([
-        'loss'=>$nn->losses()->SparseCategoricalCrossentropy(['from_logits'=>true]),
-        'optimizer'=>'adam',
-    ]);
+    $model->compile(
+        loss:$nn->losses()->SparseCategoricalCrossentropy(from_logits:true),
+        optimizer:'adam',
+    );
     $model->summary();
     echo "training model ...\n";
     $history = $model->fit($train_img,$train_label,
-        ['epochs'=>5,'batch_size'=>256,'validation_data'=>[$test_img,$test_label]]);
+        epochs:5,batch_size:256,validation_data:[$test_img,$test_label]);
     $model->save($modelFilePath,$portable=true);
     $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
     $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
@@ -121,11 +132,13 @@ if(file_exists($modelFilePath)) {
     $plt->legend();
     $plt->title($dataset);
 }
+
 $images = $test_img[[0,7]];
 $labels = $test_label[[0,7]];
 $predicts = $model->predict($images);
 // for from_logits
-$predicts = $nn->backend->softmax($predicts);
+$K = $nn->backend();
+$predicts = $K->ndarray($nn->backend->softmax($K->array($predicts)));
 
 if($inputShape[2]==1) {
     array_pop($inputShape);
@@ -141,4 +154,5 @@ foreach ($predicts as $i => $predict) {
     $axes[$i*2]->setTitle($class_names[$label]."($label)");
     $axes[$i*2+1]->bar($mo->arange(10),$predict);
 }
+
 $plt->show();

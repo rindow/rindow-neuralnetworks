@@ -10,10 +10,14 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
-    public function newBackend($mo)
+    public function newMatrixOperator()
     {
-        $builder = new NeuralNetworks($mo);
-        return $builder->backend();
+        return new MatrixOperator();
+    }
+
+    public function newNeuralNetworks($mo)
+    {
+        return new NeuralNetworks($mo);
     }
 
     public function getPlotConfig()
@@ -26,9 +30,10 @@ class Test extends TestCase
 
     public function testBuilder()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy',
             $nn->losses()->CategoricalCrossEntropy());
@@ -36,9 +41,11 @@ class Test extends TestCase
 
     public function testDefault()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $func = new CategoricalCrossEntropy($backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $func = new CategoricalCrossEntropy($K);
 /*
         $x = $K->array([
             [0.0, 0.0 , 6.0],
@@ -74,13 +81,19 @@ class Test extends TestCase
             [0, 1, 0], [0, 0, 1]
         ]);
 
-        $y = $backend->softmax($x);
-        $loss = $func->forward($t,$y);
+        $x = $K->softmax($x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         $this->assertLessThan(0.01,abs(0.9868951-$loss));
 
-        $dx = $func->backward([$K->array(1.0)]);
-        $dx = $backend->dsoftmax($dx[0],$y);
-        #$this->assertLessThan(0.001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
+        $dx = $K->dSoftmax($dx[1],$x);
+        #$this->assertLessThan(0.001,$K->scalar($K->asum($K->sub($K->sub($x,$dx),$t))));
         $this->assertTrue($mo->la()->isclose(
             $mo->array([[ 0.11335728, -0.22118606,  0.10782879],
                         [ 0.12457169,  0.25085658, -0.3754283 ]]),
@@ -89,9 +102,11 @@ class Test extends TestCase
 
     public function testFromLogits()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $func = new CategoricalCrossEntropy($backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $func = new CategoricalCrossEntropy($K);
         $func->setFromLogits(true);
 /*
         $x = $K->array([
@@ -126,11 +141,17 @@ class Test extends TestCase
         ]);
         //$y = $backend->softmax($x);
 
-        $loss = $func->forward($t,$x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         $this->assertLessThan(0.01,abs(0.9868951-$loss));
 
-        $dx = $func->backward([$K->array(1.0)]);
-        $dx = $dx[0];
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
+        $dx = $dx[1];
         #$this->assertLessThan(0.0001,$K->scalar($K->asum($K->sub($K->sub($y,$dx),$t))));
         $this->assertTrue($mo->la()->isclose(
             $mo->array([[ 0.11335728, -0.22118606,  0.10782879],

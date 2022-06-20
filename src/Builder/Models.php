@@ -9,7 +9,7 @@ class Models
     protected $backend;
     protected $builder;
 
-    public function __construct($backend,$builder)
+    public function __construct(object $backend, object $builder)
     {
         $this->backend = $backend;
         $this->builder = $builder;

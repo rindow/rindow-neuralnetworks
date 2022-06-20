@@ -2,12 +2,10 @@
 namespace Rindow\NeuralNetworks\Data\Image;
 
 use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 
 class ImageFilter implements DatasetFilter
 {
-    use GenericUtils;
     protected $mo;
     protected $inputs;
     protected $tests;
@@ -18,18 +16,21 @@ class ImageFilter implements DatasetFilter
     protected $widthShiftInteger;
 
     public function __construct(
-        $mo,
-        array $options=null,
-        array &$leftargs=null
+        object $mo,
+        string $data_format=null,
+        float $height_shift=null,
+        float $width_shift=null,
+        bool $vertical_flip=null,
+        bool $horizontal_flip=null,
         )
     {
-        extract($this->extractArgs([
-            'data_format'=>'channels_last',
-            'height_shift'=>0,
-            'width_shift'=>0,
-            'vertical_flip'=>false,
-            'horizontal_flip'=>false
-        ],$options,$leftargs));
+        // defaults
+        $data_format = $data_format ?? 'channels_last';
+        $height_shift = $height_shift ?? 0;
+        $width_shift = $width_shift ?? 0;
+        $vertical_flip = $vertical_flip ?? false;
+        $horizontal_flip = $horizontal_flip ?? false;
+
         $this->mo = $mo;
         if($data_format=='channels_last') {
             $channels_first = false;

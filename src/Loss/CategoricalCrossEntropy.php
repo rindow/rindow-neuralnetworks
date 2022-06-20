@@ -16,7 +16,7 @@ class CategoricalCrossEntropy extends AbstractCrossEntropy
         return $this->backend->dSoftmax($dOutputs, $outputs);
     }
 
-    protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : float
+    protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray
     {
         return $this->backend->categoricalCrossEntropy($trues, $predicts);
     }
@@ -54,7 +54,7 @@ class CategoricalCrossEntropy extends AbstractCrossEntropy
         $trues = $K->argmax($trues, $axis=1,$dtype);
         $sum = $K->sum($K->equal($trues, $predicts));
         $sum = $K->scalar($sum);
-        $accuracy = $sum / (float)$trues->shape()[0];
+        $accuracy = $sum/$trues->shape()[0];
         return $accuracy;
     }
 }

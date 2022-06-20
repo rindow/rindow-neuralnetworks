@@ -3,16 +3,18 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use Interop\Polite\Math\Matrix\NDArray;
 
-class Conv2D extends AbstractConv implements Layer
+class Conv2D extends AbstractConv
 {
     protected $rank = 2;
+    protected $defaultLayerName = 'conv2d';
 
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
-        $this->status = new \stdClass();
+        $container = $this->container();
+        $container->status = new \stdClass();
         $outputs = $K->conv2d(
-                $this->status,
+                $container->status,
                 $inputs,
                 $this->kernel,
                 $this->bias,
@@ -21,23 +23,27 @@ class Conv2D extends AbstractConv implements Layer
                 $this->data_format,
                 $this->dilation_rate
         );
-        if($this->activation)
-            $outputs = $this->activation->forward($outputs,$training);
+        if($this->activation) {
+            $container->activation = new \stdClass();
+            $outputs = $this->activation->forward($container->activation,$outputs,$training);
+        }
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        if($this->activation)
-            $dOutputs = $this->activation->backward($dOutputs);
+        $container = $this->container();
+        if($this->activation) {
+            $dOutputs = $this->activation->backward($container->activation,$dOutputs);
+        }
         $dInputs = $K->dConv2d(
-            $this->status,
+            $container->status,
             $dOutputs,
             $this->dKernel,
             $this->dBias
         );
-        $this->status = null;
+        $container->status = null;
         return $dInputs;
     }
 }

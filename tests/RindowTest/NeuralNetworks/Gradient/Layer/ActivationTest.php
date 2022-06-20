@@ -36,7 +36,7 @@ class Test extends TestCase
             [-1.0,-0.5,0.0,0.5,1.0],
             [-1.0,-0.5,0.0,0.5,1.0],
         ]));
-        $layer = $nn->layers->Activation('relu',['input_shape'=>[5]]);
+        $layer = $nn->layers->Activation('relu', input_shape:[5]);
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {

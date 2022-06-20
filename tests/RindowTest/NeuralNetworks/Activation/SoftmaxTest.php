@@ -23,14 +23,16 @@ class Test extends TestCase
     public function verifyGradient($mo, $K, $function, NDArray $x, ...$args)
     {
         $f = function($x) use ($K,$function,$args){
+            $states = new \stdClass();
             $x = $K->array($x);
-            $y = $function->forward($x,...$args);
+            $y = $function->forward($states,$x,...$args);
             return $K->ndarray($y);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
-        $outputs = $function->forward($x, ...$args);
+        $states = new \stdClass();
+        $outputs = $function->forward($states,$x, ...$args);
         $ones = $K->ones($outputs->shape(),$outputs->dtype());
-        $dInputs = $function->backward($ones);
+        $dInputs = $function->backward($states,$ones);
         return $mo->la()->isclose($grads[0],$K->ndarray($dInputs),null,1e-4);
     }
 
@@ -40,6 +42,7 @@ class Test extends TestCase
         $K = $this->newBackend($mo);
         $activation = new Softmax($K);
 
+        $states = new \stdClass();
         $x = $mo->array([
             [-1.0,-0.5,0.0,0.5,1.0],
             [-1.0,-0.5,0.0,0.5,1.0],
@@ -47,7 +50,7 @@ class Test extends TestCase
         ]);
         $copyX = $mo->copy($x);
         $x = $K->array($x);
-        $y = $activation->forward($x, $training=true);
+        $y = $activation->forward($states,$x, $training=true);
         $y = $K->ndarray($y);
         $x = $K->ndarray($x);
         $this->assertEquals($copyX->toArray(),$x->toArray());
@@ -64,7 +67,7 @@ class Test extends TestCase
         ]);
         $copydout = $mo->copy($dout);
         $dout = $K->array($dout);
-        $dx = $activation->backward($dout);
+        $dx = $activation->backward($states,$dout);
         $dx = $K->ndarray($dx);
         $dout = $K->ndarray($dout);
         $this->assertEquals($dout->shape(),$dx->shape());

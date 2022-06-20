@@ -32,7 +32,7 @@ class Test extends TestCase
 
         $x = $g->Variable($K->array([[0.05, 0.95, 0], [0.1, 0.8, 0.1]]));
         $t = $K->array([1, 2],NDArray::int32);
-        $activation = $nn->layers->Activation('softmax',['input_shape'=>[3]]);
+        $activation = $nn->layers->Activation('softmax',input_shape:[3]);
         $loss = $nn->losses->SparseCategoricalCrossEntropy();
 
         $outputs = $nn->with($tape=$g->GradientTape(),
@@ -62,7 +62,7 @@ class Test extends TestCase
         $x = $g->Variable($K->array([[0.05, 0.95, 0], [0.1, 0.8, 0.1]]));
         $t = $K->array([1, 2],NDArray::int32);
         $loss = $nn->losses->SparseCategoricalCrossEntropy(
-            ['from_logits'=>true]
+            from_logits:true
         );
 
         $outputs = $nn->with($tape=$g->GradientTape(),

@@ -38,7 +38,7 @@ class Test extends TestCase
         $layer = $nn->layers->Conv1D(
             $filters=2,
             $kernel_size=2,
-            ['input_shape'=>[3,1]]);
+            input_shape:[3,1]);
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {

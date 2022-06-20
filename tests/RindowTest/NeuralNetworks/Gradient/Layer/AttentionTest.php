@@ -40,8 +40,8 @@ class Test extends TestCase
             [0,1,2,3],
         ]));
 
-        $embed1 = $nn->layers->Embedding($inputDim=2, $outputDim=3, ['input_length'=>2]);
-        $embed2 = $nn->layers->Embedding($inputDim=4, $outputDim=3, ['input_length'=>4]);
+        $embed1 = $nn->layers->Embedding($inputDim=2, $outputDim=3, input_length:2);
+        $embed2 = $nn->layers->Embedding($inputDim=4, $outputDim=3, input_length:4);
         $layer = $nn->layers->Attention();
 
         $outputs = $nn->with($tape=$g->GradientTape(),
@@ -77,8 +77,8 @@ class Test extends TestCase
             [0,1,2,3],
         ]));
 
-        $embed1 = $nn->layers->Embedding($inputDim=2, $outputDim=3, ['input_length'=>2]);
-        $embed2 = $nn->layers->Embedding($inputDim=4, $outputDim=3, ['input_length'=>4]);
+        $embed1 = $nn->layers->Embedding($inputDim=2, $outputDim=3, input_length:2);
+        $embed2 = $nn->layers->Embedding($inputDim=4, $outputDim=3, input_length:4);
         $layer = $nn->layers->Attention();
 
         $outputs = $nn->with($tape=$g->GradientTape(),

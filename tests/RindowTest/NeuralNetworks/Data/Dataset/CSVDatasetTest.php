@@ -43,13 +43,11 @@ class Test extends TestCase
 
         $dataset = $nn->data->CSVDataset(
             __DIR__.'/csv',
-            [
-                'pattern'=>'@.*\\.csv@',
-                'batch_size'=>2,
-                'skip_header'=>true,
-                'filter'=>$filter,
-                'shuffle'=>false,
-            ]
+            pattern: '@.*\\.csv@',
+            batch_size: 2,
+            skip_header: true,
+            filter: $filter,
+            shuffle: false,
         );
         $datas = [];
         foreach ($dataset as $key => $value) {

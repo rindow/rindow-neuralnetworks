@@ -73,10 +73,9 @@ class ImageClassification extends AbstractModel
     {
         parent::__construct($backend,$builder);
         $this->dense1 = $builder->layers->Dense($units=128,
-            ['input_shape'=>[(int)array_product([28,28,1])],
-            'kernel_initializer'=>'he_normal',
-            'activation'=>'relu',
-            ]
+            input_shape:[(int)array_product([28,28,1])],
+            kernel_initializer:'he_normal',
+            activation:'relu',
         );
         $this->dense2 = $builder->layers->Dense($units=10);
     }
@@ -90,10 +89,11 @@ class ImageClassification extends AbstractModel
 }
 $model = new ImageClassification($nn->backend(),$nn);
 echo "creating model ...\n";
-$model->compile([
-    'loss'=>$nn->losses()->SparseCategoricalCrossentropy(['from_logits'=>true]),
-    'optimizer'=>'adam',
-]);
+$model->compile(
+    loss:$nn->losses()->SparseCategoricalCrossentropy(from_logits:true),
+    optimizer:'adam',
+);
+$model->build([1,(int)(28*28*1)],true); // This is only needed for summary
 $model->summary();
 
 $modelFilePath = __DIR__."/basic-image-classification-custom-${dataset}.model";
@@ -104,7 +104,7 @@ if(file_exists($modelFilePath)) {
 } else {
     echo "training model ...\n";
     $history = $model->fit($train_img,$train_label,
-        ['epochs'=>5,'batch_size'=>256,'validation_data'=>[$test_img,$test_label]]);
+        epochs:5,batch_size:256,validation_data:[$test_img,$test_label]);
     $model->saveWeightsToFile($modelFilePath,$portable=true);
     $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
     $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');

@@ -10,6 +10,8 @@ use Rindow\NeuralNetworks\Layer\Flatten;
 use Rindow\NeuralNetworks\Layer\ExpandDims;
 use Rindow\NeuralNetworks\Layer\RepeatVector;
 use Rindow\NeuralNetworks\Layer\Concatenate;
+use Rindow\NeuralNetworks\Layer\Max;
+use Rindow\NeuralNetworks\Layer\Gather;
 use Rindow\NeuralNetworks\Layer\Conv1D;
 use Rindow\NeuralNetworks\Layer\Conv2D;
 use Rindow\NeuralNetworks\Layer\Conv3D;
@@ -36,212 +38,225 @@ class Layers
 {
     protected $backend;
 
-    public function __construct($backend)
+    public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
     public function Activation(
-        $activation,array $options=null)
+        $activation, ...$options)
     {
-        return new Activation($this->backend,$activation,$options);
+        return new Activation($this->backend,$activation,...$options);
     }
 
-    public function Dense(int $units, array $options=null)
+    public function Dense(int $units, ...$options)
     {
-        return new Dense($this->backend, $units, $options);
+        return new Dense($this->backend, $units, ...$options);
     }
 
     public function Input(
-        array $options=null)
+        ...$options)
     {
-        return new Input($this->backend, $options);
+        return new Input($this->backend, ...$options);
     }
 
     public function Flatten(
-        array $options=null)
+        ...$options)
     {
-        return new Flatten($this->backend, $options);
+        return new Flatten($this->backend, ...$options);
     }
 
     public function ExpandDims(
         int $axis,
-        array $options=null)
+        ...$options)
     {
-        return new ExpandDims($this->backend, $axis, $options);
+        return new ExpandDims($this->backend, $axis, ...$options);
     }
 
     public function RepeatVector(
         int $repeats,
-        array $options=null)
+        ...$options)
     {
-        return new RepeatVector($this->backend, $repeats, $options);
+        return new RepeatVector($this->backend, $repeats, ...$options);
     }
 
     public function Concatenate(
-        array $options=null)
+        ...$options)
     {
-        return new Concatenate($this->backend, $options);
+        return new Concatenate($this->backend, ...$options);
+    }
+
+    public function Max(
+        ...$options)
+    {
+        return new Max($this->backend, ...$options);
+    }
+
+    public function Gather(
+        ...$options)
+    {
+        return new Gather($this->backend, ...$options);
     }
 
     public function Conv1D(
-        int $filters, $kernel_size, array $options=null)
+        int $filters, int|array $kernel_size, ...$options)
     {
         return new Conv1D(
             $this->backend,
             $filters,
             $kernel_size,
-            $options);
+            ...$options);
     }
 
     public function Conv2D(
-        int $filters, $kernel_size, array $options=null)
+        int $filters, int|array $kernel_size, ...$options)
     {
         return new Conv2D(
             $this->backend,
             $filters,
             $kernel_size,
-            $options);
+            ...$options);
     }
 
     public function Conv3D(
-        int $filters, $kernel_size, array $options=null)
+        int $filters, int|array $kernel_size, ...$options)
     {
         return new Conv3D(
             $this->backend,
             $filters,
             $kernel_size,
-            $options);
+            ...$options);
     }
 
     public function MaxPooling1D(
-        array $options=null)
+        ...$options)
     {
         return new MaxPooling1D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function MaxPooling2D(
-        array $options=null)
+        ...$options)
     {
         return new MaxPooling2D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function MaxPooling3D(
-        array $options=null)
+        ...$options)
     {
         return new MaxPooling3D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function AveragePooling1D(
-        array $options=null)
+        ...$options)
     {
         return new AveragePooling1D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function AveragePooling2D(
-        array $options=null)
+        ...$options)
     {
         return new AveragePooling2D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function AveragePooling3D(
-        array $options=null)
+        ...$options)
     {
         return new AveragePooling3D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function GlobalMaxPooling1D(
-        array $options=null)
+        ...$options)
     {
         return new GlobalMaxPooling1D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function GlobalMaxPooling2D(
-        array $options=null)
+        ...$options)
     {
         return new GlobalMaxPooling2D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function GlobalMaxPooling3D(
-        array $options=null)
+        ...$options)
     {
         return new GlobalMaxPooling3D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function GlobalAveragePooling1D(
-        array $options=null)
+        ...$options)
     {
         return new GlobalAveragePooling1D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function GlobalAveragePooling2D(
-        array $options=null)
+        ...$options)
     {
         return new GlobalAveragePooling2D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
     public function GlobalAveragePooling3D(
-        array $options=null)
+        ...$options)
     {
         return new GlobalAveragePooling3D(
             $this->backend,
-            $options);
+            ...$options);
     }
 
-    public function Dropout(float $rate,array $options=null)
+    public function Dropout(
+        float $rate, ...$options)
     {
-        return new Dropout($this->backend,$rate,$options);
+        return new Dropout($this->backend,$rate,...$options);
     }
 
-    public function BatchNormalization(array $options=null)
+    public function BatchNormalization(...$options)
     {
-        return new BatchNormalization($this->backend,$options);
+        return new BatchNormalization($this->backend,...$options);
     }
 
-    public function Embedding(int $inputDim,int $outputDim, array $options=null)
+    public function Embedding(int $inputDim,int $outputDim, ...$options)
     {
-        return new Embedding($this->backend, $inputDim, $outputDim, $options);
+        return new Embedding($this->backend, $inputDim, $outputDim, ...$options);
     }
 
-    public function SimpleRNN(int $units, array $options=null)
+    public function SimpleRNN(int $units, ...$options)
     {
-        return new SimpleRNN($this->backend, $units, $options);
+        return new SimpleRNN($this->backend, $units, ...$options);
     }
 
-    public function LSTM(int $units, array $options=null)
+    public function LSTM(int $units, ...$options)
     {
-        return new LSTM($this->backend, $units, $options);
+        return new LSTM($this->backend, $units, ...$options);
     }
 
-    public function GRU(int $units, array $options=null)
+    public function GRU(int $units, ...$options)
     {
-        return new GRU($this->backend, $units, $options);
+        return new GRU($this->backend, $units, ...$options);
     }
 
-    public function Attention(array $options=null)
+    public function Attention(...$options)
     {
-        return new Attention($this->backend, $options);
+        return new Attention($this->backend, ...$options);
     }
 }

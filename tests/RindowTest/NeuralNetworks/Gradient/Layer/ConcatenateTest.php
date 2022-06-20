@@ -38,9 +38,9 @@ class Test extends TestCase
         $this->assertEquals([2,4],$x->shape());
         $x = $g->Variable($x);
         $flatten1 = $nn->layers->Flatten(
-            ['input_shape'=>[4]]);
+            input_shape:[4]);
         $flatten2 = $nn->layers->Flatten(
-            ['input_shape'=>[4]]);
+            input_shape:[4]);
         $layer = $nn->layers->Concatenate();
 
         $outputs = $nn->with($tape=$g->GradientTape(),

@@ -5,7 +5,7 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Dense extends AbstractLayer implements Layer
+class Dense extends AbstractLayer
 {
     use GenericUtils;
     protected $backend;
@@ -20,20 +20,30 @@ class Dense extends AbstractLayer implements Layer
     protected $bias;
     protected $dKernel;
     protected $dBias;
-    protected $inputs;
+    //protected $inputs;
 
-    public function __construct($backend,int $units, array $options=null)
+    public function __construct(
+        object $backend,
+        int $units,
+        array $input_shape=null,
+        string|object $activation=null,
+        bool $use_bias=null,
+        string|callable $kernel_initializer=null,
+        string|callable $bias_initializer=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'input_shape'=>null,
-            'activation'=>null,
-            'use_bias'=>true,
-            'kernel_initializer'=>'glorot_uniform',
-            'bias_initializer'=>'zeros',
-            //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
-            //'activity_regularizer'=null,
-            //'kernel_constraint'=null, 'bias_constraint'=null,
-        ],$options));
+        // defaults
+        $input_shape = $input_shape ?? null;
+        $activation = $activation ?? null;
+        $use_bias = $use_bias ?? true;
+        $kernel_initializer = $kernel_initializer ?? 'glorot_uniform';
+        $bias_initializer = $bias_initializer ?? 'zeros';
+        $name = $name ?? null;
+        //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
+        //'activity_regularizer'=null,
+        //'kernel_constraint'=null, 'bias_constraint'=null,
+
         $this->backend = $K = $backend;
         $this->units = $units;
         $this->inputShape = $input_shape;
@@ -44,14 +54,13 @@ class Dense extends AbstractLayer implements Layer
         if($use_bias===null || $use_bias) {
             $this->useBias = true;
         }
+        $this->initName($name,'dense');
+        $this->allocateWeights($this->useBias?2:1);
         $this->setActivation($activation);
     }
 
-    public function build($variable=null, array $options=null)
+    public function build($variable=null, array $sampleWeights=null)
     {
-        extract($this->extractArgs([
-            'sampleWeights'=>null,
-        ],$options));
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
         $biasInitializer = $this->biasInitializer;
@@ -62,25 +71,28 @@ class Dense extends AbstractLayer implements Layer
         ///        'Unsuppored input shape: ['.implode(',',$inputShape).']');
         //}
         $shape = $inputShape;
-        $this->inputDim=array_pop($shape);
-        if($sampleWeights) {
-            $this->kernel = $sampleWeights[0];
-            $this->bias = $sampleWeights[1];
-        } else {
-            $this->kernel = $kernelInitializer(
-                [$this->inputDim,$this->units],
-                [$this->inputDim,$this->units]);
-            if($this->useBias) {
-                $this->bias = $biasInitializer([$this->units]);
+        $inputDim=array_pop($shape);
+        if($this->kernel===null) {
+            if($sampleWeights) {
+                $this->kernel = $sampleWeights[0];
+                $this->bias = $sampleWeights[1];
+            } else {
+                $this->kernel = $kernelInitializer(
+                    [$inputDim,$this->units],
+                    [$inputDim,$this->units]);
+                if($this->useBias) {
+                    $this->bias = $biasInitializer([$this->units]);
+                }
             }
         }
+
         $this->dKernel = $K->zerosLike($this->kernel);
         if($this->useBias) {
             $this->dBias = $K->zerosLike($this->bias);
         }
         array_push($shape,$this->units);
         $this->outputShape = $shape;
-        return $this->createOutputDefinition([$this->outputShape]);
+        $this->syncWeightVariables();
     }
 
     public function getParams() : array
@@ -101,6 +113,16 @@ class Dense extends AbstractLayer implements Layer
         }
     }
 
+    public function reverseSyncWeightVariables() : void
+    {
+        if($this->useBias) {
+            $this->kernel = $this->weights[0]->value();
+            $this->bias = $this->weights[1]->value();
+        } else {
+            $this->kernel = $this->weights[0]->value();
+        }
+    }
+
     public function getConfig() : array
     {
         return [
@@ -118,38 +140,44 @@ class Dense extends AbstractLayer implements Layer
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
+        $container = $this->container();
         $shape = $inputs->shape();
-        $this->origInputsShape = $shape;
+        $container->origInputsShape = $shape;
         $inputDim=array_pop($shape);
         $inputSize=array_product($shape);
-        $this->inputs = $inputs->reshape([$inputSize,$inputDim]);
+        $container->inputs = $inputs->reshape([$inputSize,$inputDim]);
         if($this->bias) {
-            $outputs = $K->batch_gemm($this->inputs, $this->kernel,1.0,1.0,$this->bias);
+            $outputs = $K->batch_gemm($container->inputs, $this->kernel,1.0,1.0,$this->bias);
         } else {
-            $outputs = $K->gemm($this->inputs, $this->kernel);
+            $outputs = $K->gemm($container->inputs, $this->kernel);
         }
-        $this->flattenOutputsShape = $outputs->shape();
+        $container->flattenOutputsShape = $outputs->shape();
         array_push($shape,$this->units);
         $outputs = $outputs->reshape($shape);
-        if($this->activation)
-            $outputs = $this->activation->forward($outputs,$training);
+        if($this->activation) {
+            $container->activation = new \stdClass();
+            $outputs = $this->activation->forward($container->activation,$outputs,$training);
+        }
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        if($this->activation)
-            $dOutputs = $this->activation->backward($dOutputs);
-        $dInputs = $K->zerosLike($this->inputs);
-        $dOutputs=$dOutputs->reshape($this->flattenOutputsShape);
+        $container = $this->container();
+        if($this->activation) {
+            $dOutputs = $this->activation->backward($container->activation,$dOutputs);
+        }
+        $dInputs = $K->zerosLike($container->inputs);
+        $dOutputs=$dOutputs->reshape($container->flattenOutputsShape);
         $K->gemm($dOutputs, $this->kernel,1.0,0.0,$dInputs,false,true);
 
         // update params
-        $K->gemm($this->inputs, $dOutputs,1.0,0.0,$this->dKernel,true,false);
+        $K->gemm($container->inputs, $dOutputs,1.0,0.0,$this->dKernel,true,false);
         if($this->dBias)
             $K->copy($K->sum($dOutputs, $axis=0),$this->dBias);
 
-        return $dInputs->reshape($this->origInputsShape);
+        return $dInputs->reshape($container->origInputsShape);
     }
+
 }

@@ -26,49 +26,49 @@ class Test extends TestCase
         ],$y->toArray());
         $this->assertEquals(NDArray::int32,$y->dtype());
 
-        $y = $prep->padSequences($x,['padding'=>'post']);
+        $y = $prep->padSequences($x, padding:'post');
         $this->assertEquals([
             [ 0, 1, 2, 0, 0],
             [10,11,12,13, 0],
             [20,21,22,23,24],
         ],$y->toArray());
 
-        $y = $prep->padSequences($x,['maxlen'=>4]);
+        $y = $prep->padSequences($x, maxlen: 4);
         $this->assertEquals([
             [ 0, 0, 1, 2],
             [10,11,12,13],
             [21,22,23,24],
         ],$y->toArray());
 
-        $y = $prep->padSequences($x,['maxlen'=>4,'truncating'=>'post']);
+        $y = $prep->padSequences($x,maxlen: 4, truncating: 'post');
         $this->assertEquals([
             [ 0, 0, 1, 2],
             [10,11,12,13],
             [20,21,22,23],
         ],$y->toArray());
 
-        $y = $prep->padSequences($x,['maxlen'=>4,'truncating'=>'post','padding'=>'post']);
+        $y = $prep->padSequences($x, maxlen: 4, truncating: 'post', padding: 'post');
         $this->assertEquals([
             [ 0, 1, 2, 0],
             [10,11,12,13],
             [20,21,22,23],
         ],$y->toArray());
 
-        $y = $prep->padSequences($x,['maxlen'=>4,'padding'=>'post']);
+        $y = $prep->padSequences($x, maxlen: 4, padding: 'post');
         $this->assertEquals([
             [ 0, 1, 2, 0],
             [10,11,12,13],
             [21,22,23,24],
         ],$y->toArray());
 
-        $y = $prep->padSequences($x,['value'=>99]);
+        $y = $prep->padSequences($x, value: 99);
         $this->assertEquals([
             [ 99,99, 0, 1, 2],
             [ 99,10,11,12,13],
             [20,21,22,23,24],
         ],$y->toArray());
 
-        $y = $prep->padSequences($x,['value'=>0.5,'dtype'=>NDArray::float32]);
+        $y = $prep->padSequences($x, value: 0.5, dtype: NDArray::float32);
         $this->assertEquals([
             [ 0.5,0.5, 0, 1, 2],
             [ 0.5,10,11,12,13],

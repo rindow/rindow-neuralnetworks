@@ -5,27 +5,32 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Input extends AbstractLayer implements Layer
+class Input extends AbstractLayer
 {
     use GenericUtils;
     protected $backend;
 
-    public function __construct($backend,array $options=null)
+    public function __construct(
+        object $backend,
+        array $shape=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'shape'=>null,
-        ],$options));
+        $shape = $shape ?? null;
+        $name = $name ?? null;
+        
+        $this->backend = $backend;
         $this->inputShape = $shape;
+        $this->initName($name,'input');
     }
 
-    public function build($variable=null, array $options=null)
+    public function build($variable=null, array $sampleWeights=null)
     {
         $K = $this->backend;
 
         $inputShape = $this->normalizeInputShape($variable);
         $outputShape = $inputShape;
         $this->outputShape = $outputShape;
-        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
