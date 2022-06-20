@@ -10,10 +10,14 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
-    public function newBackend($mo)
+    public function newMatrixOperator()
     {
-        $builder = new NeuralNetworks($mo);
-        return $builder->backend();
+        return new MatrixOperator();
+    }
+
+    public function newNeuralNetworks($mo)
+    {
+        return new NeuralNetworks($mo);
     }
 
     public function getPlotConfig()
@@ -26,9 +30,10 @@ class Test extends TestCase
 
     public function testBuilder()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\MeanSquaredError',
             $nn->losses()->MeanSquaredError());
@@ -36,9 +41,11 @@ class Test extends TestCase
 
     public function testOneHot()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $lossFunction = new MeanSquaredError($backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $lossFunction = new MeanSquaredError($K);
 
         $trues = $K->array([
             [0.0, 0.0 , 1.0],
@@ -49,10 +56,17 @@ class Test extends TestCase
             [0.025, 0.95 , 0.025],
         ]);
         $loss = $lossFunction->forward($trues,$predicts);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($lossFunction,$trues, $predicts) {
+                $outputsVariable = $lossFunction->forward($trues, $predicts);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         $this->assertTrue(0.01>abs(0.0-$loss));
 
-        $dx = $lossFunction->backward([$K->array(1.0)]);
-        $dx = $dx[0];
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
+        $dx = $dx[1];
         $this->assertEquals($predicts->shape(),$dx->shape());
         $this->assertTrue($K->scalar($K->asum($dx))<0.1);
     }

@@ -11,18 +11,25 @@ class Gather extends AbstractMultiInputLayer
     protected $backend;
     protected $axis;
 
-    public function __construct($backend,array $options=null)
+    public function __construct(
+        object $backend,
+        int $axis=null,
+        array $input_shapes=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'axis'=>-1,
-            'input_shapes'=>null,
-        ],$options));
+        // defaults
+        $axis = $axis ?? -1;
+        $input_shapes = $input_shapes ?? null;
+        $name = $name ?? null;
+        
         $this->backend = $backend;
         $this->axis = $axis;
         $this->inputShape = $input_shapes;
+        $this->initName($name,'gather');
     }
 
-    public function build($variables=null, array $options=null)
+    public function build($variables=null, array $sampleWeights=null)
     {
         $K = $this->backend;
 
@@ -65,7 +72,6 @@ class Gather extends AbstractMultiInputLayer
         $this->realAxis = $axis+1;
 
         $this->outputShape = $outputShape;
-        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
@@ -91,22 +97,25 @@ class Gather extends AbstractMultiInputLayer
     protected function call(array $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
+        $container = $this->container();
         [$source,$indexes] = $inputs;
         $outputs = $K->gather($source,$indexes,$this->realAxis);
-        $this->indexes = $indexes;
+        $container->indexes = $indexes;
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : array
     {
         $K = $this->backend;
+        $container = $this->container();
         $dSource = $K->scatter(
-            $this->indexes,
+            $container->indexes,
             $dOutputs,
             $this->reduceNumClass,
             $this->realAxis
         );
-        $dIndex = $K->zerosLike($this->indexes);
+        $dIndex = $K->zerosLike($container->indexes);
         return [$dSource,$dIndex];
     }
+
 }

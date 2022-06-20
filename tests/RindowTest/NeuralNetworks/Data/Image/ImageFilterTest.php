@@ -25,21 +25,17 @@ class Test extends TestCase
             [3],
         ]);
         $filter = $nn->data->ImageFilter(
-            [
-                'height_shift'=>0.8,
-                'width_shift'=>2,
-                'vertical_flip'=>true,
-                'horizontal_flip'=>true,
-            ]
+            height_shift: 0.8,
+            width_shift: 2,
+            vertical_flip: true,
+            horizontal_flip: true,
         );
         $dataset = $nn->data->NDArrayDataset(
             $inputs,
-            [
-                'tests'=>$tests,
-                'batch_size'=>2,
-                'shuffle'=>false,
-                'filter'=>$filter,
-            ]
+            tests: $tests,
+            batch_size: 2,
+            shuffle: false,
+            filter: $filter,
         );
         foreach ($dataset as $key => $value) {
             $datas[] = $value;
@@ -75,15 +71,13 @@ class Test extends TestCase
         ]);
         $dataset = $nn->data->ImageDataGenerator(
             $inputs,
-            [
-                'tests'=>$tests,
-                'batch_size'=>2,
-                'height_shift'=>0.8,
-                'width_shift'=>2,
-                'vertical_flip'=>true,
-                'horizontal_flip'=>true,
-                'shuffle'=>false,
-            ]
+            tests: $tests,
+            batch_size: 2,
+            height_shift: 0.8,
+            width_shift: 2,
+            vertical_flip: true,
+            horizontal_flip: true,
+            shuffle: false,
         );
         foreach ($dataset as $key => $value) {
             $datas[] = $value;

@@ -1,13 +1,11 @@
 <?php
 namespace Rindow\NeuralNetworks\Optimizer;
 
-use Rindow\NeuralNetworks\Support\GenericUtils;
-use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Variable;
 use UnexpectedValueException;
 
 class Adam implements Optimizer
 {
-    use GenericUtils;
     protected $backend;
     protected $lr;
     protected $beta1;
@@ -17,14 +15,20 @@ class Adam implements Optimizer
     protected $v;
     protected $epsilon;
 
-    public function __construct($backend, array $options=null)
+    public function __construct(
+        object $backend,
+        float $lr=null,
+        float $beta1=null,
+        float $beta2=null,
+        float $epsilon=null,
+    )
     {
-        extract($this->extractArgs([
-            'lr'      => 0.001,
-            'beta1'   => 0.9,
-            'beta2'   => 0.999,
-            'epsilon' => null,
-        ],$options));
+        // defaults
+        $lr      = $lr ?? 0.001;
+        $beta1   = $beta1 ?? 0.9;
+        $beta2   = $beta2 ?? 0.999;
+        $epsilon = $epsilon ?? null;
+
         $this->backend = $K = $backend;
         $this->lr = $lr;
         $this->beta1 = $beta1;
@@ -40,8 +44,19 @@ class Adam implements Optimizer
         if($this->m === null) {
             return [];
         }
-
         return array_merge([$this->iter],$this->m,$this->v);
+    }
+
+    public function loadWeights(array $params) : void
+    {
+        $this->iter = array_shift($params);
+        $count = (int)intval(count($params)/2);
+        $m = [];
+        for($i=0;$i<$count;$i++) {
+            $m[] = array_shift($params);
+        }
+        $this->m = $m;
+        $this->v = $params;
     }
 
     public function getConfig() : array
@@ -94,22 +109,7 @@ class Adam implements Optimizer
         $lr_t = $this->lr * sqrt(1.0 - ($this->beta2**$iter)) /
                                 (1.0 - ($this->beta1**$iter)) ;
 
-        foreach (array_keys($params) as $key) {
-            $p = $params[$key];
-            $g = $grads[$key];
-            $m = $this->m[$key];
-            $v = $this->v[$key];
-
-            // m = ( beta_1 * m ) + ( 1 - beta_1 ) * g
-            // v = ( beta_2 * v ) + ( 1 - beta_2 ) * g**2
-            // p = p - lr_t * m / ( sqrt(v) + epsilon )
-            #$K->update($m,$K->add($K->scale($this->beta1,$m),
-            #                      $K->scale(1.0-$this->beta1,$g)));
-            #$K->update($v,$K->add($K->scale($this->beta2,$v),
-            #                      $K->scale(1.0-$this->beta2,$K->square($g))));
-            #$K->update($p,$K->sub($p,$K->mul($K->scale($lr_t,$m),
-            #                                 $K->rsqrt($v,$this->epsilon))));
-
+        foreach(array_map(null,$params,$grads,$this->m,$this->v) as [$p,$g,$m,$v]) {
             // m += ( 1 - beta_1 ) * ( g - m )
             // v += ( 1 - beta_2 ) * ( g**2 - v )
             // p -= lr_t * m / ( sqrt(v) + epsilon )

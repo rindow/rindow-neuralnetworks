@@ -11,13 +11,17 @@ use Rindow\Math\Plot\Plot;
 
 class Test extends TestCase
 {
-    public function newBackend($mo)
+    public function newMatrixOperator()
     {
-        $builder = new NeuralNetworks($mo);
-        return $builder->backend();
+        return new MatrixOperator();
     }
 
-    public function verifyGradient($mo, $K, $function, NDArray $t, NDArray $x,$fromLogits=null)
+    public function newNeuralNetworks($mo)
+    {
+        return new NeuralNetworks($mo);
+    }
+
+    public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
     {
         $f = function($x) use ($mo,$K,$function,$t,$fromLogits){
             $x = $K->array($x);
@@ -26,13 +30,19 @@ class Test extends TestCase
             //    $x = $K->sigmoid($x);
             //}
             $l = $function->forward($t,$x);
+            $l = $K->scalar($l);
             return $mo->array([$l]);
         };
         $xx = $K->ndarray($x);
         $grads = $mo->la()->numericalGradient(1e-3,$f,$xx);
-        $outputs = $function->forward($t,$x);
-        $dInputs = $function->backward([$K->array(1.0)]);
-        $dInputs = $K->ndarray($dInputs[0]);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($function,$t, $x) {
+                $outputsVariable = $function->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $dInputs = $outputsVariable->creator()->backward([$K->array(1.0)]);
+        $dInputs = $K->ndarray($dInputs[1]);
 #echo "\n";
 #echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
 #echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
@@ -50,9 +60,10 @@ class Test extends TestCase
 
     public function testGraph()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
         $loss = $nn->losses()->BinaryCrossEntropy();
         $x = [0.1,0.3,0.5,0.7,0.9,0.1,0.3,0.5,0.7,0.9];
@@ -60,18 +71,19 @@ class Test extends TestCase
         $y = [];
         foreach($x as $k => $xx) {
             $tt = $t[$k];
-            $y[] = $loss->forward($K->array([$tt]),$K->array([[$xx]]));
+            $y[] = $K->scalar($loss->forward($K->array([$tt]),$K->array([[$xx]])));
         }
         $plt->plot($mo->array($y));
-        #$plt->show();
+        $plt->show();
         $this->assertTrue(true);
     }
 
     public function testBuilder()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
-        $nn = new NeuralNetworks($mo,$backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $this->assertInstanceof(
             'Rindow\NeuralNetworks\Loss\BinaryCrossEntropy',
             $nn->losses()->BinaryCrossEntropy());
@@ -79,9 +91,11 @@ class Test extends TestCase
 
     public function testDefault()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $func = new BinaryCrossEntropy($backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $func = new BinaryCrossEntropy($K);
 
         $x = $K->array([
             [0.00001], [0.00001] , [0.99999],
@@ -91,13 +105,19 @@ class Test extends TestCase
         ]);
         $copyx = $K->copy($x);
         $copyt = $K->copy($t);
-        $loss = $func->forward($t,$x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         #$accuracy = $func->accuracy($t,$x);
         $this->assertLessThan(0.001,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
         //$this->assertLessThan(0.001,abs(1-$dx[0][0])/6);
@@ -105,6 +125,7 @@ class Test extends TestCase
         //$this->assertLessThan(0.001,abs(-1-$dx[2][0])/6);
 
         $accuracy = $func->accuracy($t,$x);
+        $accuracy = $K->scalar($accuracy);
         $this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -116,16 +137,24 @@ class Test extends TestCase
         $t = $K->array([
             0.0, 0.0 , 1.0,
         ]);
-        $loss = $func->forward($t,$x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         $this->assertGreaterThan(8,abs($loss));
 
-        $dx = $func->backward([$K->array(1.0)]);
-        $dx = $K->ndarray($dx[0]);
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
+        $dx = $K->ndarray($dx[1]);
+
         $this->assertGreaterThan(100,$dx[0][0]);
         $this->assertGreaterThan(100,$dx[1][0]);
         $this->assertLessThan(100,$dx[2][0]);
 
         $accuracy = $func->accuracy($t,$x);
+        $accuracy = $K->scalar($accuracy);
         $this->assertLessThan(0.0001,abs(0-$accuracy));
 
         $x = $K->array([
@@ -137,14 +166,16 @@ class Test extends TestCase
             0, 1 , 1,
         ]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$K,$func,$t,$x));
+            $this->verifyGradient($mo,$nn,$K,$g,$func,$t,$x));
     }
 
     public function testFromLogits()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $func = new BinaryCrossEntropy($backend);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $func = new BinaryCrossEntropy($K);
         $func->setFromLogits(true);
 
         $x = $K->array([
@@ -157,12 +188,18 @@ class Test extends TestCase
         $copyt = $K->copy($t);
         //$y = $func->forward($x,true);
         //$y = $backend->sigmoid($x);
-        $loss = $func->forward($t,$x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         $this->assertLessThan(0.001,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
@@ -176,12 +213,18 @@ class Test extends TestCase
         $copyt = $K->copy($t);
         //$y = $func->forward($x,true);
         //$y = $backend->sigmoid($x);
-        $loss = $func->forward($t,$x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->scalar($outputsVariable);
         $this->assertGreaterThan(7,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
-        $dx = $func->backward([$K->array(1.0)]);
+        $dx = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
 
@@ -192,6 +235,6 @@ class Test extends TestCase
             0.0, 1.0 , 0.0,
         ]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$K,$func,$t,$x,true));
+            $this->verifyGradient($mo,$nn,$K,$g,$func,$t,$x,true));
     }
 }

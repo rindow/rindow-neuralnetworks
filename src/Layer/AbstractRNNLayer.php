@@ -1,14 +1,12 @@
 <?php
 namespace Rindow\NeuralNetworks\Layer;
 
-use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
-use Rindow\NeuralNetworks\Gradient\Core\Variable;
-use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
-use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use ArrayAccess;
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
-use Rindow\NeuralNetworks\Model\BuildContext;
+use Rindow\NeuralNetworks\Gradient\Variable;
 
 /**
  *
@@ -16,90 +14,96 @@ use Rindow\NeuralNetworks\Model\BuildContext;
 abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
 {
     use GradientUtils;
-    abstract protected function call(NDArray $inputs, bool $training, array $initialStates=null, array $options=null);
-    abstract protected function differentiate(NDArray $dOutputs, array $dStates=null);
     abstract protected function numOfOutputStates($options);
 
-    protected $enableInitialStates;
+    protected $initialStates; // the statefull variable is not in container
+    //protected $calcStates;
+    //protected $origInputsShape;
+    //protected $enableInitialStates;
 
-    final public function forward(object $inputs, bool $training, array $initialStates=null,array $options=null)
+    public function setShapeInspection(bool $enable)
     {
-        if(BuildContext::$build) {
-            $variables = null;
-            if($inputs!==null) {
-                $variables = [$inputs];
-            }
-            if($initialStates!==null) {
-                $variables = array_merge($variables,$initialStates);
-            }
-            $results = $this->build($variables,$options);
-            if(is_array($results)) {
-                $outputs = array_shift($results);
-                return [$outputs,$results];
-            } else {
-                return $outputs;
-            }
-        }
-        $this->assertInputShape($inputs,'forward');
-        $this->assertStatesShape($initialStates,'forward');
-        $results = $this->call($inputs,$training,$initialStates,$options);
-        if(is_array($results)) {
-            [$outputs,$states] = $results;
-            $this->assertStatesShape($states,'forward');
-        } elseif($results instanceof NDArray) {
-            $outputs = $results;
-        }
-        $this->assertOutputShape($outputs,'forward');
-        return $results;
+        parent::setShapeInspection($enable);
+        $this->cell->setShapeInspection($enable);
+    }
+
+    public function getParams() : array
+    {
+        return $this->cell->getParams();
+    }
+
+    public function getGrads() : array
+    {
+        return $this->cell->getGrads();
+    }
+
+    public function reverseSyncWeightVariables() : void
+    {
+        $this->cell->reverseSyncCellWeightVariables($this->weights);
     }
 
     /**
     *  @param  array<NDArray> $dOutputs
     *  @return array<NDArray>
     */
-    final public function backward(array $dOutputs) : array
+    final public function backward(array $dOutputs,ArrayAccess $grads=null,array $oidsToCollect=null) : array
     {
-        $dStates = $dOutputs;
-        $dOutputs = array_shift($dStates);
-        if(!($dOutputs instanceof NDArray)) {
-            throw new InvalidArgumentException('dOutputs must be list of NDArray');
-        } elseif(count($dStates)==0) {
-            $dStates = null;
+        if(!$this->shapeInspection) {
+            $tmpdStates = $dOutputs;
+            $tmpdOutputs = array_shift($tmpdStates);
+            if(!($tmpdOutputs instanceof NDArray)) {
+                throw new InvalidArgumentException('dOutputs must be list of NDArray');
+            } elseif(count($tmpdStates)==0) {
+                $tmpdStates = null;
+            }
+            $this->assertOutputShape($tmpdOutputs,'backward');
+            $this->assertStatesShape($tmpdStates,'backward');
         }
 
-        $this->assertOutputShape($dOutputs,'backward');
-        $this->assertStatesShape($dStates,'backward');
-
-        $results = $this->differentiate($dOutputs,$dStates);
-
-        if(is_array($results)) {
-            [$dInputs,$dStates] = $results;
-            $this->assertStatesShape($dStates,'backward');
-            $results = array_merge([$dInputs],$dStates);
-        } elseif($results instanceof NDArray) {
-            $dInputs = $results;
-            $results = [$results];
+        $dInputs = $this->differentiate($dOutputs);
+        if(!$this->shapeInspection) {
+            $tmpdStates = $dInputs;
+            $tmpdInputs = array_shift($tmpdStates);
+            if(count($tmpdStates)>0) {
+                $this->assertStatesShape($tmpdStates,'backward');
+            }
+            $this->assertInputShape($tmpdInputs,'backward');
         }
-        $this->assertInputShape($dInputs,'backward');
-        return $results;
+        $this->collectGradients($this->backend,array_map(null,$this->trainableVariables(),$this->getGrads()),
+            $grads,$oidsToCollect);
+
+        return $dInputs;
     }
 
-
-    protected function callCell(NDArray $inputs,bool $training, array $initialStates=null, array $options=null)
+    protected function call(array $inputs,bool $training)
     {
         $K = $this->backend;
-        $this->enableInitialStates=($initialStates!==null)?true:false;
+        $container = $this->container();
+        $initialStates = $inputs;
+        $inputs = array_shift($initialStates);
+        $container->enableInitialStates=(count($initialStates)>0)?true:false;
         [$batches,$timesteps,$feature]=$inputs->shape();
-        if($initialStates===null&&
-            $this->stateful) {
-            $initialStates = $this->initialStates;
+        if(count($initialStates)==0 && $this->stateful) {
+            $initialStates = $this->initialStates; // the statefull variable is not in container
         }
-        if($initialStates===null){
-            $initialStates = [];
+        if(count($initialStates)==0){
             foreach($this->statesShapes as $shape){
                 $initialStates[] = $K->zeros(array_merge([$batches],$shape));
             }
+        } else {
+            $states = [];
+            foreach($initialStates as $i => $s) {
+                if($s===null) {
+                    $shape = $this->statesShapes[$i];
+                    $states[] = $K->zeros(array_merge([$batches],$shape));
+                } else {
+                    $states[] = $s;
+                }
+            }
+            $initialStates = $states;
+            unset($states);
         }
+        
         $outputs = null;
         if($this->returnSequences){
             $outputs = $K->zeros([$batches,$timesteps,$this->units]);
@@ -112,24 +116,27 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             $outputs,
             $this->goBackwards
         );
-        $this->calcStates = $calcStates;
-        $this->origInputsShape = $inputs->shape();
+        $container->calcStates = $calcStates;
+        $container->origInputsShape = $inputs->shape();
         if($this->stateful) {
-            $this->initialStates = $states;
+            $this->initialStates = $states; // the statefull variable is not in container
         }
         if($this->returnState){
-            return [$outputs,$states];
+            return array_merge([$outputs],$states);
         } else {
-            return $outputs;
+            return [$outputs];
         }
     }
 
-    protected function differentiateCell(NDArray $dOutputs, array $dNextStates=null)
+    protected function differentiate(array $dOutputs)
     {
         $K = $this->backend;
-        $dInputs=$K->zeros($this->origInputsShape);
-        if($dNextStates===null){
-            $dNextStates = [];
+        $container = $this->container();
+        $dNextStates = $dOutputs;
+        $dOutputs = array_shift($dNextStates);
+
+        $dInputs=$K->zeros($container->origInputsShape);
+        if(count($dNextStates)==0){
             $batches = $dOutputs->shape()[0];
             foreach($this->statesShapes as $shape){
                 $dNextStates[] = $K->zeros(array_merge([$batches],$shape),$dOutputs->dtype());
@@ -144,16 +151,21 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             [$this->cell,'backward'],
             $dOutputs,
             $dNextStates,
-            $this->calcStates,
+            $container->calcStates,
             $dInputs,
             $this->goBackwards
         );
-        $this->calcStates = null;
-        if($this->enableInitialStates) {
-            return [$dInputs, $dPrevStates];
+        $container->calcStates = null;
+        if($container->enableInitialStates) {
+            return array_merge([$dInputs], $dPrevStates);
         } else {
-            return $dInputs;
+            return [$dInputs];
         }
+    }
+
+    public function __invoke(...$args)
+    {
+        return $this->forward(...$args);
     }
 
     /**
@@ -164,52 +176,64 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     *  @return array<Variable>
     *       outputs
     */
-    public function __invoke($inputs, bool $training, array $initialStates=null, array $options=null)
+    final public function forward(object $inputs, Variable|bool $training, array $initialStates=null,array $options=null)
     {
-        $outputs = null;
-        if($this->outputShape==null) {
-            $inputShape = null;
-            $creator = $inputs->creator();
-            if($creator) {
-                $inputShape = [$inputs];
-            }
-            $outputs = $this->build($inputShape);
+        $inputs = [$inputs];
+        if($initialStates!==null) {
+            $inputs = array_merge($inputs,$initialStates);
         }
-        if($inputs instanceof Undetermined) {
-            if($outputs===null) {
-                throw new InvalidArgumentException('Undetermined is found in second calling.');
-            }
-            if(is_array($outputs)) {
-                $states = $outputs;
-                $outputs = array_shift($states);
-                return [$outputs,$states];
-            } else {
-                return $outputs;
-            }
+        [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
+        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+
+        if(!$this->built) {
+            $this->build($inputs);
+            $this->built = true;
         }
 
-        $inputsVariables = [$inputs];
-        if($initialStates!==null) {
-            $rawStatus = array_map(function($stat){return $stat->value();},$initialStates);
-            $inputsVariables = array_merge($inputsVariables,$initialStates);
-        } else {
-            $rawStatus = null;
+        $session = $this->preGradientProcessOnSession($inputs,['training'=>$training]);
+        $session->begin();
+        try {
+            $rawInitialStates = $rawInputs;
+            $tmpRawInputs = array_shift($rawInitialStates);
+            $this->assertInputShape($tmpRawInputs,'forward');
+            if(count($rawInitialStates)>0) {
+                $this->assertStatesShape($rawInitialStates,'forward');
+            }
+            unset($tmpRawInputs);
+            unset($rawInitialStates);
+            $rawOutputs = $this->call($rawInputs,$rawTraining);
+            $rawStates = $rawOutputs;
+            $tmpRawOutputs = array_shift($rawStates);
+            if(count($rawStates)>0) {
+                $this->assertStatesShape($rawStates,'forward');
+            }
+            $this->assertOutputShape($tmpRawOutputs,'forward');
+            unset($tmpRawOutputs);
+            unset($rawStates);
+        } finally {
+            $session->end();
         }
-        $outputs = $this->forward($inputs->value(),$training,$rawStatus,$options);
-        if(is_array($outputs)) {
-            [$o, $outputs] = $outputs;
-            array_unshift($outputs, $o);
+
+        $outputs = $this->postGradientProcessOnSession(
+            $this->backend, $session, $inputs, $rawOutputs);
+        
+        if(count($outputs)>1) {
+            $states = $outputs;
+            $outputs = array_shift($states);
+            return [$outputs,$states];
         } else {
-            $outputs = [$outputs];
+            return $outputs[0];
         }
-        $outputsVariables = $this->postGradientProcess(
-            $this->backend, $inputsVariables, $outputs);
-        if(count($outputsVariables)>1) {
-            $outputs = array_shift($outputsVariables);
-            return [$outputs,$outputsVariables];
-        } else {
-            return $outputsVariables[0];
-        }
+    }
+
+    /**
+     * Call from SessionFunc in compiled graph
+     */
+    public function _rawCall(array $inputs,array $options)
+    {
+        $training = $options['training'] ?? false;
+        $results = $this->call($inputs,$training);
+        return $results;
     }
 
     public function __clone()
@@ -217,5 +241,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         if(isset($this->cell)) {
             $this->cell = clone $this->cell;
         }
+        $this->allocateWeights(count($this->weights));
+        $this->syncWeightVariables();
     }
 }

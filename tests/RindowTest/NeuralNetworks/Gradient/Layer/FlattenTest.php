@@ -35,7 +35,7 @@ class Test extends TestCase
             [[0.0],[0.0],[6.0]],
             [[0.0],[0.0],[6.0]],
         ]));
-        $layer1 = $nn->layers->Flatten(['input_shape'=>[3,1]]);
+        $layer1 = $nn->layers->Flatten(input_shape:[3,1]);
         $layer2 = $nn->layers->Flatten();
 
         $outputs = $nn->with($tape=$g->GradientTape(),

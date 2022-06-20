@@ -7,6 +7,7 @@ use RuntimeException;
 use PDO;
 use PDOException;
 use IteratorAggregate;
+use Traversable;
 
 /*
     $hdf = new HDASqlite('filename');
@@ -60,7 +61,7 @@ class HDASqlite implements HDA
         $this->pdo = null;
     }
 
-    public function offsetExists($offset)
+    public function offsetExists($offset) : bool
     {
         $d = $this->querySingle( $this->ancestor, $offset );
         if(!$d)
@@ -69,7 +70,7 @@ class HDASqlite implements HDA
             return true;
     }
 
-    public function offsetGet( $offset )
+    public function offsetGet( $offset ) : mixed
     {
         $d = $this->querySingle( $this->ancestor, $offset );
         if(!$d)
@@ -82,7 +83,7 @@ class HDASqlite implements HDA
             throw new RuntimeException('unsupported data type');
         }
     }
-    public function offsetSet( $offset , $value )
+    public function offsetSet( $offset , $value ) : void
     {
         $this->deleteDir($this->ancestor, $offset);
         if(is_scalar($value)) {
@@ -98,14 +99,14 @@ class HDASqlite implements HDA
             throw new RuntimeException('unsupported data type');
         }
     }
-    public function offsetUnset( $offset )
+    public function offsetUnset( $offset ) : void
     {
         if(!$this->offsetExists($offset))
             return;
         $this->deleteDir($this->ancestor, $offset);
     }
 
-    public function getIterator()
+    public function getIterator() :  Traversable
     {
         return new HDASqliteIterator($this->pdo, $this->table, $this->ancestor);
     }

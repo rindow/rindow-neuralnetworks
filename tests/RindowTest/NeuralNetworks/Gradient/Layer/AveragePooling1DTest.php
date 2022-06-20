@@ -33,7 +33,7 @@ class Test extends TestCase
         $g = $nn->gradient();
 
         $x = $g->Variable($K->ones([2,4,3]));
-        $layer = $nn->layers->AveragePooling1D(['input_shape'=>[4,3]]);
+        $layer = $nn->layers->AveragePooling1D(input_shape:[4,3]);
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {

@@ -9,29 +9,38 @@ abstract class AbstractActivation implements Activation
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     protected $states;
-    public function __construct($backend)
+    public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
-    public function getStates() : object
+    //public function setStates($states) : void
+    //{
+    //    $this->states = $states;
+    //}
+
+    public function forward(object $states, NDArray $inputs, bool $training) : NDArray
     {
-        return $this->states;
+        //if($this->states===null) {
+        //    $this->states = new \stdClass();
+        //}
+        $this->states = $states;
+        try {
+            $outputs = $this->call($inputs,$training);
+        } finally {
+            $this->states = null;
+        }
+        return $outputs;
     }
 
-    public function setStates($states) : void
+    public function backward(object $states, NDArray $dOutputs) : NDArray
     {
         $this->states = $states;
-    }
-
-    public function forward(NDArray $inputs, bool $training) : NDArray
-    {
-        $this->states = new \stdClass();
-        return $this->call($inputs,$training);
-    }
-
-    public function backward(NDArray $dOutputs) : NDArray
-    {
-        return $this->differentiate($dOutputs);
+        try {
+            $dInputs = $this->differentiate($dOutputs);
+        } finally {
+            $this->states = null;
+        }
+        return $dInputs;
     }
 }

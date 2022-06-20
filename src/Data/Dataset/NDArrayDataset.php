@@ -2,14 +2,13 @@
 namespace Rindow\NeuralNetworks\Data\Dataset;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 use Countable;
 use IteratorAggregate;
+use Traversable;
 
 class NDArrayDataset implements Countable,IteratorAggregate,Dataset
 {
-    use GenericUtils;
     protected $mo;
     protected $inputs;
     protected $tests;
@@ -21,16 +20,18 @@ class NDArrayDataset implements Countable,IteratorAggregate,Dataset
     public function __construct(
         $mo,
         $inputs,
-        array $options=null,
-        array &$leftargs=null
-        )
+        NDArray $tests=null,
+        int $batch_size=null,
+        $shuffle=null,
+        DatasetFilter $filter=null,
+    )
     {
-        extract($this->extractArgs([
-            'tests'=>null,
-            'batch_size'=>32,
-            'shuffle'=>true,
-            'filter'=>null,
-        ],$options,$leftargs));
+        // defaults
+        $tests = $tests ?? null;
+        $batch_size = $batch_size ?? 32;
+        $shuffle = $shuffle ?? true;
+        $filter = $filter ?? null;
+
         $this->mo = $mo;
         if(is_array($inputs)) {
             $this->multiInputs = true;
@@ -84,12 +85,12 @@ class NDArrayDataset implements Countable,IteratorAggregate,Dataset
         return count($this->inputs[0]);
     }
 
-    public function count()
+    public function count() : int
     {
         return (int)ceil(count($this->inputs[0])/$this->batchSize);
     }
 
-    public function  getIterator()
+    public function  getIterator() : Traversable
     {
         $la = $this->mo->la();
         if(count($this->inputs[0])==0)

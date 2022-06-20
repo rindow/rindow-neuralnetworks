@@ -9,23 +9,23 @@ class Optimizers
 {
     protected $backend;
 
-    public function __construct($backend)
+    public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
-    public function SGD(array $options=null)
+    public function SGD(...$options)
     {
-        return new SGD($this->backend, $options);
+        return new SGD($this->backend, ...$options);
     }
 
-    public function Adam(array $options=null)
+    public function Adam(...$options)
     {
-        return new Adam($this->backend, $options);
+        return new Adam($this->backend, ...$options);
     }
 
-    public function RMSprop(array $options=null)
+    public function RMSprop(...$options)
     {
-        return new RMSprop($this->backend, $options);
+        return new RMSprop($this->backend, ...$options);
     }
 }

@@ -56,7 +56,7 @@ class Test extends TestCase
         $b = $g->Variable($K->array([[7,8],[9,10],[11,12]]));
         $c = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$a,$b) {
-                $c = $g->matmul($a,$b,['transpose_a'=>true]);
+                $c = $g->matmul($a,$b,transpose_a:true);
                 return $c;
             }
         );
@@ -78,7 +78,7 @@ class Test extends TestCase
         $b = $g->Variable($K->array([[7,9,11],[8,10,12]]));
         $c = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$a,$b) {
-                $c = $g->matmul($a,$b,['transpose_b'=>true]);
+                $c = $g->matmul($a,$b,transpose_b:true);
                 return $c;
             }
         );
@@ -100,7 +100,7 @@ class Test extends TestCase
         $b = $g->Variable($K->array([[7,8],[9,10],[11,12]]));
         $c = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$a,$b) {
-                $c = $g->matmul($a,$b,['transpose_a'=>true,'transpose_b'=>true]);
+                $c = $g->matmul($a,$b, transpose_a:true, transpose_b:true);
                 return $c;
             }
         );
@@ -144,7 +144,7 @@ class Test extends TestCase
         $b = $g->Variable($K->array($mo->arange(12,13,null,NDArray::float32)->reshape([2,3,2])));
         $c = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$a,$b) {
-                $c = $g->matmul($a,$b,['transpose_a'=>true]);
+                $c = $g->matmul($a,$b, transpose_a: true);
                 return $c;
             }
         );
@@ -166,7 +166,7 @@ class Test extends TestCase
         $b = $g->Variable($K->array($mo->arange(12,13,null,NDArray::float32)->reshape([2,2,3])));
         $c = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$a,$b) {
-                $c = $g->matmul($a,$b,['transpose_b'=>true]);
+                $c = $g->matmul($a,$b, transpose_b:true);
                 return $c;
             }
         );

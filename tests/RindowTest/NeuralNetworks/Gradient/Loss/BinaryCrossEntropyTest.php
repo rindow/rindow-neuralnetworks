@@ -32,7 +32,7 @@ class Test extends TestCase
 
         $x = $g->Variable($K->array([-18.6, 0.51, 2.94, -12.8]));
         $t = $K->array([0, 1, 0, 0]);
-        $activation = $nn->layers->Activation('sigmoid',['input_shape'=>[]]);
+        $activation = $nn->layers->Activation('sigmoid',input_shape:[]);
         $loss = $nn->losses->BinaryCrossEntropy();
 
         $outputs = $nn->with($tape=$g->GradientTape(),
@@ -61,7 +61,7 @@ class Test extends TestCase
         $x = $g->Variable($K->array([-18.6, 0.51, 2.94, -12.8]));
         $t = $K->array([0, 1, 0, 0]);
         $loss = $nn->losses->BinaryCrossEntropy(
-            ['from_logits'=>true]
+            from_logits:true
         );
 
         $outputs = $nn->with($tape=$g->GradientTape(),

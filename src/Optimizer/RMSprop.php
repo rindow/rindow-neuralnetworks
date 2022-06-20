@@ -1,11 +1,10 @@
 <?php
 namespace Rindow\NeuralNetworks\Optimizer;
 
-use Rindow\NeuralNetworks\Support\GenericUtils;
+use Rindow\NeuralNetworks\Gradient\Variable;
 
 class RMSprop implements Optimizer
 {
-    use GenericUtils;
     protected $backend;
     protected $lr;
     protected $rho;
@@ -14,14 +13,20 @@ class RMSprop implements Optimizer
     protected $a;
     protected $epsilon;
 
-    public function __construct($backend, array $options=null)
+    public function __construct(
+        object $backend,
+        float $lr=null,
+        float $rho=null,
+        float $decay=null,
+        float $epsilon=null,
+    )
     {
-        extract($this->extractArgs([
-            'lr'=>0.001,
-            'rho'=>0.9,
-            'decay'=>0.0,
-            'epsilon'=>null,
-        ],$options));
+        // defaults
+        $lr = $lr ?? 0.001;
+        $rho = $rho ?? 0.9;
+        $decay = $decay ?? 0.0;
+        $epsilon = $epsilon ?? null;
+
         $this->backend = $K = $backend;
         $this->lr = $lr;
         $this->rho = $rho;
@@ -41,6 +46,12 @@ class RMSprop implements Optimizer
         return array_merge([$this->iter],$this->a);
     }
 
+    public function loadWeights(array $params) : void
+    {
+        $this->iter = array_shift($params);
+        $this->a = $params;
+    }
+
     public function getConfig() : array
     {
         return [
@@ -56,7 +67,7 @@ class RMSprop implements Optimizer
     public function build(array $params) : void
     {
         $K = $this->backend;
-        $this->a = array_map(function($p) use ($K) {return $K->zerosLike($p);},$params);
+        $this->a = array_map(fn($p)=>$K->zerosLike($p),$params);
         $this->iter = $K->zeros([]);
     }
 
@@ -87,8 +98,7 @@ class RMSprop implements Optimizer
             $lr = $lr * (1 / (1 + $this->decay * $iter));
         }
 
-        foreach(array_map(null, $params, $grads, $this->a) as $data) {
-            [$p, $g, $a] = $data;
+        foreach(array_map(null, $params, $grads, $this->a) as [$p, $g, $a]) {
             # update accumulator
 
             // new_a = rho*a + (1-rho)*(g^2)

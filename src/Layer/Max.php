@@ -5,24 +5,30 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Max extends AbstractLayer implements Layer
+class Max extends AbstractLayer
 {
     use GenericUtils;
     protected $backend;
     protected $axis;
 
-    public function __construct($backend,array $options=null)
+    public function __construct(
+        object $backend,
+        int $axis=null,
+        array $input_shape=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'axis'=>-1,
-            'input_shape'=>null,
-        ],$options));
+        $axis = $axis ?? -1;
+        $input_shape = $input_shape ?? null;
+        $name = $name ?? null;
+        
         $this->backend = $backend;
         $this->axis = $axis;
         $this->inputShape = $input_shape;
+        $this->initName($name,'max');
     }
 
-    public function build($variable=null, array $options=null)
+    public function build($variable=null, array $sampleWeights=null)
     {
         $K = $this->backend;
 
@@ -50,7 +56,6 @@ class Max extends AbstractLayer implements Layer
         $this->realAxis = $axis+1;
 
         $this->outputShape = $outputShape;
-        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
@@ -76,15 +81,17 @@ class Max extends AbstractLayer implements Layer
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
+        $container = $this->container();
         $outputs = $K->max($inputs,$this->realAxis);
-        $this->inputs = $inputs;
+        $container->inputs = $inputs;
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        $argMax = $K->argMax($this->inputs,$this->realAxis);
+        $container = $this->container();
+        $argMax = $K->argMax($container->inputs,$this->realAxis);
         $dInputs = $K->scatter(
             $argMax,
             $dOutputs,

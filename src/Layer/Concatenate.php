@@ -13,22 +13,27 @@ class Concatenate extends AbstractMultiInputLayer
     protected $shapes;
 
     public function __construct(
-        $backend,
-        array $options=null)
+        object $backend,
+        int $axis=null,
+        array $input_shapes=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'axis'=>-1,
-            'input_shapes'=>null,
-        ],$options));
+        // defaults
+        $axis = $axis ?? -1;
+        $input_shapes = $input_shapes ?? null;
+        $name = $name ?? null;
+
         $this->backend = $backend;
         if(!is_int($axis)) {
             throw new InvalidArgumentException('axis must be integer.');
         }
         $this->axis = $axis;
         $this->inputShape = $input_shapes;
+        $this->initName($name,'concatenate');
     }
 
-    public function build($variables=null, array $options=null)
+    public function build($variables=null, array $sampleWeights=null)
     {
         $K = $this->backend;
         if(!is_array($variables) && $variables!==null) {
@@ -70,7 +75,6 @@ class Concatenate extends AbstractMultiInputLayer
         array_unshift($shape,$m);
         $shape = array_merge($shapestack,$shape);
         $this->outputShape = $shape;
-        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
@@ -96,10 +100,11 @@ class Concatenate extends AbstractMultiInputLayer
     protected function call(array $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
+        $container = $this->container();
         $outputs = $K->concat($inputs,$this->axis);
-        $this->shapes = [];
+        $container->shapes = [];
         foreach ($inputs as $v) {
-            $this->shapes[] = $v->shape();
+            $container->shapes[] = $v->shape();
         }
         return $outputs;
     }
@@ -107,12 +112,13 @@ class Concatenate extends AbstractMultiInputLayer
     protected function differentiate(NDArray $dOutputs) : array
     {
         $K = $this->backend;
+        $container = $this->container();
         if($this->axis<0) {
-            $axis = count($this->shapes[0])+$this->axis;
+            $axis = count($container->shapes[0])+$this->axis;
         } else {
             $axis = $this->axis;
         }
-        foreach ($this->shapes as $shape) {
+        foreach ($container->shapes as $shape) {
             $sizeSplits[] = $shape[$axis];
         }
         $dInputs = $K->split($dOutputs,$sizeSplits,$axis);

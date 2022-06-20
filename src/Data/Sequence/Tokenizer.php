@@ -2,7 +2,6 @@
 namespace Rindow\NeuralNetworks\Data\Sequence;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 use ArrayObject;
 
@@ -58,7 +57,6 @@ if(version_compare(PHP_VERSION, '7.4.0') < 0) {
 
 class Tokenizer
 {
-    use GenericUtils;
     protected $mo;
     protected $analyzer;
     protected $numWords;
@@ -74,20 +72,30 @@ class Tokenizer
     protected $filtersMap;
     protected $specialsMap;
 
-    public function __construct($mo, array $options=null)
+    public function __construct(
+        object $mo,
+        callable $analyzer=null,
+        int $num_words=null,
+        string $filters=null,
+        string $specials=null,
+        bool $lower=null,
+        string $split=null,
+        bool $char_level=null,
+        string $oov_token=null,
+        int $document_count=null,
+    )
     {
         $this->mo = $mo;
-        extract($this->extractArgs([
-            'analyzer'=>null,
-            'num_words'=>null,
-            'filters'=>"!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n",
-            'specials'=>null,
-            'lower'=>true,
-            'split'=>" ",
-            'char_level'=>false,
-            'oov_token'=>null,
-            'document_count'=>0,
-        ],$options));
+        $analyzer = $analyzer ?? null;
+        $num_words = $num_words ?? null;
+        $filters = $filters ?? "!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n";
+        $specials = $specials ?? null;
+        $lower = $lower ?? true;
+        $split = $split ?? " ";
+        $char_level = $char_level ?? false;
+        $oov_token = $oov_token ?? null;
+        $document_count = $document_count ?? 0;
+
         $this->analyzer = $analyzer;
         $this->numWords = $num_words;
         $this->filters = $filters;
@@ -141,7 +149,8 @@ class Tokenizer
         foreach ($texts as $text) {
             $this->documentCount++;
             if($this->analyzer) {
-                $seq = $this->analyzer($text);
+                $analyzer = $this->analyzer;
+                $seq = $analyzer($text);
             } else {
                 $seq = $this->textToWordSequence(
                     $text,$this->filters,$this->specials,$this->lower,$this->split);
@@ -187,7 +196,8 @@ class Tokenizer
             $this->wordToindex[$this->oovToken] : null;
         foreach ($texts as $text) {
             if($this->analyzer) {
-                $seq = $this->analyzer($text);
+                $analyzer = $this->analyzer;
+                $seq = $analyzer($text);
             } else {
                 $seq = $this->textToWordSequence(
                     $text,$this->filters,$this->specials,$this->lower,$this->split);

@@ -32,17 +32,17 @@ if(!file_exists($savefilename)) {
     $classnames = ['neg','pos'];
     $dataset = $nn->data->TextClassifiedDataset(
         $datasetdir.'/train',
-        ['pattern'=>'@[0-9_]*\\.txt@','maxlen'=>256,'num_words'=>10000,
-        'classnames'=>$classnames,'restricted_by_class'=>$classnames,
-        'shuffle'=>true,'verbose'=>1]);
+        pattern:'@[0-9_]*\\.txt@',maxlen:256,num_words:10000,
+        classnames:$classnames,restricted_by_class:$classnames,
+        shuffle:true,verbose:1);
     [$train_inputs,$train_labels] = $dataset->loadData();
     $classnames = $dataset->classnames();
     $tokenizer = $dataset->getTokenizer();
     $dataset = $nn->data->TextClassifiedDataset(
         $datasetdir.'/test',
-        ['pattern'=>'@[0-9_]*\\.txt@','tokenizer'=>$tokenizer,'maxlen'=>256,'num_words'=>10000,
-        'classnames'=>$classnames,'restricted_by_class'=>$classnames,
-        'shuffle'=>true,'verbose'=>1]);
+        pattern:'@[0-9_]*\\.txt@',tokenizer:$tokenizer,maxlen:256,num_words:10000,
+        classnames:$classnames,restricted_by_class:$classnames,
+        shuffle:true,verbose:1);
     [$test_inputs,$test_labels] = $dataset->loadData();
     $train_labels = $mo->la()->astype($train_labels,NDArray::float32);
     $test_labels = $mo->la()->astype($test_labels,NDArray::float32);
@@ -91,22 +91,22 @@ if(file_exists($modelFilePath)) {
         $nn->layers()->Embedding(
             $inputDim=count($tokenizer->getWords()),
             $outputDim=16,
-            ['input_length'=>$inputlen,]),
+            input_length:$inputlen),
         $nn->layers()->GlobalAveragePooling1D(),
         $nn->layers()->Dense($units=1,
-            ['activation'=>'sigmoid']),
+            activation:'sigmoid'),
     ]);
 
-    $model->compile([
-        'loss'=>$nn->losses->BinaryCrossEntropy(),
-        'optimizer'=>'adam',
-    ]);
+    $model->compile(
+        loss:$nn->losses->BinaryCrossEntropy(),
+        optimizer:'adam',
+    );
     $model->summary();
     echo "training model ...\n";
-    $history = $model->fit($train_inputs,$train_labels,[
-        'epochs'=>10,'batch_size'=>64,
-        'validation_data'=>[$val_inputs,$val_labels],
-    ]);
+    $history = $model->fit($train_inputs,$train_labels,
+        epochs:10,batch_size:64,
+        validation_data:[$val_inputs,$val_labels],
+    );
     $model->save($modelFilePath);
     $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
     $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
@@ -116,6 +116,6 @@ if(file_exists($modelFilePath)) {
     $plt->title('imdb');
     $plt->show();
 }
-$model->evaluate($test_inputs,$test_labels,[
-    'batch_size'=>64,'verbose'=>1,
-]);
+$model->evaluate($test_inputs,$test_labels,
+    batch_size:64,verbose:1,
+);

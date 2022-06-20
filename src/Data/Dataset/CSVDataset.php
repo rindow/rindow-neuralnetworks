@@ -2,16 +2,15 @@
 namespace Rindow\NeuralNetworks\Data\Dataset;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use Rindow\NeuralNetworks\Support\Dir;
 use InvalidArgumentException;
 use LogicException;
 use Countable;
 use IteratorAggregate;
+use Traversable;
 
 class CSVDataset implements Countable,IteratorAggregate,Dataset
 {
-    use GenericUtils;
     protected $mo;
     protected $path;
     protected $pattern;
@@ -29,22 +28,32 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
     protected $maxDatasetSize=0;
 
     public function __construct(
-        $mo, string $path, array $options=null,
-        array &$leftargs=null
-        )
+        object $mo,
+        string $path,
+        string $pattern=null,
+        int $batch_size=null,
+        bool $skip_header=null,
+        DatasetFilter $filter=null,
+        object $crawler=null,
+        bool $shuffle=null,
+        int $length=null,
+        string $delimiter=null,
+        string $enclosure=null,
+        string $escape=null,
+    )
     {
-        extract($this->extractArgs([
-            'pattern'=>null,
-            'batch_size'=>32,
-            'skip_header'=>false,
-            'filter'=>null,
-            'crawler'=>null,
-            'shuffle'=>false,
-            'length'=>0,
-            'delimiter'=>',',
-            'enclosure'=>'"',
-            'escape'=>'\\',
-        ],$options,$leftargs));
+        // defaults 
+        $pattern = $pattern ?? null;
+        $batch_size = $batch_size ?? 32;
+        $skip_header = $skip_header ?? false;
+        $filter = $filter ?? null;
+        $crawler = $crawler ?? null;
+        $shuffle = $shuffle ?? false;
+        $length = $length ?? 0;
+        $delimiter = $delimiter ?? ',';
+        $enclosure = $enclosure ?? '"';
+        $escape = $escape ?? '\\';
+
         $this->mo = $mo;
         $this->crawler = $crawler;
         $this->path = $path;
@@ -78,7 +87,7 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         return $this->maxDatasetSize;
     }
 
-    public function count()
+    public function count() : int
     {
         return $this->maxSteps;
     }
@@ -108,7 +117,7 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         return [$inputs,$tests];
     }
 
-    public function  getIterator()
+    public function  getIterator() : Traversable
     {
         if(!($this->filter instanceof DatasetFilter)) {
             throw new LogicException('DatasetFilter is not specified');

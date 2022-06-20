@@ -16,11 +16,11 @@ class AbstractTestFunction extends AbstractFunction
     protected $logger;
     protected $name;
 
-    public function __construct($backend,$options=null)
+    public function __construct($backend,$logger=null,$name=null)
     {
-        parent::__construct($backend,$options);
-        $this->logger = $options['logger'];
-        $this->name = $options['name'];
+        parent::__construct($backend);
+        $this->logger = $logger;
+        $this->name = $name;
     }
 
     public function getName()
@@ -48,14 +48,10 @@ class AbstractTestFunction extends AbstractFunction
         return $outputs;
     }
 
-    public function testGetValueType($v)
+    public function checkGetValueType($v)
     {
         $K = $this->backend;
-        if($v instanceof Undetermined) {
-            return 'U';
-        } elseif($v instanceof UndeterminedNDArray) {
-            return 'UN';
-        } elseif($v instanceof NDArray) {
+        if($v instanceof NDArray) {
             if($K->scalar($K->sum($v)) == 0) {
                 return 'Z';
             } else {
@@ -73,7 +69,7 @@ class AbstractTestFunction extends AbstractFunction
                 return array_merge(
                     $c,
                     (property_exists($v,'_debug_name')?[$v->_debug_name]:[
-                        $this->testGetValueType($v)
+                        $this->checkGetValueType($v)
                     ]));
             },[]);
         $this->logger->log('diff '.$this->name.'('.implode(',',$args).') gen='.$this->generation);
@@ -140,17 +136,19 @@ class TestBuilder
         $this->logger = $logger;
     }
 
-    public function twoInOneOut($x,$y,$options)
+    public function twoInOneOut($x,$y,$logger=null,$name=null)
     {
-        $options['logger'] = $this->logger;
-        $func = new TestFunction2In1Out($this->backend,$options);
+        $logger = $logger ?? $this->logger;
+        $func = new TestFunction2In1Out(
+            $this->backend, logger:$logger, name:$name);
         return $func($x,$y);
     }
 
-    public function oneInTwoOut($x,$options)
+    public function oneInTwoOut($x,$logger=null,$name=null)
     {
-        $options['logger'] = $this->logger;
-        $func = new TestFunction1In2Out($this->backend,$options);
+        $logger = $logger ?? $this->logger;
+        $func = new TestFunction1In2Out(
+            $this->backend, logger:$logger, name:$name);
         return $func($x);
     }
 }
@@ -184,21 +182,22 @@ class Test extends TestCase
     {
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
         $g = $nn->gradient();
         $logger = new Logger();
         $b = new TestBuilder($nn->backend(),$logger);
 
-        $x0 = $g->Variable($mo->array(0.5),['name'=>'x0']);
-        $x1 = $g->Variable($mo->array(0.5),['name'=>'x1']);
-        $x2 = $g->Variable($mo->array(0.5),['name'=>'x2']);
-        $x3 = $g->Variable($mo->array(0.5),['name'=>'x3']);
+        $x0 = $g->Variable($mo->array(0.5),name:'x0');
+        $x1 = $g->Variable($mo->array(0.5),name:'x1');
+        $x2 = $g->Variable($mo->array(0.5),name:'x2');
+        $x3 = $g->Variable($mo->array(0.5),name:'x3');
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$b,$x0,$x1,$x2,$x3){
                 $y = $b->twoInOneOut(
                     $b->twoInOneOut(
-                        $b->twoInOneOut($x0,$x1,['name'=>'F1']),
-                        $x2,['name'=>'F2']),
-                    $x3,['name'=>'F3']);
+                        $b->twoInOneOut($x0,$x1,name:'F1'),
+                        $x2, name:'F2'),
+                    $x3, name:'F3');
                 return $y;
             }
         );
@@ -224,14 +223,14 @@ class Test extends TestCase
         $logger = new Logger();
         $b = new TestBuilder($nn->backend(),$logger);
 
-        $x0 = $g->Variable($mo->array(0.5),['name'=>'x0']);
+        $x0 = $g->Variable($mo->array(0.5),name:'x0');
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$b,$x0){
                 $y = $b->twoInOneOut(
                     $b->twoInOneOut(
-                        $b->twoInOneOut($x0,$x0,['name'=>'F1']),
-                        $x0,['name'=>'F2']),
-                    $x0,['name'=>'F3']);
+                        $b->twoInOneOut($x0,$x0,name:'F1'),
+                        $x0,name:'F2'),
+                    $x0, name:'F3');
                 return $y;
             }
         );
@@ -257,12 +256,12 @@ class Test extends TestCase
         $logger = new Logger();
         $b = new TestBuilder($nn->backend(),$logger);
 
-        $x0 = $g->Variable($mo->array(0.5),['name'=>'x0']);
+        $x0 = $g->Variable($mo->array(0.5),name:'x0');
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$b,$x0){
-                $y0 = $b->twoInOneOut($x0,$x0,['name'=>'F1']);
-                $y1 = $b->twoInOneOut($x0,$y0,['name'=>'F2']);
-                $y = $b->twoInOneOut($y0,$y1,['name'=>'F3']);
+                $y0 = $b->twoInOneOut($x0,$x0,name:'F1');
+                $y1 = $b->twoInOneOut($x0,$y0,name:'F2');
+                $y = $b->twoInOneOut($y0,$y1,name:'F3');
                 return $y;
             }
         );
@@ -288,14 +287,14 @@ class Test extends TestCase
         $logger = new Logger();
         $b = new TestBuilder($nn->backend(),$logger);
 
-        $x0 = $g->Variable($mo->array(0.5),['name'=>'x0']);
-        $x1 = $g->Variable($mo->array(0.5),['name'=>'x1']);
+        $x0 = $g->Variable($mo->array(0.5),name:'x0');
+        $x1 = $g->Variable($mo->array(0.5),name:'x1');
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$b,$x0,$x1){
-                $y0 = $b->twoInOneOut($x0,$x1,['name'=>'F1']);
-                [$y1,$y2] = $b->oneInTwoOut($y0,['name'=>'F2']);
-                $y3 = $b->twoInOneOut($y1,$x0,['name'=>'F3']);
-                $y = $b->twoInOneOut($y2,$y3,['name'=>'F4']);
+                $y0 = $b->twoInOneOut($x0,$x1,name:'F1');
+                [$y1,$y2] = $b->oneInTwoOut($y0,name:'F2');
+                $y3 = $b->twoInOneOut($y1,$x0,name:'F3');
+                $y = $b->twoInOneOut($y2,$y3,name:'F4');
                 return $y;
             }
         );
@@ -323,12 +322,12 @@ class Test extends TestCase
         $logger = new Logger();
         $b = new TestBuilder($nn->backend(),$logger);
 
-        $x0 = $g->Variable($mo->array(0.5),['name'=>'x0']);
-        $x1 = $g->Variable($mo->array(0.5),['name'=>'x1']);
+        $x0 = $g->Variable($mo->array(0.5),name:'x0');
+        $x1 = $g->Variable($mo->array(0.5),name:'x1');
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$b,$x0,$x1){
-                [$y0,$y1] = $b->oneInTwoOut($x0,['name'=>'F1']);
-                $y = $b->twoInOneOut($x1,$y0,['name'=>'F2']);
+                [$y0,$y1] = $b->oneInTwoOut($x0,name:'F1');
+                $y = $b->twoInOneOut($x1,$y0,name:'F2');
                 // $y1 is not used
                 return $y;
             }

@@ -35,7 +35,7 @@ class Test extends TestCase
             [[0.0],[0.0],[6.0]],
             [[0.0],[0.0],[6.0]],
         ]));
-        $flatten = $nn->layers->Flatten(['input_shape'=>[3,1]]);
+        $flatten = $nn->layers->Flatten(input_shape:[3,1]);
         $layer =   $nn->layers->BatchNormalization();
 
         $outputs = $nn->with($tape=$g->GradientTape(),
@@ -45,9 +45,10 @@ class Test extends TestCase
                 return $outputs;
             }
         );
-        $gradients = $tape->gradient($outputs, $layer->weights());
+        $gradients = $tape->gradient($outputs, $layer->trainableVariables());
 
-        $this->assertCount(2,$layer->weights());
+        $this->assertCount(4,$layer->variables());
+        $this->assertCount(2,$layer->trainableVariables());
         $this->assertCount(2,$gradients);
         $this->assertEquals([2,3],$outputs->value()->shape());
         $this->assertEquals([3],$gradients[0]->shape());

@@ -41,7 +41,8 @@ Rindow Neural networks usually work with:
 Requires
 ========
 
-- PHP 7.2, 7.3, 7.4 and 8.0.
+- PHP 8.0 and PHP 8.1.
+- If you want to use it in PHP 7.x environment, please use Release 1.x.
 
 Install
 =======

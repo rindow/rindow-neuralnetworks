@@ -2,28 +2,33 @@
 namespace Rindow\NeuralNetworks\Data\Sequence;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 
 class Preprocessor
 {
-    use GenericUtils;
     protected $mo;
 
-    public function __construct($mo)
+    public function __construct(object $mo)
     {
         $this->mo = $mo;
     }
 
-    public function padSequences(iterable $sequences, array $options=null) : NDArray
+    public function padSequences(
+        iterable $sequences,
+        int $maxlen=null,
+        int $dtype=null,
+        string $padding=null,
+        string $truncating=null,
+        float|int|bool $value=null,
+    ) : NDArray
     {
-        extract($this->extractArgs([
-            'maxlen'=>null,
-            'dtype'=>NDArray::int32,
-            'padding'=>"pre",
-            'truncating'=>"pre",
-            'value'=>0,
-        ],$options));
+        // defaults
+        $maxlen = $maxlen ?? null;
+        $dtype = $dtype ?? NDArray::int32;
+        $padding = $padding ?? "pre";
+        $truncating = $truncating ?? "pre";
+        $value = $value ?? 0;
+        
         if(!is_iterable($sequences)) {
             throw new InvalidArgumentException('sequences must be iterable.');
         }

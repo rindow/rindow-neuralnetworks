@@ -6,36 +6,33 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\GlobalMaxPooling1D;
-use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
-use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use InvalidArgumentException;
 
 class Test extends TestCase
 {
-    public function newBackend($mo)
+    public function newMatrixOperator()
     {
-        $builder = new NeuralNetworks($mo);
-        return $builder->backend();
+        return new MatrixOperator();
     }
 
-    public function newInputShape($inputShape)
+    public function newNeuralNetworks($mo)
     {
-        array_unshift($inputShape,1);
-        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
-        return $variable;
+        return new NeuralNetworks($mo);
     }
 
     public function testDefaultInitialize()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $layer = new GlobalMaxPooling1D(
-            $backend,
-            [
-                'input_shape'=>[4,3]
-            ]);
+            $K,
+            input_shape:[4,3]
+            );
 
-        $layer->build();
+        $inputs = $g->Variable($K->zeros([1,4,3]));
+        $layer->build($inputs);
         $params = $layer->getParams();
         $this->assertCount(0,$params);
 
@@ -45,44 +42,51 @@ class Test extends TestCase
         $this->assertEquals([3],$layer->outputShape());
     }
 
-    public function testNotspecifiedInputShape()
-    {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
-        $layer = new GlobalMaxPooling1D(
-            $backend,
-            [
-            ]);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is not defined');
-        $layer->build();
-    }
-
     public function testSetInputShape()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $layer = new GlobalMaxPooling1D(
-            $backend,
-            [
-            ]);
-        $layer->build($this->newInputShape([4,3]));
+            $K,
+            );
+        $inputs = $g->Variable($K->zeros([1,4,3]));
+        $layer->build($inputs);
 
         $this->assertEquals([3],$layer->outputShape());
     }
 
+    public function testUnmatchSpecifiedInputShape()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $layer = new GlobalMaxPooling1D(
+            $K,
+            input_shape:[4,3]
+            );
+
+        $inputs = $g->Variable($K->zeros([1,4,5]));
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as [4,3] but [4,5] given in GlobalMaxPooling1D');
+        $layer->build($inputs);
+    }
+
     public function testNormalForwardAndBackward()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $fn = $backend;
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $fn = $K;
 
         $layer = new GlobalMaxPooling1D(
-            $backend,
-            ['input_shape'=>[3,2]]);
+            $K,
+            input_shape:[3,2]);
 
-        $layer->build();
+        //$layer->build();
 
         //
         // forward
@@ -93,7 +97,13 @@ class Test extends TestCase
             [[6,5],[4,3],[2,1]],
         ]);
         $copyInputs = $K->copy($inputs);
-        $outputs = $layer->forward($inputs, $training=true);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs, $training=true);
+                return $outputsVariable;
+            }
+        );
+        $outputs = $K->ndarray($outputsVariable);
         //
         $this->assertEquals([2,3,2],$inputs->shape());
         $this->assertEquals([2,2],$outputs->shape());
@@ -114,7 +124,7 @@ class Test extends TestCase
 
         $copydOutputs = $K->copy(
             $dOutputs);
-        [$dInputs] = $layer->backward([$dOutputs]);
+        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2,2],$dOutputs->shape());
         $this->assertEquals([2,3,2],$dInputs->shape());

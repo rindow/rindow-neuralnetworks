@@ -25,29 +25,42 @@ class GRU extends AbstractRNNLayer
     protected $timesteps;
     protected $feature;
 
-    protected $calcStates;
-    protected $initialStates;
-    protected $origInputsShape;
-
-    public function __construct($backend,int $units, array $options=null)
+    public function __construct(
+        object $backend,
+        int $units,
+        array $input_shape=null,
+        string|object $activation=null,
+        string|object $recurrent_activation=null,
+        bool $use_bias=null,
+        string|callable $kernel_initializer=null,
+        string|callable $recurrent_initializer=null,
+        string|callable $bias_initializer=null,
+        bool $return_sequences=null,
+        bool $return_state=null,
+        bool $go_backwards=null,
+        bool $stateful=null,
+        bool $reset_after=null,
+        string $name=null,
+    )
     {
-        extract($this->extractArgs([
-            'input_shape'=>null,
-            'activation'=>'tanh',
-            'recurrent_activation'=>'sigmoid',
-            'use_bias'=>true,
-            'kernel_initializer'=>'glorot_uniform',
-            'recurrent_initializer'=>'orthogonal',
-            'bias_initializer'=>'zeros',
-            'return_sequences'=>false,
-            'return_state'=>false,
-            'go_backwards'=>false,
-            'stateful'=>false,
-            'reset_after'=>true,
-            //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
-            //'activity_regularizer'=null,
-            //'kernel_constraint'=null, 'bias_constraint'=null,
-        ],$options));
+        // defaults
+        $input_shape = $input_shape ?? null;
+        $activation = $activation ?? 'tanh';
+        $recurrent_activation = $recurrent_activation ?? 'sigmoid';
+        $use_bias = $use_bias ?? true;
+        $kernel_initializer = $kernel_initializer ?? 'glorot_uniform';
+        $recurrent_initializer = $recurrent_initializer ?? 'orthogonal';
+        $bias_initializer = $bias_initializer ?? 'zeros';
+        $return_sequences = $return_sequences ?? false;
+        $return_state = $return_state ?? false;
+        $go_backwards = $go_backwards ?? false;
+        $stateful = $stateful ?? false;
+        $reset_after = $reset_after ?? true;
+        $name = $name ?? null;
+        //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
+        //'activity_regularizer'=null,
+        //'kernel_constraint'=null, 'bias_constraint'=null,
+        
         $this->backend = $K = $backend;
         $this->activationName = $activation;
         $this->recurrentActivationName = $recurrent_activation;
@@ -56,6 +69,7 @@ class GRU extends AbstractRNNLayer
         if($use_bias) {
             $this->useBias = $use_bias;
         }
+        $this->allocateWeights($this->useBias?3:2);
         $this->kernelInitializerName = $kernel_initializer;
         $this->recurrentInitializerName = $recurrent_initializer;
         $this->biasInitializerName = $bias_initializer;
@@ -64,25 +78,22 @@ class GRU extends AbstractRNNLayer
         $this->goBackwards = $go_backwards;
         $this->stateful = $stateful;
         $this->resetAfter = $reset_after;
+        $this->initName($name,'gru');
         $this->cell = new GRUCell(
             $this->backend,
             $this->units,
-            [
-            'activation'=>$activation,
-            'recurrent_activation'=>$recurrent_activation,
-            'use_bias'=>$this->useBias,
-            'kernel_initializer'=>$this->kernelInitializerName,
-            'recurrent_initializer'=>$this->recurrentInitializerName,
-            'bias_initializer'=>$this->biasInitializerName,
-            'reset_after'=>$this->resetAfter,
-            ]);
+            activation:$activation,
+            recurrent_activation:$recurrent_activation,
+            use_bias:$this->useBias,
+            kernel_initializer:$this->kernelInitializerName,
+            recurrent_initializer:$this->recurrentInitializerName,
+            bias_initializer:$this->biasInitializerName,
+            reset_after:$this->resetAfter,
+            );
     }
 
-    public function build($variables=null, array $options=null)
+    public function build($variables=null, array $sampleWeights=null)
     {
-        extract($this->extractArgs([
-            'sampleWeights'=>null,
-        ],$options));
         $K = $this->backend;
         if(is_object($variables)) {
             $variables = [$variables];
@@ -97,7 +108,7 @@ class GRU extends AbstractRNNLayer
         }
         $this->timesteps = $inputShape[0];
         $this->feature = $inputShape[1];
-        $this->cell->build([$this->feature],$options);
+        $this->cell->build([$this->feature], sampleWeights:$sampleWeights);
         $this->statesShapes = [
             [$this->units],
         ];
@@ -107,29 +118,9 @@ class GRU extends AbstractRNNLayer
         }else{
             $this->outputShape = [$this->units];
         }
-        $this->normalizeInitialStatesShape($variables,$this->statesShapes);
-        if($this->returnState) {
-            return $this->createOutputDefinition(array_merge([$this->outputShape],$this->statesShapes));
-        } else {
-            return $this->createOutputDefinition([$this->outputShape]);
-        }
+        $this->syncWeightVariables();
     }
 
-    public function setShapeInspection(bool $enable)
-    {
-        parent::setShapeInspection($enable);
-        $this->cell->setShapeInspection($enable);
-    }
-
-    public function getParams() : array
-    {
-        return $this->cell->getParams();
-    }
-
-    public function getGrads() : array
-    {
-        return $this->cell->getGrads();
-    }
 
     public function getConfig() : array
     {
@@ -150,16 +141,6 @@ class GRU extends AbstractRNNLayer
                 'reset_after'=>$this->resetAfter,
             ]
         ];
-    }
-
-    protected function call(NDArray $inputs, bool $training, array $initialStates=null, array $options=null)
-    {
-        return $this->callCell($inputs,$training,$initialStates,$options);
-    }
-
-    protected function differentiate(NDArray $dOutputs, array $dStates=null)
-    {
-        return $this->differentiateCell($dOutputs,$dStates);
     }
 
     protected function numOfOutputStates($options)

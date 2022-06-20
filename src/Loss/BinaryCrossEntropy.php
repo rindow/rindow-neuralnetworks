@@ -17,7 +17,7 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
         return $this->backend->dSigmoid($dOutputs, $outputs);
     }
 
-    protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : float
+    protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray
     {
         $ndimP = $predicts->ndim();
         if($ndimP!=1 && ($ndimP!=2 || $predicts->shape()[1]!=1)) {
@@ -66,7 +66,7 @@ class BinaryCrossEntropy extends AbstractCrossEntropy
         }
         $sum = $K->sum($K->equal($trues, $predicts));
         $sum = $K->scalar($sum);
-        $accuracy = $sum / (float)$trues->size();
+        $accuracy = $sum/$trues->size();
         return $accuracy;
     }
 }

@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Backend\RindowBlas;
 
 use Interop\Polite\Math\Matrix\NDArray;
+use Rindow\NeuralNetworks\Gradient\Variable;
 use InvalidArgumentException;
 
 class Backend
@@ -14,8 +15,8 @@ class Backend
         'random_uniform'    => 'random_uniform',
         'random_normal'     => 'random_normal',
         'orthogonal'        => 'orthogonal',
-        'zeros'             => 'zeros',
-        'ones'              => 'ones',
+        'zeros'             => 'kernel_zeros',
+        'ones'              => 'kernel_ones',
     ];
     protected $epsilon = 1e-7;
     protected $equalEpsilon = 1e-06;
@@ -62,6 +63,11 @@ class Backend
         $this->epsilon = $epsilon;
     }
 
+    public function shapeToString(array $shape) : string
+    {
+        return "[".implode(',',$shape)."]";
+    }
+
     public function dtypeToString($dtype) : string
     {
         $mo = $this->matrixOperator;
@@ -72,6 +78,11 @@ class Backend
     {
         $mo = $this->matrixOperator;
         return $mo->toString($array,$format,$indent);
+    }
+
+    public function isInt(NDArray $value)
+    {
+        return $this->la->isInt($value);
     }
 
     public function alloc(array $shape,$dtype=null)
@@ -95,6 +106,9 @@ class Backend
 
     public function ndarray(NDArray $ndarray)
     {
+        if($ndarray instanceof Variable) {
+            $ndarray = $ndarray->value();
+        }
         return $ndarray;
     }
 
@@ -112,11 +126,23 @@ class Backend
         return $array;
     }
 
-    public function getInitializer($name)
+    public function getInitializer($name,...$options)
     {
-        if(!array_key_exists($name,$this->initializers))
+        if(is_callable($name)) {
+            return $name;
+        }
+        if(!array_key_exists($name,$this->initializers)) {
             throw new InvalidArgumentException('Unsupported initializer: '.$name);
-        return [$this,$this->initializers[$name]];
+        }
+        $initFn = [$this,$this->initializers[$name]];
+        $init = function($shape,$nodeNum=null) use ($initFn,$options) {
+            if($nodeNum===null) {
+                $nodeNum = [];
+            }
+            $nodeNum = array_merge($nodeNum,$options);
+            return $initFn($shape,$nodeNum);
+        };
+        return $init;
     }
 
     public function glorot_normal(array $shape,$nodeNum=null)
@@ -229,6 +255,16 @@ class Backend
         $limit = sqrt(3*$scale);
         $kernel = $this->la->randomUniform($shape,-$limit,$limit);
         return $kernel;
+    }
+
+    public function kernel_zeros(array $shape,$nodeNum=null)
+    {
+        return $this->zeros($shape);
+    }
+
+    public function kernel_ones(array $shape,$nodeNum=null)
+    {
+        return $this->ones($shape);
     }
 
     public function zeros(array $shape,$dtype=null)
@@ -1408,13 +1444,15 @@ class Backend
     //    return dx
 
     // MSE
-    public function meanSquaredError(NDArray $trues, NDArray $predicts) : float
+    public function meanSquaredError(NDArray $trues, NDArray $predicts) : NDArray
     {
         $la = $this->la;
         //  E = (1/N) * sum((Yk-Tk)**2)
         $N = $predicts->size();
-        return $la->sum($la->square(
+        $loss = $la->sum($la->square(
             $la->axpy($trues,$la->copy($predicts),-1.0))) / $N;
+
+        return $this->array($loss,$predicts->dtype());
     }
 
     public function dMeanSquaredError(NDArray $trues,NDArray $predicts) : NDarray
@@ -1435,7 +1473,7 @@ class Backend
 
     public function sparseCategoricalCrossEntropy(
         NDArray $trues, NDArray $predicts,
-        bool $fromLogits=null)
+        bool $fromLogits=null) : NDArray
     {
         $la = $this->la;
         $ndim = $trues->ndim();
@@ -1466,9 +1504,11 @@ class Backend
             throw new InvalidArgumentException('unmatch shape of dimensions:'.$msg);
         }
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
-        return -1.0 * $la->sum($la->log($la->increment(
+        $loss = -1.0 * $la->sum($la->log($la->increment(
                 $la->gather($predicts,$trues,$axis=1),
                 $this->epsilon))) / $batchSize;
+
+        return $this->array($loss,$predicts->dtype());
     }
 
     public function dSparseCategoricalCrossEntropy(
@@ -1518,7 +1558,7 @@ class Backend
     }
 
     public function categoricalCrossEntropy(
-        NDArray $trues, NDArray $predicts) : float
+        NDArray $trues, NDArray $predicts) : NDArray
     {
         $la = $this->la;
         if($trues->shape()!=$predicts->shape()){
@@ -1528,7 +1568,7 @@ class Backend
         //  E = - 1/N * sum-n(sum-k(t-nk * log(y-nk)))
         $batchSize = $predicts->shape()[0];
         $tmp = $la->log($la->increment($la->copy($predicts),$this->epsilon));
-        return -1.0 * $la->sum($la->multiply($trues,
+        $loss =  -1.0 * $la->sum($la->multiply($trues,
             $tmp)) / $batchSize;
 
         // way for clip
@@ -1536,6 +1576,8 @@ class Backend
         //    $this->la->copy($predicts),1-$this->epsilon),$this->epsilon);
         //return -1.0 * $this->la->sum($this->la->multiply($trues,
         //    $this->la->log($predicts))) / $batchSize;
+
+        return $this->array($loss,$predicts->dtype());
     }
 
     public function dCategoricalCrossEntropy(
@@ -1559,7 +1601,7 @@ class Backend
     }
 
     public function binaryCrossEntropy(
-        NDArray $trues, NDArray $predicts) : float
+        NDArray $trues, NDArray $predicts) : NDArray
     {
         if($trues->shape()!=$predicts->shape()){
             throw new InvalidArgumentException('must be same shape of dimensions');
@@ -1578,12 +1620,13 @@ class Backend
         // E =  t      * -log( p ) +
         //     (1 - t) * -log( 1 - p )
         $batchSize = $predicts->shape()[0];
-        return $la->sum($la->axpy($la->multiply($la->copy($trues),
+        $loss = $la->sum($la->axpy($la->multiply($la->copy($trues),
                                         $la->scal(-1,$la->log($la->copy($predicts)))),
                         $la->multiply($la->increment($la->copy($trues),1,-1),
                                         $la->scal(-1,$la->log(
                                             $la->increment($la->copy($predicts),1,-1))))))
                                             / $batchSize;
+        return $this->array($loss,$predicts->dtype());
     }
 
     public function dBinaryCrossEntropy(

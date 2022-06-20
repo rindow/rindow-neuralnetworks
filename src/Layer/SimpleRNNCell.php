@@ -3,11 +3,9 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 
 class SimpleRNNCell extends AbstractRNNCell
 {
-    use GenericUtils;
     protected $backend;
     protected $units;
     protected $activation;
@@ -23,22 +21,32 @@ class SimpleRNNCell extends AbstractRNNCell
     protected $dBias;
     protected $inputs;
 
-    public function __construct($backend,int $units, array $options=null)
+    public function __construct(
+        object $backend,
+        int $units,
+        array $input_shape=null,
+        string|object $activation=null,
+        bool $use_bias=null,
+        string|callable $kernel_initializer=null,
+        string|callable $recurrent_initializer=null,
+        string|callable $bias_initializer=null,
+    )
     {
-        extract($this->extractArgs([
-            'input_shape'=>null,
-            'activation'=>'tanh',
-            'use_bias'=>true,
-            'kernel_initializer'=>'glorot_uniform',
-            'recurrent_initializer'=>'orthogonal',
-            'bias_initializer'=>'zeros',
-            //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
-            //'activity_regularizer'=null,
-            //'kernel_constraint'=null, 'bias_constraint'=null,
-        ],$options));
+        // defaults
+        $input_shape = $input_shape ?? null;
+        $activation = $activation ?? 'tanh';
+        $use_bias = $use_bias ?? true;
+        $kernel_initializer = $kernel_initializer ?? 'glorot_uniform';
+        $recurrent_initializer = $recurrent_initializer ?? 'orthogonal';
+        $bias_initializer = $bias_initializer ?? 'zeros';
+        //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
+        //'activity_regularizer'=null,
+        //'kernel_constraint'=null, 'bias_constraint'=null,
+        
         $this->backend = $K = $backend;
         $this->units = $units;
         $this->inputShape = $input_shape;
+
         if($use_bias) {
             $this->useBias = $use_bias;
         }
@@ -51,11 +59,8 @@ class SimpleRNNCell extends AbstractRNNCell
         $this->biasInitializerName = $bias_initializer;
     }
 
-    public function build($inputShape=null, array $options=null)
+    public function build($inputShape=null, array $sampleWeights=null)
     {
-        extract($this->extractArgs([
-            'sampleWeights'=>null,
-        ],$options));
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
         $recurrentInitializer = $this->recurrentInitializer;
@@ -68,47 +73,31 @@ class SimpleRNNCell extends AbstractRNNCell
         //}
         $shape = $inputShape;
         $inputDim = array_pop($shape);
-        if($sampleWeights) {
-            $this->kernel = $sampleWeights[0];
-            $this->recurrentKernel = $sampleWeights[1];
-            $this->bias = $sampleWeights[2];
-        } else {
-            $this->kernel = $kernelInitializer(
-                [$inputDim,$this->units],
-                [$inputDim,$this->units]);
-            $this->recurrentKernel = $recurrentInitializer(
-                [$this->units,$this->units],
-                [$this->units,$this->units]);
-            if($this->useBias) {
-                $this->bias = $biasInitializer([$this->units]);
+        if($this->kernel===null) {
+            if($sampleWeights) {
+                $this->kernel = $sampleWeights[0];
+                $this->recurrentKernel = $sampleWeights[1];
+                $this->bias = $sampleWeights[2];
+            } else {
+                $this->kernel = $kernelInitializer(
+                    [$inputDim,$this->units],
+                    [$inputDim,$this->units]);
+                $this->recurrentKernel = $recurrentInitializer(
+                    [$this->units,$this->units],
+                    [$this->units,$this->units]);
+                if($this->useBias) {
+                    $this->bias = $biasInitializer([$this->units]);
+                }
             }
         }
         $this->dKernel = $K->zerosLike($this->kernel);
         $this->dRecurrentKernel = $K->zerosLike($this->recurrentKernel);
-        if($this->bias) {
+        if($this->useBias) {
             $this->dBias = $K->zerosLike($this->bias);
         }
         array_push($shape,$this->units);
         $this->outputShape = $shape;
         return $this->outputShape;
-    }
-
-    public function getParams() : array
-    {
-        if($this->bias) {
-            return [$this->kernel,$this->recurrentKernel,$this->bias];
-        } else {
-            return [$this->kernel,$this->recurrentKernel];
-        }
-    }
-
-    public function getGrads() : array
-    {
-        if($this->bias) {
-            return [$this->dKernel,$this->dRecurrentKernel,$this->dBias];
-        } else {
-            return [$this->dKernel,$this->dRecurrentKernel];
-        }
     }
 
     public function getConfig() : array
@@ -137,8 +126,8 @@ class SimpleRNNCell extends AbstractRNNCell
         }
         $outputs = $K->gemm($prev_h, $this->recurrentKernel,1.0,1.0,$outputs);
         if($this->activation) {
-            $outputs = $this->activation->forward($outputs,$training);
-            $calcState->activation = $this->activation->getStates();
+            $calcState->activation = new \stdClass();
+            $outputs = $this->activation->forward($calcState->activation,$outputs,$training);
         }
 
         $calcState->inputs = $inputs;
@@ -152,8 +141,7 @@ class SimpleRNNCell extends AbstractRNNCell
         $dNext_h = $dStates[0];
         $dOutputs = $K->add($dOutputs,$dNext_h);
         if($this->activation) {
-            $this->activation->setStates($calcState->activation);
-            $dOutputs = $this->activation->backward($dOutputs);
+            $dOutputs = $this->activation->backward($calcState->activation,$dOutputs);
         }
         $dInputs = $K->zerosLike($calcState->inputs);
         if($this->bias) {

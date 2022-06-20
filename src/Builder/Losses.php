@@ -12,33 +12,33 @@ class Losses
 {
     protected $backend;
 
-    public function __construct($backend)
+    public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
-    public function MeanSquaredError(array $options=null)
+    public function MeanSquaredError(...$options)
     {
-        return new MeanSquaredError($this->backend,$options);
+        return new MeanSquaredError($this->backend, ...$options);
     }
 
-    public function SparseCategoricalCrossEntropy(array $options=null)
+    public function SparseCategoricalCrossEntropy(...$options)
     {
-        return new SparseCategoricalCrossEntropy($this->backend,$options);
+        return new SparseCategoricalCrossEntropy($this->backend, ...$options);
     }
 
-    public function CategoricalCrossEntropy(array $options=null)
+    public function CategoricalCrossEntropy(...$options)
     {
-        return new CategoricalCrossEntropy($this->backend,$options);
+        return new CategoricalCrossEntropy($this->backend, ...$options);
     }
 
-    public function BinaryCrossEntropy(array $options=null)
+    public function BinaryCrossEntropy(...$options)
     {
-        return new BinaryCrossEntropy($this->backend,$options);
+        return new BinaryCrossEntropy($this->backend, ...$options);
     }
 
-    public function Huber(array $options=null)
+    public function Huber(...$options)
     {
-        return new Huber($this->backend,$options);
+        return new Huber($this->backend, ...$options);
     }
 }

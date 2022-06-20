@@ -35,7 +35,7 @@ class Test extends TestCase
             [0,1,2],
             [2,1,0],
         ]));
-        $layer = $nn->layers->Embedding($inputDim=3, $outputDim=4, ['input_length'=>3]);
+        $layer = $nn->layers->Embedding($inputDim=3, $outputDim=4, input_length:3);
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {

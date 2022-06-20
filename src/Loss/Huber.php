@@ -2,23 +2,23 @@
 namespace Rindow\NeuralNetworks\Loss;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 use DomainException;
+use ArrayAccess;
 
-class Huber extends AbstractGradient implements Loss
+class Huber extends AbstractLoss implements Loss
 {
-    use GenericUtils;
     protected $backend;
     protected $delta;
-    protected $trues;
-    protected $predicts;
 
-    public function __construct($backend,array $options=null)
+    public function __construct(
+        object $backend,
+        float $delta=null
+    )
     {
-        extract($this->extractArgs([
-            'delta'=>1.0,
-        ],$options));
+        // defaults
+        $delta = $delta ?? 1.0;
+
         $this->backend = $K = $backend;
         $this->delta = $delta;
     }
@@ -29,9 +29,10 @@ class Huber extends AbstractGradient implements Loss
         ];
     }
 
-    public function forward(NDArray $trues, NDArray $predicts) : float
+    protected function call(NDArray $trues, NDArray $predicts) : NDArray
     {
         $K = $this->backend;
+        $container = $this->container();
         //$this->assertOutputShape($predicts);
         //if($trues->ndim()!=2) {
         //    throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
@@ -44,34 +45,38 @@ class Huber extends AbstractGradient implements Loss
         #  loss = 0.5 * d^2 + d * (|x| - d)  if |x| > d
         #       = d*|x| - 0.5*d^2
         #       = d*(|x| - 0.5*d)
-        $this->trues = $trues;
-        $this->predicts = $predicts;
         $x = $K->sub($trues,$predicts);
         $absx = $K->abs($x);
         $lessThenDelta = $K->lessEqual($absx, $this->delta);
-        $greaterThenDelta = $K->greater($absx, $this->delta);
+        $greaterThenDelta = $K->increment($K->copy($lessThenDelta),1.0,-1.0);
         $squaredLoss = $K->scale(0.5, $K->square($x));
         $linearLoss = $K->scale($this->delta, $K->increment($absx, -0.5*$this->delta));
         $loss = $K->add(
             $K->mul($lessThenDelta,   $squaredLoss),
-            $K->mul($greaterThenDelta,$linearLoss)
+            $K->mul($greaterThenDelta,$linearLoss),
         );
-        $this->diffx = $x;
-        $this->lessThenDelta = $lessThenDelta;
-        $this->greaterThenDelta = $greaterThenDelta;
-        return $K->scalar($K->sum($loss))/$N;
+        $container->diffx = $x;
+        $container->lessThenDelta = $lessThenDelta;
+        $container->greaterThenDelta = $greaterThenDelta;
+        $loss = $K->sum($loss);
+
+        if($loss instanceof NDArray) {
+            return $K->scale(1/$N,$loss);
+        }
+        return $K->array($loss/$N,$predicts->dtype());
     }
 
-    public function backward(array $dOutputs) : array
+    protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
     {
         $K = $this->backend;
-        $x = $this->diffx;
+        $container = $this->container();
+        $x = $container->diffx;
         $n = $x->size();
         $dSquaredLoss = $K->scale(-1/$n,$x);
         $dLinearLoss = $K->scale(-$this->delta/$n,$K->sign($x));
         $dInputs = $K->add(
-            $K->mul($this->lessThenDelta,   $dSquaredLoss),
-            $K->mul($this->greaterThenDelta,$dLinearLoss)
+            $K->mul($container->lessThenDelta,   $dSquaredLoss),
+            $K->mul($container->greaterThenDelta,$dLinearLoss),
         );
         return [$dInputs];
     }
@@ -97,7 +102,7 @@ class Huber extends AbstractGradient implements Loss
             $sum = $K->nrm2($K->sub($predicts,$trues));
         }
         $sum = $K->scalar($sum);
-        $accuracy = $sum / (float)$trues->shape()[0];
+        $accuracy = $sum/$trues->shape()[0];
         return $accuracy;
     }
 }

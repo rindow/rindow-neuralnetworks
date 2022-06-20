@@ -30,7 +30,7 @@ class Test extends TestCase
         ]);
         $dataset = $nn->data->NDArrayDataset(
             $inputs,
-            ['tests'=>$tests,'batch_size'=>2,'shuffle'=>false]
+            tests:$tests,  batch_size: 2, shuffle: false
         );
         $this->assertEquals(3,count($dataset));
         $this->assertEquals(5,$dataset->datasetSize());
@@ -76,7 +76,7 @@ class Test extends TestCase
         ]);
         $dataset = $nn->data->NDArrayDataset(
             $inputs,
-            ['batch_size'=>2,'shuffle'=>false]
+            batch_size: 2, shuffle: false
         );
         $this->assertEquals(3,count($dataset));
         $this->assertEquals(5,$dataset->datasetSize());
@@ -114,7 +114,7 @@ class Test extends TestCase
         ]);
         $dataset = $nn->data->NDArrayDataset(
             $inputs,
-            ['tests'=>$tests,'batch_size'=>1,'shuffle'=>false]
+            tests:  $tests, batch_size: 1, shuffle: false
         );
         $this->assertEquals(3,count($dataset));
         $this->assertEquals(3,$dataset->datasetSize());
@@ -190,7 +190,7 @@ class Test extends TestCase
         ]);
         $dataset = $nn->data->NDArrayDataset(
             $inputs,
-            ['tests'=>$tests,'batch_size'=>2,'shuffle'=>true]
+            tests: $tests, batch_size: 2, shuffle: true
         );
         $this->assertEquals(3,count($dataset));
         $this->assertEquals(5,$dataset->datasetSize());

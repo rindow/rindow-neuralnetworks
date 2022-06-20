@@ -2,10 +2,10 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
+use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
-use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
-use Rindow\NeuralNetworks\Model\BuildContext;
+use Rindow\NeuralNetworks\Gradient\Variable;
 
 abstract class AbstractMultiInputLayer extends AbstractLayerBase
 {
@@ -41,21 +41,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
         }
     }
 
-    public function forward(array $inputs, bool $training)
-    {
-        if(BuildContext::$build) {
-            return $this->build($inputs);
-        }
-        if(count($inputs)<2) {
-            throw new InvalidArgumentException('Must have arguments greater than 2 or equal');
-        }
-        $this->assertInputShapes($inputs,'forward');
-        $outputs = $this->call($inputs,$training);
-        $this->assertOutputShape($outputs,'forward');
-        return $outputs;
-    }
-
-    public function backward(array $dOutputs) : array
+    public function backward(array $dOutputs, ArrayAccess $grads=null,array $oidsToCollect=null) : array
     {
         if(count($dOutputs)!=1) {
             throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
@@ -67,33 +53,59 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
         $this->assertOutputShape($dOutputs,'backward');
         $dInputs = $this->differentiate($dOutputs);
         $this->assertInputShapes($dInputs,'backward');
+        $this->collectGradients($this->backend,array_map(null,$this->trainableVariables(),$this->getGrads()),
+            $grads,$oidsToCollect);
         return $dInputs;
     }
 
+    public function __invoke($inputs, $training)
+    {
+        $outputs = $this->forward($inputs, $training);
+        return $outputs;
+    }
 
     /**
     *  @param array<Variable>  $inputs
     *  @return array<Variable>
     */
-    public function __invoke($inputs, bool $training)
+    public function forward(array $inputs, Variable|bool $training)
     {
         if(!is_array($inputs)) {
             throw new InvalidArgumentException('inputs must be list of Variable');
         }
-        $outputs = null;
-        if($this->outputShape==null) {
-            $outputs = $this->build($inputs);
+        if(count($inputs)<2) {
+            throw new InvalidArgumentException('Must have arguments greater than 2 or equal');
         }
-        if($inputs[0] instanceof Undetermined) {
-            if($outputs===null) {
-                throw new InvalidArgumentException('Undetermined is found in second calling.');
-            }
-            return $outputs;
+        [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
+        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+        if(!$this->built) {
+            $this->build($inputs);
+            $this->built = true;
         }
-        $rawInputs = array_map(function($value){return $value->value();},$inputs);
-        $outputs = $this->forward($rawInputs,$training);
-        $outputs = $this->postGradientProcess(
-            $this->backend, $inputs, [$outputs]);
+        $session = $this->preGradientProcessOnSession($inputs);
+        $session->begin();
+        try {
+            $this->assertInputShapes($inputs,'forward');
+            $rawOutputs = $this->call($rawInputs,$rawTraining);
+            $this->assertOutputShape($rawOutputs,'forward');
+        } finally {
+            $session->end();
+        }
+        $outputs = $this->postGradientProcessOnSession(
+            $this->backend, $session, $inputs, [$rawOutputs]);
         return $outputs[0];
+    }
+
+    /**
+     * Call from SessionFunc in compiled graph
+     */
+    public function _rawCall(array $inputs,array $options)
+    {
+        $training = $options['training'] ?? false;
+        $outputs = $this->call($inputs, $training);
+        if(!is_array($outputs)) {
+            $outputs = [$outputs];
+        }
+        return $outputs;
     }
 }

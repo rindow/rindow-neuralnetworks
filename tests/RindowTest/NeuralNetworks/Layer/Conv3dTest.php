@@ -6,38 +6,36 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Conv3D;
-use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
-use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use InvalidArgumentException;
 
 class Test extends TestCase
 {
-    public function newBackend($mo)
+    public function newMatrixOperator()
     {
-        $builder = new NeuralNetworks($mo);
-        return $builder->backend();
+        return new MatrixOperator();
     }
 
-    public function newInputShape($inputShape)
+    public function newNeuralNetworks($mo)
     {
-        array_unshift($inputShape,1);
-        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
-        return $variable;
+        return new NeuralNetworks($mo);
     }
 
     public function testDefaultInitialize()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
         $layer = new Conv3D(
-            $backend,
+            $K,
             $filters=5,
             $kernel_size=3,
-            [
-                'input_shape'=>[4,4,4,1]
-            ]);
+            input_shape:[4,4,4,1]
+            );
 
-        $layer->build();
+        $inputs = $g->Variable($K->zeros([1,4,4,4,1]));
+        $layer->build($inputs);
         $params = $layer->getParams();
         $this->assertCount(2,$params);
         $this->assertEquals([3,3,3,1,5],$params[0]->shape());
@@ -55,33 +53,19 @@ class Test extends TestCase
         $this->assertEquals([2,2,2,5],$layer->outputShape());
     }
 
-    public function testNotspecifiedInputShape()
-    {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
-        $layer = new Conv3D(
-            $backend,
-            $filters=5,
-            $kernel_size=3,
-            [
-            ]);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is not defined');
-        $layer->build();
-    }
-
     public function testSetInputShape()
     {
-        $mo = new MatrixOperator();
-        $backend = $this->newBackend($mo);
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
         $layer = new Conv3D(
-            $backend,
+            $K,
             $filters=5,
             $kernel_size=3,
-            [
-            ]);
-        $layer->build($this->newInputShape([4,4,4,1]));
+            );
+        $inputs = $g->Variable($K->zeros([1,4,4,4,1]));
+        $layer->build($inputs);
         $params = $layer->getParams();
         $this->assertCount(2,$params);
         $this->assertEquals([3,3,3,1,5],$params[0]->shape());
@@ -89,17 +73,40 @@ class Test extends TestCase
         $this->assertEquals([2,2,2,5],$layer->outputShape());
     }
 
+    public function testUnmatchSpecifiedInputShape()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $layer = new Conv3D(
+            $K,
+            $filters=5,
+            $kernel_size=3,
+            input_shape:[4,4,4,1]
+            );
+
+        $inputs = $g->Variable($K->zeros([1,4,4,4,2]));
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as [4,4,4,1] but [4,4,4,2] given in Conv3D');
+        $layer->build($inputs);
+    }
+
     public function testNormalForwardAndBackward()
     {
-        $mo = new MatrixOperator();
-        $K = $backend = $this->newBackend($mo);
-        $fn = $backend;
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
 
         $layer = new Conv3D(
-            $backend,
+            $K,
             $filters=2,
             $kernel_size=2,
-            ['input_shape'=>[3,3,3,1]]);
+            input_shape:[3,3,3,1]);
+
+        //  batch size 2
+        $inputs = $K->ones([2,3,3,3,1]);
 
         /*
         $kernel = $mo->array([
@@ -112,10 +119,8 @@ class Test extends TestCase
                 [0.5,0.1]
             );  // bias
         $layer->build(null,
-            ['sampleWeights'=>
-                [$kernel,$bias]
-        ]);*/
-        $layer->build();
+            sampleWeights:[$kernel,$bias]);*/
+        $layer->build($g->Variable($inputs));
         [$kernel,$bias]=$layer->getParams();
         $this->assertEquals(
             [2,2,2,1,2],
@@ -127,13 +132,17 @@ class Test extends TestCase
         //
         // forward
         //
-        //  batch size 2
-        $inputs = $K->ones([2,3,3,3,1]);
         $this->assertEquals(
             [2,3,3,3,1],
             $inputs->shape());
         $copyInputs = $K->copy($inputs);
-        $outputs = $layer->forward($inputs, $training=true);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs, $training=true);
+                return $outputsVariable;
+            }
+        );
+        $outputs = $K->ndarray($outputsVariable);
         //
         $this->assertEquals(
             [2,2,2,2,2],$outputs->shape());
@@ -146,7 +155,7 @@ class Test extends TestCase
         $dOutputs = $K->fill([2,2,2,2,2],0.1);
         $copydOutputs = $K->copy(
             $dOutputs);
-        [$dInputs] = $layer->backward([$dOutputs]);
+        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2,3,3,3,1],$dInputs->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
