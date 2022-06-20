@@ -4,14 +4,12 @@ namespace Rindow\NeuralNetworks\Model;
 use InvalidArgumentException;
 use UnexpectedValueException;
 use LogicException;
-use Rindow\NeuralNetworks\Layer\Layer;
+use Rindow\NeuralNetworks\Layer\LayerBase;
 use Interop\Polite\Math\Matrix\NDArray;
 
 class Sequential extends AbstractModel
 {
-    protected $layers = [];
-
-    public function __construct(object $backend,object $builder,$hda,array $layers=null)
+    public function __construct($backend,$builder,$hda,array $layers=null)
     {
         parent::__construct($backend,$builder,$hda);
         if($layers!==null) {
@@ -21,8 +19,11 @@ class Sequential extends AbstractModel
         }
     }
 
-    public function add(Layer $layer)
+    public function add($layer)
     {
+        if(!($layer instanceof LayerBase)) {
+            throw new InvalidArgumentException('invalid Layer');
+        }
         $this->layers[] = $layer;
         //$this->extractWeights($layer);
         //$activation = $layer->activation();
@@ -39,40 +40,33 @@ class Sequential extends AbstractModel
     //    return $lastLayer;
     //}
 
-    public function layers() : array
+    protected function buildLayers(array $options=null) : void
     {
-        return $this->layers;
-    }
-
-    public function submodules() : array
-    {
-        return $this->layers;
-    }
-    
-    public function variables() : array
-    {
-        $variables = [];
-        foreach($this->layers as $layer) {
-            $variables = array_merge($variables,$layer->weights());
+        // initialize weight paramators
+        $inputShape = null;
+        foreach ($this->layers as $layer) {
+            $inputShape = $layer->build($inputShape);
+            //$this->extractWeights($layer);
         }
-
-        return $variables;
+        $this->params = [];
+        $this->grads = [];
+        foreach($this->layers as $weights) {
+            $this->params = array_merge($this->params,$weights->getParams());
+            $this->grads  = array_merge($this->grads, $weights->getGrads());
+        }
     }
-    
-    protected function call(...$args)
+
+    public function forward(...$args)
     {
         $x = array_shift($args);
         $training = array_shift($args);
-        if($training==null) {
-            $training = false;
-        }
-        //$trues = array_shift($args);
+        $trues = array_shift($args);
         foreach($this->layers as $layer) {
             $x = $layer->forward($x, $training);
         }
         return $x;
     }
-/*
+
     protected function backward(array $dOutputs) : array
     {
         $dout = $dOutputs;
@@ -81,33 +75,6 @@ class Sequential extends AbstractModel
             $dout = $layer->backward($dout);
         }
         return $dout;
-    }
-*/
-    protected function generateLayersConfig() : array
-    {
-        $layerNames = [];
-        $layers = [];
-
-        foreach ($this->layers as $layer) {
-            $name = $layer->getName();
-            $layerNames[] = $name;
-            $layers[$name] = [
-                'class'  => get_class($layer),
-                'config' => $layer->getConfig(),
-            ];
-        }
-        return [$layerNames,$layers];
-    }
-
-    public function summary()
-    {
-        if(!$this->built) {
-            $first = $this->layers[0];
-            $inputShape = $first->inputShape();
-            array_unshift($inputShape,1);
-            $this->build($inputShape);
-        }
-        parent::summary();
     }
 
     public function toJson() : string
@@ -141,20 +108,5 @@ class Sequential extends AbstractModel
         $f['modelConfig'] = $this->toJson();
         $f['modelWeights'] = [];
         $this->saveWeights($f['modelWeights'],$portable);
-    }
-
-    public function __clone()
-    {
-        $newLayers = [];
-        foreach ($this->layers as $layer) {
-            $newLayers[] = clone $layer;
-        }
-        $this->layers = $newLayers;
-        //$this->built = false;
-        //$this->params = [];
-        //$this->grads = [];
-        //$this->optimizer = null;
-        //$this->lossFunction = null;
-        //$this->metrics = null;
     }
 }

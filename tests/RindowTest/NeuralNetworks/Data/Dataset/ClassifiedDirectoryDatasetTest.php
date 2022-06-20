@@ -17,8 +17,10 @@ class Test extends TestCase
         $dataset = new ClassifiedDirectoryDataset(
             $mo,
             __DIR__.'/text',
-            pattern: '@.*\\.txt@',
-            batch_size: 2,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>2,
+            ]
         );
         $datas = [];
         $sets = [];
@@ -56,8 +58,10 @@ class Test extends TestCase
         $dataset = new ClassifiedDirectoryDataset(
             $mo,
             __DIR__.'/text',
-            pattern: '@.*\\.txt@',
-            batch_size: 0,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>0,
+            ]
         );
         $sets = [];
         foreach ($dataset as $key => $value) {
@@ -89,9 +93,11 @@ class Test extends TestCase
         $dataset = new ClassifiedDirectoryDataset(
             $mo,
             __DIR__.'/text',
-            pattern: '@.*\\.txt@',
-            batch_size: 0,
-            unclassified: true,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>0,
+                'unclassified'=>true,
+            ]
         );
         $sets = [];
         foreach ($dataset as $key => $value) {

@@ -5,29 +5,22 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class ExpandDims extends AbstractLayer
+class ExpandDims extends AbstractLayer implements Layer
 {
     use GenericUtils;
     protected $backend;
     protected $axis;
 
-    public function __construct(
-        object $backend,
-        int $axis,
-        array $input_shape=null,
-        string $name=null,
-    )
+    public function __construct($backend,int $axis,array $options=null)
     {
-        $input_shape = $input_shape ?? null;
-        $name = $name ?? null;
-        
-        $this->backend = $backend;
+        extract($this->extractArgs([
+            'input_shape'=>null,
+        ],$options));
         $this->axis = $axis;
         $this->inputShape = $input_shape;
-        $this->initName($name,'expanddims');
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build($variable=null, array $options=null)
     {
         $K = $this->backend;
 
@@ -51,6 +44,7 @@ class ExpandDims extends AbstractLayer
         }
         $outputShape = array_merge($left,[1],$right);
         $this->outputShape = $outputShape;
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

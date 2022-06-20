@@ -24,16 +24,14 @@ class Test extends TestCase
     public function verifyGradient($mo, $K, $function, NDArray $x, ...$args)
     {
         $f = function($x) use ($K,$function,$args){
-            $states = new \stdClass();
             $x = $K->array($x);
-            $y = $function->forward($states,$x,...$args);
+            $y = $function->forward($x,...$args);
             return $K->ndarray($y);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
-        $states = new \stdClass();
-        $outputs = $function->forward($states,$x, ...$args);
+        $outputs = $function->forward($x, ...$args);
         $ones = $K->ones($outputs->shape(),$outputs->dtype());
-        $dInputs = $function->backward($states,$ones);
+        $dInputs = $function->backward($ones);
         return $mo->la()->isclose($grads[0],$K->ndarray($dInputs));
     }
 
@@ -43,10 +41,9 @@ class Test extends TestCase
         $K = $this->newBackend($mo);
         $activation = new Sigmoid($K);
 
-        $states = new \stdClass();
         $x = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
         $x = $K->array($x);
-        $y = $activation->forward($states,$x, $training=true);
+        $y = $activation->forward($x, $training=true);
         $y = $K->ndarray($y);
         $x = $K->ndarray($x);
 
@@ -60,7 +57,7 @@ class Test extends TestCase
         $dout = $x;
         $copydout = $mo->copy($dout);
         $dout = $K->array($dout);
-        $dx = $activation->backward($states,$dout);
+        $dx = $activation->backward($dout);
         $dx = $K->ndarray($dx);
         $dout = $K->ndarray($dout);
         $this->assertTrue(abs(-0.196-$dx[0])<0.01);

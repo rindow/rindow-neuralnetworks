@@ -5,25 +5,18 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Activation extends AbstractLayer
+class Activation extends AbstractLayer implements Layer
 {
     use GenericUtils;
     protected $backend;
 
-    public function __construct(
-        object $backend,
-        string|object $activation,
-        array $input_shape=null,
-        string $name=null,
-    )
+    public function __construct($backend, $activation,array $options=null)
     {
-        // defaults
-        $input_shape = $input_shape ?? null;
-        $name = $name ?? null;
-
+        extract($this->extractArgs([
+            'input_shape'=>null,
+        ],$options));
         $this->backend = $K = $backend;
         $this->inputShape = $input_shape;
-        $this->initName($name,'activation');
         $this->setActivation($activation);
     }
 
@@ -31,27 +24,24 @@ class Activation extends AbstractLayer
     {
         return [
             'activation'=>$this->activationName,
-            'input_shape'=>$this->inputShape,
+            'options' => [
+                'input_shape'=>$this->inputShape,
+            ],
         ];
     }
 
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $outputs = $inputs;
-        if($this->activation) {
-            $container = $this->container();
-            $outputs = $this->activation->forward($container,$outputs,$training);
-        }
+        if($this->activation)
+            $outputs = $this->activation->forward($outputs,$training);
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
-        $dInputs = $dOutputs;
-        if($this->activation) {
-            $container = $this->container();
-            $dInputs = $this->activation->backward($container,$dOutputs);
-        }
-        return $dInputs;
+        if($this->activation)
+            $dOutputs = $this->activation->backward($dOutputs);
+        return $dOutputs;
     }
 }

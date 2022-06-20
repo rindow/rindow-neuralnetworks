@@ -27,7 +27,7 @@ class NeuralNetworks
     protected $utils;
     protected $gradient;
 
-    public function __construct(object $matrixOperator=null, object $backend=null)
+    public function __construct($matrixOperator=null,$backend=null)
     {
         if($backend==null) {
             if($matrixOperator==null) {
@@ -132,8 +132,8 @@ class NeuralNetworks
         return $this->gradient;
     }
 
-    public function with(...$args)
+    public function with(Context $context, callable $function)
     {
-        return Execute::with(...$args);
+        return Execute::with($context,$function);
     }
 }

@@ -12,14 +12,10 @@ use Rindow\NeuralNetworks\Activation\Tanh;
 
 class Test extends TestCase
 {
-    public function newMatrixOperator()
+    public function newBackend($mo)
     {
-        return new MatrixOperator();
-    }
-
-    public function newNeuralNetworks($mo)
-    {
-        return new NeuralNetworks($mo);
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
     }
 
     public function verifyGradient($mo, $K, $function, NDArray $x,array $states)
@@ -42,17 +38,16 @@ class Test extends TestCase
 
     public function testDefaultInitialize()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new LSTMCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3]
-            );
+            [
+                'input_shape'=>[3]
+            ]);
 
-        $layer->build([3]);
+        $layer->build();
         $params = $layer->getParams();
         $this->assertCount(3,$params);
         $this->assertEquals([3,16],$params[0]->shape());
@@ -69,54 +64,50 @@ class Test extends TestCase
         $this->assertEquals([4],$layer->outputShape());
     }
 
+    public function testNotspecifiedInputShape()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $layer = new LSTMCell(
+            $backend,
+            $units=4,
+            [
+            ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is not defined');
+        $layer->build();
+    }
+
     public function testSetInputShape()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new LSTMCell(
-            $K,
+            $backend,
             $units=4,
-            );
+            [
+            ]);
         $layer->build($inputShape=[3]);
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([4],$layer->outputShape());
     }
 
-    public function testUnmatchSpecifiedInputShape()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $layer = new LSTMCell(
-            $K,
-            $units=4,
-            input_shape:[3],
-            );
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [3] but [4] given in LSTMCell');
-        $layer->build([4]);
-    }
-
     public function testNormalForwardAndBackward()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTMCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3]
-            );
+            [
+                'input_shape'=>[3]
+            ]);
 
-        $layer->build([3]);
+        $layer->build();
         $grads = $layer->getGrads();
 
 
@@ -178,25 +169,24 @@ class Test extends TestCase
 
     public function testOutputsAndGrads()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTMCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3],
-            activation:'linear',
-            recurrent_activation:'linear',
-            );
+            [
+                'input_shape'=>[3],
+                'activation'=>null,
+                'recurrent_activation'=>null,
+            ]);
 
         $kernel = $K->ones([3,4*4]);
         $recurrent = $K->ones([4,4*4]);
         $bias = $K->ones([4*4]);
-        $layer->build([3],
-            sampleWeights:[$kernel,$recurrent,$bias]
+        $layer->build(null,
+            ['sampleWeights'=>[$kernel,$recurrent,$bias]]
         );
         $this->assertNull($layer->getActivation());
         $grads = $layer->getGrads();
@@ -288,19 +278,18 @@ class Test extends TestCase
 
     public function testVerifyGradient()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTMCell(
-            $K,
+            $backend,
             $units=3,
-                input_shape:[10],
-                #activation:'linear',
-            );
-        $layer->build([10]);
+            [
+                'input_shape'=>[10],
+                #'activation'=>null,
+            ]);
+        $layer->build();
         $weights = $layer->getParams();
 
         $x = $K->array([

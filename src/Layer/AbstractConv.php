@@ -5,7 +5,7 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-abstract class AbstractConv extends AbstractImage
+abstract class AbstractConv extends AbstractImage implements Layer
 {
     abstract protected function call(NDArray $inputs, bool $training) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
@@ -22,57 +22,38 @@ abstract class AbstractConv extends AbstractImage
     protected $useBias;
     protected $kernelInitializer;
     protected $biasInitializer;
-    protected $defaultLayerName;
 
     protected $kernel;
     protected $bias;
     protected $dKernel;
     protected $dBias;
-    //protected $status;
+    protected $status;
 
 
-    public function __construct(
-        object $backend,
-        int $filters,
-        int|array $kernel_size,
-        int|array $strides=null,
-        string $padding=null,
-        string $data_format=null,
-        int|array $dilation_rate=null,
-        int $groups=null,
-        string|object $activation=null,
-        bool $use_bias=null,
-        string|callable $kernel_initializer=null,
-        string|callable $bias_initializer=null,
-        string $kernel_regularizer=null,
-        string $bias_regularizer=null,
-        string $activity_regularizer=null,
-        string $kernel_constraint=null,
-        string $bias_constraint=null,
-        array $input_shape=null,
-        string $name=null,
-    )
+    public function __construct($backend,int $filters, $kernel_size, array $options=null)
     {
-        // defaults 
-        $strides = $strides ?? 1;
-        $padding = $padding ?? "valid";
-        $data_format = $data_format ?? null;
-        $dilation_rate = $dilation_rate ?? 1;
-        $groups = $groups ?? 1;
-        $activation = $activation ?? null;
-        $use_bias = $use_bias ?? true;
-        $kernel_initializer = $kernel_initializer ?? "glorot_uniform";
-        $bias_initializer = $bias_initializer ?? "zeros";
-        $kernel_regularizer = $kernel_regularizer ?? null;
-        $bias_regularizer = $bias_regularizer ?? null;
-        $activity_regularizer = $activity_regularizer ?? null;
-        $kernel_constraint = $kernel_constraint ?? null;
-        $bias_constraint = $bias_constraint ?? null;
-        $input_shape = $input_shape ?? null;
+        extract($this->extractArgs([
+            'strides'=>1,
+            'padding'=>"valid",
+            'data_format'=>null,
+            'dilation_rate'=>1,
+            'groups'=>1,
+            'activation'=>null,
+            'use_bias'=>true,
+            'kernel_initializer'=>"glorot_uniform",
+            'bias_initializer'=>"zeros",
+            'kernel_regularizer'=>null,
+            'bias_regularizer'=>null,
+            'activity_regularizer'=>null,
+            'kernel_constraint'=>null,
+            'bias_constraint'=>null,
 
+            'input_shape'=>null,
+            'activation'=>null,
+            'use_bias'=>true,
 
+        ],$options));
         $this->backend = $K = $backend;
-        $this->initName($name,$this->defaultLayerName);
         $kernel_size=$this->normalizeFilterSize($kernel_size,'kernel_size',
             null,true);
         $strides=$this->normalizeFilterSize($strides,'strides',1);
@@ -92,12 +73,14 @@ abstract class AbstractConv extends AbstractImage
         if($use_bias===null || $use_bias) {
             $this->useBias = true;
         }
-        $this->allocateWeights($this->useBias?2:1);
         $this->setActivation($activation);
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build($variable=null, array $options=null)
     {
+        extract($this->extractArgs([
+            'sampleWeights'=>null,
+        ],$options));
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
         $biasInitializer = $this->biasInitializer;
@@ -116,21 +99,21 @@ abstract class AbstractConv extends AbstractImage
         array_push($outputShape,$this->filters);
 
         $channels = $this->getChannels();
-        array_push($kernel_size,$channels);
-        array_push($kernel_size,$this->filters);
-        if($this->kernel===null) {
-            if($sampleWeights) {
-                $this->kernel = $sampleWeights[0];
-                $this->bias = $sampleWeights[1];
-            } else {
-                $tmpSize = array_product($this->kernel_size);
-                $this->kernel = $kernelInitializer(
-                    $kernel_size,
-                    [$tmpSize*$channels,$tmpSize*$this->filters]
-                );
-                if($this->useBias) {
-                    $this->bias = $biasInitializer([$this->filters]);
-                }
+        array_push($kernel_size,
+            $channels);
+        array_push($kernel_size,
+            $this->filters);
+        if($sampleWeights) {
+            $this->kernel = $sampleWeights[0];
+            $this->bias = $sampleWeights[1];
+        } else {
+            $tmpSize = array_product($this->kernel_size);
+            $this->kernel = $kernelInitializer(
+                $kernel_size,
+                [$tmpSize*$channels,$tmpSize*$this->filters]
+            );
+            if($this->useBias) {
+                $this->bias = $biasInitializer([$this->filters]);
             }
         }
         $this->dKernel = $K->zerosLike($this->kernel);
@@ -138,7 +121,7 @@ abstract class AbstractConv extends AbstractImage
             $this->dBias = $K->zerosLike($this->bias);
         }
         $this->outputShape = $outputShape;
-        $this->syncWeightVariables();
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
@@ -156,16 +139,6 @@ abstract class AbstractConv extends AbstractImage
             return [$this->dKernel,$this->dBias];
         } else {
             return [$this->dKernel];
-        }
-    }
-
-    public function reverseSyncWeightVariables() : void
-    {
-        if($this->useBias) {
-            $this->kernel = $this->weights[0]->value();
-            $this->bias = $this->weights[1]->value();
-        } else {
-            $this->kernel = $this->weights[0]->value();
         }
     }
 

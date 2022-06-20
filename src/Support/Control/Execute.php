@@ -5,28 +5,15 @@ use Throwable;
 
 class Execute
 {
-    static public function with(
-        Context $context,
-        callable $func=null,
-        array $args=null,
-        bool $without_ctx=null,
-        )
+    static public function with(Context $context, callable $func)
     {
-        if($args===null) {
-            $args = [];
-        }
         $context->enter();
         try {
-            if($without_ctx) {
-                $result = $func(...$args);
-            } else {
-                $result = $func($context, ...$args);
-            }
+            $result = $func($context);
         } catch(Throwable $e) {
-            if(!$context->exit($e)) {
-                throw $e;
-            }
-            $result = null;
+            if($context->exit($e))
+                return null;
+            throw $e;
         }
         $context->exit(null);
         return $result;

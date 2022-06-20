@@ -82,16 +82,6 @@ function formatingImage($mo,$train_img,$inputShape) {
     return $mo->scale(1.0/255.0,$mo->astype($train_img,NDArray::float32));
 }
 
-//echo "slice images ...\n";
-//$samples = 1000;
-//$testSamples = (int)min(ceil($samples/10),count($test_img));
-//$train_img = $train_img[[0,$samples-1]];
-//$train_label = $train_label[[0,$samples-1]];
-//$test_img = $test_img[[0,$testSamples-1]];
-//$test_label = $test_label[[0,$testSamples-1]];
-//echo "Truncated train=[".implode(',',$train_img->shape())."]\n";
-//echo "Truncated test=[".implode(',',$test_img->shape())."]\n";
-
 echo "formating train images ...\n";
 $train_img = formatingImage($mo,$train_img,$inputShape);
 $train_label = $mo->la()->astype($train_label,NDArray::int32);
@@ -111,58 +101,58 @@ if(file_exists($modelFilePath)) {
         $nn->layers()->Conv2D(
             $filters=64,
             $kernel_size=3,
-            input_shape:$inputShape,
-            kernel_initializer:'he_normal'),
+            ['input_shape'=>$inputShape,
+            'kernel_initializer'=>'he_normal',]),
         $nn->layers()->BatchNormalization(),
         $nn->layers()->Activation('relu'),
         $nn->layers()->Conv2D(
             $filters=64,
             $kernel_size=3,
-            kernel_initializer:'he_normal'),
+            ['kernel_initializer'=>'he_normal',]),
         $nn->layers()->MaxPooling2D(),
         $nn->layers()->Conv2D(
             $filters=128,
             $kernel_size=3,
-            kernel_initializer:'he_normal'),
+            ['kernel_initializer'=>'he_normal',]),
         $nn->layers()->BatchNormalization(),
         $nn->layers()->Activation('relu'),
         $nn->layers()->Conv2D(
             $filters=128,
             $kernel_size=3,
-            kernel_initializer:'he_normal'),
+            ['kernel_initializer'=>'he_normal',]),
         $nn->layers()->MaxPooling2D(),
         $nn->layers()->Conv2D(
             $filters=256,
             $kernel_size=3,
-            kernel_initializer:'he_normal',
-            activation:'relu'),
+            ['kernel_initializer'=>'he_normal',
+            'activation'=>'relu']),
         $nn->layers()->GlobalAveragePooling2D(),
         $nn->layers()->Dense($units=512,
-            kernel_initializer:'he_normal'),
+            ['kernel_initializer'=>'he_normal',]),
         $nn->layers()->BatchNormalization(),
         $nn->layers()->Activation('relu'),
         $nn->layers()->Dense($units=10,
-            activation:'softmax'),
+            ['activation'=>'softmax']),
     ]);
 
-    $model->compile(
-        loss:'sparse_categorical_crossentropy',
-        optimizer:'adam',
-    );
+    $model->compile([
+        'loss'=>'sparse_categorical_crossentropy',
+        'optimizer'=>'adam',
+    ]);
     $model->summary();
     echo "training model ...\n";
-    $train_dataset = $nn->data->ImageDataGenerator($train_img,
-        tests:$train_label,
-        batch_size:$batch_size,
-        shuffle:true,
-        height_shift:2,
-        width_shift:2,
-        vertical_flip:true,
-        horizontal_flip:true
-    );
+    $train_dataset = $nn->data->ImageDataGenerator($train_img,[
+        'tests'=>$train_label,
+        'batch_size'=>$batch_size,
+        'shuffle'=>true,
+        'height_shift'=>2,
+        'width_shift'=>2,
+        'vertical_flip'=>true,
+        'horizontal_flip'=>true
+    ]);
     $history = $model->fit($train_dataset,null,
-        epochs:$epochs,
-            validation_data:[$test_img,$test_label]);
+        ['epochs'=>$epochs,
+            'validation_data'=>[$test_img,$test_label]]);
     $model->save($modelFilePath,$portable=true);
     $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
     $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
@@ -171,7 +161,6 @@ if(file_exists($modelFilePath)) {
     $plt->legend();
     $plt->title($dataset);
 }
-
 $images = $test_img[[0,7]];
 $labels = $test_label[[0,7]];
 $predicts = $model->predict($images);
@@ -190,5 +179,4 @@ foreach ($predicts as $i => $predict) {
     $axes[$i*2]->setTitle($class_names[$label]."($label)");
     $axes[$i*2+1]->bar($mo->arange(10),$predict);
 }
-
 $plt->show();

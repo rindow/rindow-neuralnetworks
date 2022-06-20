@@ -10,28 +10,16 @@ class FunctionFactory
         'softmax' => Softmax::class,
         'relu' => ReLU::class,
         'tanh' => Tanh::class,
-        'linear' => null,
     ];
-    static public function factory(object $backend, string $name) : ?Activation
+    static public function factory($backend, string $name) : Activation
     {
-        if(array_key_exists($name,self::$functions)) {
+        if(isset(self::$functions[$name])) {
             $class = self::$functions[$name];
-            if($class===null) {
-                return null;
-            }
             return new $class($backend);
         }
         if(is_subclass_of($name, Activation::class)) {
             return new $class($backend);
         }
-        
-        if(is_string($name)||is_numeric($name)) {
-            ;
-        } elseif(is_object($name)) {
-            $name = 'object:'.get_class($name);
-        } else {
-            $name = gettype($name);
-        }
-        throw new InvalidArgumentException('invalid function name:'.$name);
+        throw new InvalidArgumentException('invalid function name');
     }
 }

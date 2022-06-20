@@ -1,41 +1,44 @@
 <?php
 namespace RindowTest\NeuralNetworks\Layer\EmbeddingTest;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Embedding;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 
 class Test extends TestCase
 {
-    public function newMatrixOperator()
+    public function newBackend($mo)
     {
-        return new MatrixOperator();
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
     }
 
-    public function newNeuralNetworks($mo)
+    public function newInputShape($inputShape)
     {
-        return new NeuralNetworks($mo);
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
     public function testDefaultInitialize()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new Embedding(
-            $K,
+            $backend,
             $inputDim=4,
             $outputDim=5,
-            input_length:3
-            );
+            [
+                'input_length'=>3
+            ]);
 
-        $inputs = $g->Variable($K->zeros([1,3]));
-        $layer->build($inputs);
+        $layer->build();
         $params = $layer->getParams();
         $this->assertCount(1,$params);
         $this->assertEquals([4,5],$params[0]->shape());
@@ -48,78 +51,66 @@ class Test extends TestCase
         $this->assertEquals([3,5],$layer->outputShape());
     }
 
-    public function testSetInputShape()
+    public function testNotspecifiedInputShape()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new Embedding(
-            $K,
+            $backend,
             $inputDim=4,
             $outputDim=5,
-            );
-        $inputs = $g->Variable($K->zeros([1,3]));
-        $layer->build($inputs);
+            [
+            ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is not defined');
+        $layer->build();
+    }
+
+    public function testSetInputShape()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $layer = new Embedding(
+            $backend,
+            $inputDim=4,
+            $outputDim=5,
+            [
+            ]);
+        $layer->build($this->newInputShape([3]));
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([3,5],$layer->outputShape());
     }
 
-    public function testUnmatchSpecifiedInputShape()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $layer = new Embedding(
-            $K,
-            $inputDim=4,
-            $outputDim=5,
-            input_length:3
-            );
-        $inputs = $g->Variable($K->zeros([1,4]));
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [3] but [4] given in Embedding');
-        $layer->build($inputs);
-    }
-
     public function testNormalForwardAndBackward()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new Embedding(
-            $K,
+            $backend,
             $inputDim=4,
             $outputDim=5,
-            input_length:3);
-        //  2 batch
-        $inputs = $K->array([
-            [0,1,2],
-            [3,2,1],
-        ]);
+            ['input_length'=>3]);
 
         $kernel = $K->array($mo->arange(4*5,null,null,NDArray::float32)->reshape([4,5]));
-        $layer->build($g->Variable($inputs),
-            sampleWeights:[$kernel]
+        $layer->build(null,
+            ['sampleWeights'=>[$kernel]]
         );
 
 
         //
         // forward
         //
+        //  2 batch
+        $inputs = $K->array([
+            [0,1,2],
+            [3,2,1],
+        ]);
         $copyInputs = $K->copy($inputs);
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
-                return $outputsVariable;
-            }
-        );
-        $outputs = $K->ndarray($outputsVariable);
+        $outputs = $layer->forward($inputs, $training=true);
         //
         $this->assertEquals([
             [[0,1,2,3,4],
@@ -140,7 +131,7 @@ class Test extends TestCase
 
         $copydOutputs = $K->copy(
             $dOutputs);
-        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
+        [$dInputs] = $layer->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2,3],$dInputs->shape());
         $grads = $layer->getGrads();

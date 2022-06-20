@@ -10,26 +10,17 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
     protected $verbose;
 
     public function __construct(
-        object $mo,
-        string $path,
-        int $verbose=null,
-        ...$options
+        $mo, string $path, array $options=null
         )
     {
-        $opts = [];
-        foreach([
-            'pattern', 'batch_size', 'crawler', 'filter', 
-            'unclassified', 'shuffle', 'limit','restricted_by_class',
-            ] as $o) {
-            if(isset($options[$o])) {
-                $opts[$o] = $options[$o];
-                unset($options[$o]);
-            }
+        $leftargs = [];
+        parent::__construct($mo,$path,$options,$leftargs);
+        if(array_key_exists('verbose',$leftargs)) {
+            $this->verbose = $leftargs['verbose'];
+            unset($leftargs['verbose']);
         }
-        parent::__construct($mo,$path, ...$opts);
-        $this->verbose = $verbose;
         if($this->filter==null) {
-            $this->filter = new TextFilter($mo, ...$options);
+            $this->filter = new TextFilter($mo,$leftargs);
         }
     }
 

@@ -4,17 +4,18 @@ namespace Rindow\NeuralNetworks\Loss;
 use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 use DomainException;
-use ArrayAccess;
 
-class MeanSquaredError extends AbstractLoss implements Loss
+class MeanSquaredError extends AbstractGradient implements Loss
 {
     protected $backend;
-    //protected $trues;
-    //protected $predicts;
+    protected $trues;
+    protected $predicts;
 
-    public function __construct(object $backend)
+    public function __construct($backend,array $options=null)
     {
-        $this->backend = $backend;
+        //extract($this->extractArgs([
+        //],$options));
+        $this->backend = $K = $backend;
     }
 
     public function getConfig() : array
@@ -23,27 +24,25 @@ class MeanSquaredError extends AbstractLoss implements Loss
         ];
     }
 
-    protected function call(NDArray $trues, NDArray $predicts) : NDArray
+    public function forward(NDArray $trues, NDArray $predicts) : float
     {
         $K = $this->backend;
-        $container = $this->container();
         //$this->assertOutputShape($predicts);
-        //if($trues->ndim()!=2) {
-        //    throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
-        //}
+        if($trues->ndim()!=2) {
+            throw new InvalidArgumentException('categorical\'s "trues" must be shape of [batchsize,1].');
+        }
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
-        $container->trues = $trues;
-        $container->predicts = $predicts;
-        $loss = $K->meanSquaredError($trues, $predicts);
-        return $loss;
+        $this->trues = $trues;
+        $this->predicts = $predicts;
+        $this->loss = $K->meanSquaredError($trues, $predicts);
+        return $this->loss;
     }
 
-    protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    public function backward(array $dOutputs) : array
     {
         $K = $this->backend;
-        $container = $this->container();
-        $dInputs = $K->dMeanSquaredError($container->trues, $container->predicts);
+        $dInputs = $K->dMeanSquaredError($this->trues, $this->predicts);
         return [$dInputs];
     }
 
@@ -54,21 +53,16 @@ class MeanSquaredError extends AbstractLoss implements Loss
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
         // calc accuracy
-        $shape=$predicts->shape();
-        if(count($shape)>=2) {
-            if($predicts->shape()[1]>2147483648) {
-                $dtype = NDArray::int64;
-            } else {
-                $dtype = NDArray::int32;
-            }
-            $predicts = $K->argmax($predicts, $axis=1,$dtype);
-            $trues = $K->argmax($trues, $axis=1,$dtype);
-            $sum = $K->sum($K->equal($trues, $predicts));
+        if($predicts->shape()[1]>2147483648) {
+            $dtype = NDArray::int64;
         } else {
-            $sum = $K->nrm2($K->sub($predicts,$trues));
+            $dtype = NDArray::int32;
         }
+        $predicts = $K->argmax($predicts, $axis=1,$dtype);
+        $trues = $K->argmax($trues, $axis=1,$dtype);
+        $sum = $K->sum($K->equal($trues, $predicts));
         $sum = $K->scalar($sum);
-        $accuracy = $sum/$trues->shape()[0];
+        $accuracy = $sum / (float)$trues->shape()[0];
         return $accuracy;
     }
 }

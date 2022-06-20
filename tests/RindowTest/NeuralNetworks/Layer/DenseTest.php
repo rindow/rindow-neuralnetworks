@@ -1,12 +1,13 @@
 <?php
 namespace RindowTest\NeuralNetworks\Layer\DenseTest;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
-use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Dense;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use InvalidArgumentException;
 
 class Test extends TestCase
 {
@@ -15,38 +16,24 @@ class Test extends TestCase
         return new MatrixOperator();
     }
 
-    public function newNeuralNetworks($mo)
+    public function newBackend($mo)
     {
-        return new NeuralNetworks($mo);
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
     }
 
-    public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $x)
+    public function newInputShape($inputShape)
     {
-        $f = function($x) use ($mo,$K,$function){
-            $x = $K->array($x);
-            $y = $function->forward($x,$training=true);
-            return $K->ndarray($y);
-        };
-        $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
-
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($function,$x) {
-                $outputsVariable = $function->forward($x, $training=true);
-                return $outputsVariable;
-            }
-        );
-        $dOutputs = $K->ones($outputsVariable->shape(),$outputsVariable->dtype());
-        $dInputs = $outputsVariable->creator()->backward([$dOutputs]);
-
-        return $mo->la()->isclose($grads[0],$K->ndarray($dInputs[0]),1e-3);
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
     public function testDefaultInitialize()
     {
         $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $layer = new Dense($K,$units=3,input_shape:[2]);
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=3,['input_shape'=>[2]]);
 
         $layer->build();
         $params = $layer->getParams();
@@ -67,15 +54,23 @@ class Test extends TestCase
         //$layer->unlink();
     }
 
+    public function testNotspecifiedInputShape()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=3,[]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is not defined');
+        $layer->build();
+    }
+
     public function testSetInputShape()
     {
         $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $layer = new Dense($K,$units=3);
-        $inputs = $g->Variable($K->zeros([1,2]));
-        $layer->build($inputs);
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=3,[]);
+        $layer->build($this->newInputShape([2]));
         $params = $layer->getParams();
         $this->assertCount(2,$params);
         $this->assertEquals([2,3],$params[0]->shape());
@@ -83,57 +78,35 @@ class Test extends TestCase
         $this->assertEquals([3],$layer->outputShape());
     }
 
-    public function testUnmatchSpecifiedInputShape()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $layer = new Dense($K,$units=3,input_shape:[2]);
-    
-        $inputs = $g->Variable($K->zeros([1,3]));
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [2] but [3] given in Dense');
-        $layer->build($inputs);
-    }
-
     public function testNormalForwardAndBackward()
     {
         $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $K = $this->newBackend($mo);
         $fn = $mo->la();
 
-        $layer = new Dense($K,$units=2,input_shape:[3]);
+        $layer = new Dense($K,$units=2,['input_shape'=>[3]]);
 
+        $layer->build(null,[
+            'sampleWeights'=>[
+                $K->array([[0.1, 0.2], [0.1, 0.1], [0.2, 0.2]]), // kernel
+                $K->array([0.5, 0.1]),                         // bias
+            ]
+        ]);
+
+        //
+        // forward
+        //
         // 3 input x 4 minibatch
-        $inputs = $K->array([
+        $inputs = $mo->array([
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
             [0.0, 0.0 , 6.0],
         ]);
-
-        $layer->build($g->Variable($inputs),
-            sampleWeights:[
-                $K->array([[0.1, 0.2], [0.1, 0.1], [0.2, 0.2]]), // kernel
-                $K->array([0.5, 0.1]),                           // bias
-            ]
-        );
-
-        //
-        // forward
-        //
-        $copyInputs = $K->copy($inputs);
+        $copyInputs = $mo->copy($inputs);
         $inputs = $K->array($inputs);
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
-                return $outputsVariable;
-            }
-        );
-        $outputs = $K->ndarray($outputsVariable);
+        $outputs = $layer->forward($inputs, $training=true);
+        $outputs = $K->ndarray($outputs);
         $inputs = $K->ndarray($inputs);
         // 2 output x 4 batch
         $this->assertEquals([4,2],$outputs->shape());
@@ -158,7 +131,7 @@ class Test extends TestCase
         ]);
         $copydOutputs = $mo->copy($dOutputs);
         $dOutputs = $K->array($dOutputs);
-        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
+        [$dInputs] = $layer->backward([$dOutputs]);
         $dInputs = $K->ndarray($dInputs);
         $dOutputs = $K->ndarray($dOutputs);
         // 3 input x 4 batch
@@ -176,9 +149,8 @@ class Test extends TestCase
     public function testNdInput()
     {
         $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $layer = new Dense($K,$units=4,input_shape:[2,3]);
+        $K = $this->newBackend($mo);
+        $layer = new Dense($K,$units=4,['input_shape'=>[2,3]]);
 
         $layer->build();
         $params = $layer->getParams();
@@ -202,36 +174,5 @@ class Test extends TestCase
         $outputs = $layer->forward($inputs,true);
         $outputs = $K->ndarray($outputs);
         $this->assertEquals([10,2,4],$outputs->shape());
-    }
-
-    public function testGradientWithActivation()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $mo->la();
-
-        $layer = new Dense($K,$units=2,input_shape:[3],activation:'tanh');
-
-        // 3 input x 4 minibatch
-        $inputs = $K->ones([4,3]);
-
-        $layer->build($g->Variable($inputs));
-
-        //
-        // forward
-        //
-        $copyInputs = $K->copy($inputs);
-        $inputs = $K->array($inputs);
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
-                return $outputsVariable;
-            }
-        );
-
-        $this->assertTrue(
-            $this->verifyGradient($mo,$nn,$K,$g,$layer,$inputs));
     }
 }

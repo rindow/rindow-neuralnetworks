@@ -14,7 +14,7 @@ class Datasets
     protected $fashionMnist;
     protected $cifar10;
 
-    public function __construct(object $matrixOperator)
+    public function __construct($matrixOperator)
     {
         $this->matrixOperator = $matrixOperator;
     }

@@ -35,7 +35,12 @@ class Test extends TestCase
         $backend = $this->newBackend($mo);
         $backendClassName = get_class($backend);
 
-        $initializer = $backend->getInitializer('he_normal',-0.1,0.1);
+        $initializer = $backend->getInitializer('he_normal');
+        $this->assertInstanceof(
+            $backendClassName,
+            $initializer[0]
+        );
+        $this->assertEquals('he_normal',$initializer[1]);
         $this->assertTrue(is_callable($initializer));
         $kernel = $initializer([2,3]);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$kernel);
@@ -44,14 +49,24 @@ class Test extends TestCase
 
 
         $initializer = $backend->getInitializer('glorot_normal');
+        $this->assertInstanceof(
+            $backendClassName,
+            $initializer[0]
+        );
+        $this->assertEquals('glorot_normal',$initializer[1]);
         $this->assertTrue(is_callable($initializer));
-        $kernel = $initializer([2,3],[3,6]);
+        $kernel = $initializer([2,3]);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$kernel);
         $this->assertEquals([2,3],$kernel->shape());
         $this->assertEquals(NDArray::float32,$kernel->dtype());
 
 
         $initializer = $backend->getInitializer('zeros');
+        $this->assertInstanceof(
+            $backendClassName,
+            $initializer[0]
+        );
+        $this->assertEquals('zeros',$initializer[1]);
         $this->assertTrue(is_callable($initializer));
         $kernel = $initializer([2]);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$kernel);
@@ -59,6 +74,11 @@ class Test extends TestCase
         $this->assertEquals(NDArray::float32,$kernel->dtype());
 
         $initializer = $backend->getInitializer('ones');
+        $this->assertInstanceof(
+            $backendClassName,
+            $initializer[0]
+        );
+        $this->assertEquals('ones',$initializer[1]);
         $this->assertTrue(is_callable($initializer));
         $kernel = $initializer([2]);
         $this->assertInstanceof('Interop\Polite\Math\Matrix\NDArray',$kernel);
@@ -239,84 +259,13 @@ class Test extends TestCase
         $this->assertEquals([2,3],$z->toArray());
     }
 
-    public function testAbs()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([-2,-1, 0, 1, 2]);
-        $z = $K->abs($x); $K->finish();
-        $this->assertEquals([-2,-1, 0, 1, 2],$x->toArray());
-        $this->assertEquals([ 2, 1, 0, 1, 2],$z->toArray());
-    }
-
-    public function testSign()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([-2,-1, 0, 1, 2]);
-        $z = $K->sign($x); $K->finish();
-        $this->assertEquals([-2,-1, 0, 1, 2],$x->toArray());
-        $this->assertEquals([-1,-1, 0, 1, 1],$z->toArray());
-    }
-
-    public function testMaximum()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([4,5,9]);
-        $z = $K->maximum($x,5); $K->finish();
-        $this->assertEquals([4,5,9],$x->toArray());
-        $this->assertEquals([5,5,9],$z->toArray());
-    }
-
-    public function testMinimum()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([4,5,9]);
-        $z = $K->minimum($x,5); $K->finish();
-        $this->assertEquals([4,5,9],$x->toArray());
-        $this->assertEquals([4,5,5],$z->toArray());
-    }
-
     public function testGreater()
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
-        $x = $K->array([4,5,9]);
+        $x = $K->array([4,9]);
         $z = $K->greater($x,5); $K->finish();
-        $this->assertEquals([4,5,9],$x->toArray());
-        $this->assertEquals([0,0,1],$z->toArray());
-    }
-
-    public function testGreaterEqual()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([4,5,9]);
-        $z = $K->greaterEqual($x,5); $K->finish();
-        $this->assertEquals([4,5,9],$x->toArray());
-        $this->assertEquals([0,1,1],$z->toArray());
-    }
-
-    public function testLess()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([4,5,9]);
-        $z = $K->less($x,5); $K->finish();
-        $this->assertEquals([4,5,9],$x->toArray());
-        $this->assertEquals([1,0,0],$z->toArray());
-    }
-
-    public function testLessEqual()
-    {
-        $mo = $this->newMatrixOperator();
-        $K = $this->newBackend($mo);
-        $x = $K->array([4,5,9]);
-        $z = $K->lessEqual($x,5); $K->finish();
-        $this->assertEquals([4,5,9],$x->toArray());
-        $this->assertEquals([1,1,0],$z->toArray());
+        $this->assertEquals([0,1],$z->toArray());
     }
 
     public function testEqual()
@@ -545,7 +494,7 @@ class Test extends TestCase
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
         $this->assertTrue($K->equalTest(
-            0.0,$K->scalar($K->categoricalCrossEntropy($t,$y))));
+            0.0,$K->categoricalCrossEntropy($t,$y)));
 
         $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
@@ -554,7 +503,7 @@ class Test extends TestCase
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
         $this->assertTrue($K->equalTest(
-            0.0,$K->scalar($K->categoricalCrossEntropy($t,$y))));
+            0.0,$K->categoricalCrossEntropy($t,$y)));
     }
 
     public function testEqualArray()

@@ -6,23 +6,28 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\LSTM;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Activation\Tanh;
 
 class Test extends TestCase
 {
-    public function newMatrixOperator()
+    public function newBackend($mo)
     {
-        return new MatrixOperator();
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
     }
 
-    public function newNeuralNetworks($mo)
+    public function newInputShape($inputShape)
     {
-        return new NeuralNetworks($mo);
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
-    public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $x)
+    public function verifyGradient($mo, $K, $function, NDArray $x)
     {
         $f = function($x) use ($mo,$K,$function){
             $x = $K->array($x);
@@ -30,14 +35,9 @@ class Test extends TestCase
             return $K->ndarray($y);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($function,$x) {
-                $outputsVariable = $function->forward($x, $training=true);
-                return $outputsVariable;
-            }
-        );
-        $dOutputs = $K->ones($outputsVariable->shape(),$outputsVariable->dtype());
-        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
+        $outputs = $function->forward($x,$training=true);
+        $dOutputs = $K->ones($outputs->shape(),$outputs->dtype());
+        [$dInputs] = $function->backward([$dOutputs]);
 #echo "\n";
 #echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
 #echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
@@ -47,18 +47,16 @@ class Test extends TestCase
 
     public function testDefaultInitialize()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[5,3],
-            );
+            [
+                'input_shape'=>[5,3],
+            ]);
 
-        $inputs = [$g->Variable($K->zeros([1,5,3]))];
-        $layer->build($inputs);
+        $layer->build();
         $params = $layer->getParams();
         $this->assertCount(3,$params);
         $this->assertEquals([3,4*4],$params[0]->shape());
@@ -78,53 +76,46 @@ class Test extends TestCase
         $this->assertEquals([4],$layer->outputShape());
     }
 
+    public function testNotspecifiedInputShape()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $layer = new LSTM(
+            $backend,
+            $units=4,
+            [
+            ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is not defined');
+        $layer->build();
+    }
+
     public function testSetInputShape()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            );
-        $inputs = [$g->Variable($K->zeros([1,5,3]))];
-        $layer->build($inputs);
+            [
+            ]);
+        $layer->build([$this->newInputShape([5,3])]);
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([4],$layer->outputShape());
     }
 
-    public function testUnmatchSpecifiedInputShape()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $layer = new LSTM(
-            $K,
-            $units=4,
-            input_shape:[5,3],
-            );
-
-        $inputs = [$g->Variable($K->zeros([1,5,4]))];
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [5,3] but [5,4] given in LSTM');
-        $layer->build($inputs);
-    }
-
     public function testSetInputShapeForSequential()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            );
-        $inputs = $g->Variable($K->zeros([1,5,3]));
-        $layer->build($inputs);
+            [
+            ]);
+        $layer->build($this->newInputShape([5,3]));
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([4],$layer->outputShape());
@@ -132,19 +123,17 @@ class Test extends TestCase
 
     public function testInitializeWithReturnSequence()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[5,3],
-            return_sequences:true,
-            return_state:true,
-            );
-        $inputs = [$g->Variable($K->zeros([1,5,3]))];
-        $layer->build($inputs);
+            [
+                'input_shape'=>[5,3],
+                'return_sequences'=>true,
+                'return_state'=>true,
+            ]);
+        $layer->build();
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([5,4],$layer->outputShape());
@@ -152,20 +141,19 @@ class Test extends TestCase
 
     public function testDefaultForwardAndBackward()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[5,3],
-            );
+            [
+                'input_shape'=>[5,3],
+            ]);
 
-        //$layer->build();
-        //$grads = $layer->getGrads();
+        $layer->build();
+        $grads = $layer->getGrads();
 
 
         //
@@ -178,14 +166,8 @@ class Test extends TestCase
         $copyStates = [
             $K->copy($initialStates[0]),
             $K->copy($initialStates[1])];
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs,$initialStates) {
-                $outputsVariable = $layer->forward($inputs,$training=true, $initialStates);
-                return $outputsVariable;
-            }
+        $outputs = $layer->forward($inputs,$training=true, $initialStates
         );
-        $outputs = $K->ndarray($outputsVariable);
-        $grads = $layer->getGrads();
         //
         $this->assertEquals([6,4],$outputs->shape());
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
@@ -204,7 +186,7 @@ class Test extends TestCase
         $copydStates = [
             $K->copy($dStates[0]),
             $K->copy($dStates[1])];
-        $dPrevStates = $outputsVariable->creator()->backward(array_merge([$dOutputs],$dStates));
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
         $dInputs = array_shift($dPrevStates);
         $this->assertCount(2,$dPrevStates);
         // 2 batch
@@ -226,22 +208,21 @@ class Test extends TestCase
 
     public function testForwardAndBackwardWithReturnSeqquence()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[5,3],
-            return_sequences:true,
-            return_state:true,
-            );
+            [
+                'input_shape'=>[5,3],
+                'return_sequences'=>true,
+                'return_state'=>true,
+            ]);
 
-        //$layer->build();
-        //$grads = $layer->getGrads();
+        $layer->build();
+        $grads = $layer->getGrads();
 
 
         //
@@ -256,15 +237,8 @@ class Test extends TestCase
         $copyStates = [
             $K->copy($initialStates[0]),
             $K->copy($initialStates[1])];
-        [$outputsVariable,$nextStateVariables] = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs,$initialStates) {
-                [$outputsVariable,$nextStateVariables] = $layer->forward($inputs,$training=true, $initialStates);
-                return [$outputsVariable,$nextStateVariables];
-            }
+        [$outputs,$nextStates] = $layer->forward($inputs,$training=true, $initialStates
         );
-        $outputs = $K->ndarray($outputsVariable);
-        $nextStates = array_map(fn($x)=>$K->ndarray($x),$nextStateVariables);
-        $grads = $layer->getGrads();
         //
         $this->assertEquals([6,5,4],$outputs->shape());
         $this->assertCount(2,$nextStates);
@@ -290,7 +264,7 @@ class Test extends TestCase
             $K->copy($dStates[0]),
             $K->copy($dStates[1])];
         //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
-        $dPrevStates = $outputsVariable->creator()->backward(array_merge([$dOutputs],$dStates));
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
         $dInputs = array_shift($dPrevStates);
         $this->assertCount(2,$dPrevStates);
         // 2 batch
@@ -315,22 +289,21 @@ class Test extends TestCase
 
     public function testForwardAndBackwardWithReturnSeqquenceWithoutInitialStates()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[5,3],
-            return_sequences:true,
-            return_state:true,
-            );
+            [
+                'input_shape'=>[5,3],
+                'return_sequences'=>true,
+                'return_state'=>true,
+            ]);
 
-        //$layer->build();
-        //$grads = $layer->getGrads();
+        $layer->build();
+        $grads = $layer->getGrads();
 
 
         //
@@ -341,15 +314,8 @@ class Test extends TestCase
         $initialStates = null;
         $copyInputs = $K->copy($inputs);
         //$copyStates = [$mo->copy($initialStates[0])];
-        [$outputsVariable,$nextStateVariables] = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs,$initialStates) {
-                [$outputsVariable,$nextStateVariables] = $layer->forward($inputs,$training=true, $initialStates);
-                return [$outputsVariable,$nextStateVariables];
-            }
+        [$outputs,$nextStates] = $layer->forward($inputs,$training=true, $initialStates
         );
-        $outputs = $K->ndarray($outputsVariable);
-        $nextStates = array_map(fn($x)=>$K->ndarray($x),$nextStateVariables);
-        $grads = $layer->getGrads();
         //
         $this->assertEquals([6,5,4],$outputs->shape());
         $this->assertCount(2,$nextStates);
@@ -374,7 +340,7 @@ class Test extends TestCase
             $K->copy($dStates[0]),
             $K->copy($dStates[1])];
         //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
-        $dPrevStates = $outputsVariable->creator()->backward(array_merge([$dOutputs],$dStates));
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
         $dInputs = array_shift($dPrevStates);
         $this->assertCount(0,$dPrevStates);
         // 2 batch
@@ -399,50 +365,40 @@ class Test extends TestCase
 
     public function testOutputsAndGrads()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3,5],
-            return_sequences:true,
-            return_state:true,
-            activation:'linear',
-            recurrent_activation:'linear',
-            );
+            [
+                'input_shape'=>[3,5],
+                'return_sequences'=>true,
+                'return_state'=>true,
+                'activation'=>null,
+                'recurrent_activation'=>null,
+            ]);
 
-        //  2 batch
-        $inputs = $K->ones([2,3,5]);
-        $initialStates = [
-            $K->ones([2,4]),
-            $K->ones([2,4])];
-        // sampleWeights
         $kernel = $K->ones([5,4*4]);
         $recurrent = $K->ones([4,4*4]);
         $bias = $K->ones([4*4]);
-        $layer->build(
-            array_merge([$g->Variable($inputs)],array_map(fn($x)=>$g->Variable($x),$initialStates)),
-            sampleWeights:[$kernel,$recurrent,$bias]
+        $layer->build(null,
+            ['sampleWeights'=>[$kernel,$recurrent,$bias]]
         );
+        $this->assertNull($layer->getActivation());
+        $grads = $layer->getGrads();
 
 
         //
         // forward
         //
-        [$outputsVariable,$nextStateVariables] = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs,$initialStates) {
-                [$outputsVariable,$nextStateVariables] = $layer->forward($inputs,$training=true, $initialStates);
-                return [$outputsVariable,$nextStateVariables];
-            }
-        );
-        $outputs = $K->ndarray($outputsVariable);
-        $nextStates = array_map(fn($x)=>$K->ndarray($x),$nextStateVariables);
-        $grads = $layer->getGrads();
-        $this->assertNull($layer->getActivation());
+        //  2 batch
+        $inputs = $K->ones([2,3,5]);
+        $states = [
+            $K->ones([2,4]),
+            $K->ones([2,4])];
+        [$outputs,$nextStates] = $layer->forward($inputs,$training=true, $states);
         //
         $this->assertEquals(
             [2,3,4],
@@ -464,7 +420,7 @@ class Test extends TestCase
             $K->ones([2,4])];
 
         //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
-        $dPrevStates = $outputsVariable->creator()->backward(array_merge([$dOutputs],$dStates));
+        $dPrevStates = $layer->backward(array_merge([$dOutputs],$dStates));
         $dInputs = array_shift($dPrevStates);
         $this->assertCount(2,$dPrevStates);
         // 2 batch
@@ -490,20 +446,19 @@ class Test extends TestCase
 
     public function testVerifyReturnSequences()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new LSTM(
-            $K,
+            $backend,
             $units=3,
-            input_shape:[4,10],
-            return_sequences:true,
-            #return_state:true,
-            #activation:'linear',
-            );
+            [
+                'input_shape'=>[4,10],
+                'return_sequences'=>true,
+                #'return_state'=>true,
+                #'activation'=>null,
+            ]);
         $layer->build();
         $weights = $layer->getParams();
 
@@ -514,39 +469,6 @@ class Test extends TestCase
         $outputs = $layer->forward($x,$training=true);
 
         $this->assertTrue(
-            $this->verifyGradient($mo,$nn,$K,$g,$layer,$x));
-    }
-
-    public function testClone()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
-        $origLayer = new LSTM(
-            $K,
-            $units=4,
-            input_shape:[5,3],
-            );
-
-        $origLayer->build();
-        $layer = clone $origLayer;
-        $layer->build();
-
-        $origParams = $origLayer->getParams();
-        $params = $layer->getParams();
-        $this->assertCount(3,$params);
-        foreach (array_map(null,$origParams,$params) as $data) {
-            [$orig,$dest] = $data;
-            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
-        }
-        $origParams = $origLayer->getGrads();
-        $params = $layer->getGrads();
-        $this->assertCount(3,$params);
-        foreach (array_map(null,$origParams,$params) as $data) {
-            [$orig,$dest] = $data;
-            $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
-        }
+            $this->verifyGradient($mo,$K,$layer,$x));
     }
 }

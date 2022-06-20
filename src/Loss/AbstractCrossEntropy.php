@@ -2,32 +2,31 @@
 namespace Rindow\NeuralNetworks\Loss;
 
 use Interop\Polite\Math\Matrix\NDArray;
+//use Rindow\NeuralNetworks\Activation\Activation;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
+use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 use DomainException;
-use ArrayAccess;
 
-abstract class AbstractCrossEntropy extends AbstractLoss implements Loss//,Activation
+abstract class AbstractCrossEntropy extends AbstractGradient implements Loss//,Activation
 {
+    use GenericUtils;
     protected $backend;
+    protected $outputs;
+    protected $trues;
     protected $fromLogits = false;
-    //protected $outputs;
-    //protected $trues;
 
     abstract protected function activationFunction(NDArray $inputs) : NDArray;
     abstract protected function diffActivationFunction(NDArray $dOutputs, NDArray $outputs) : NDArray;
-    abstract protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray;
+    abstract protected function lossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : float;
     abstract protected function diffLossFunction(NDArray $trues, NDArray $predicts, bool $fromLogits) : NDArray;
 
-    public function __construct(
-        object $backend,
-        bool $from_logits=null
-        )
+    public function __construct($backend,array $options=null)
     {
-        // defaults
-        $from_logits = $from_logits ?? false;
-
+        extract($this->extractArgs([
+            'from_logits' => false,
+        ],$options));
         $this->backend = $backend;
         $this->fromLogits = $from_logits;
     }
@@ -47,24 +46,40 @@ abstract class AbstractCrossEntropy extends AbstractLoss implements Loss//,Activ
         return [
         ];
     }
-
-    protected function call(NDArray $trues, NDArray $predicts) : NDArray
+/*
+    public function forward(NDArray $inputs, bool $training) : NDArray
     {
-        $container = $this->container();
-        $container->trues = $trues;
+        $K = $this->backend;
+        $this->outputs = $this->activationFunction($inputs);
+        return $this->outputs;
+    }
+
+    public function backward(NDArray $dOutputs) : NDArray
+    {
+        $K = $this->backend;
+        if($this->fromLogits) {
+            return $dOutputs;
+        }
+        return $this->diffActivationFunction($dOutputs, $this->outputs);
+    }
+*/
+    //public function loss(NDArray $trues, NDArray $predicts) : float
+    public function forward(NDArray $trues, NDArray $predicts) : float
+    {
+        $this->trues = $trues;
         if($this->fromLogits) {
             $predicts = $this->activationFunction($predicts);
         }
-        $container->outputs = $predicts;
+        $this->outputs = $predicts;
         return $this->lossFunction(
-            $container->trues, $predicts, $this->fromLogits);
+            $this->trues, $predicts, $this->fromLogits);
     }
 
-    protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    //public function differentiateLoss() : NDArray
+    public function backward(array $dOutputs) : array
     {
-        $container = $this->container();
         $dInputs = $this->diffLossFunction(
-            $container->trues, $container->outputs, $this->fromLogits);
+            $this->trues, $this->outputs, $this->fromLogits);
         return [$dInputs];
     }
 }

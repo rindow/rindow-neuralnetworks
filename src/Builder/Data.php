@@ -14,7 +14,7 @@ class Data
 {
     protected $matrixOperator;
 
-    public function __construct(object $matrixOperator)
+    public function __construct($matrixOperator)
     {
         $this->matrixOperator = $matrixOperator;
     }
@@ -32,57 +32,41 @@ class Data
         throw new LogicException('Invalid operation to set');
     }
 
-    public function NDArrayDataset($inputs, ...$options)
+    public function NDArrayDataset(NDArray $inputs, array $options=null)
     {
-        return new NDArrayDataset($this->matrixOperator, $inputs, ...$options);
+        return new NDArrayDataset($this->matrixOperator, $inputs, $options);
     }
 
-    public function CSVDataset(string $path, ...$options)
+    public function CSVDataset(string $path, array $options=null)
     {
-        return new CSVDataset($this->matrixOperator, $path, ...$options);
+        return new CSVDataset($this->matrixOperator, $path, $options);
     }
 
-    public function ImageFilter(...$options)
+    public function ImageFilter(array $options=null)
     {
-        return new ImageFilter($this->matrixOperator, ...$options);
+        return new ImageFilter($this->matrixOperator, $options);
     }
 
-    public function ImageDataGenerator(NDArray $inputs, ...$options)
+    public function ImageDataGenerator(NDArray $inputs, array $options=null)
     {
-        $data_format = $options['data_format'] ?? null;
-        $height_shift = $options['height_shift'] ?? null;
-        $width_shift = $options['width_shift'] ?? null;
-        $vertical_flip = $options['vertical_flip'] ?? null;
-        $horizontal_flip = $options['horizontal_flip'] ?? null;
-        unset($options['data_format']);
-        unset($options['height_shift']);
-        unset($options['width_shift']);
-        unset($options['vertical_flip']);
-        unset($options['horizontal_flip']);
-
-        $filter = new ImageFilter($this->matrixOperator, 
-            data_format: $data_format,
-            height_shift: $height_shift,
-            width_shift: $width_shift,
-            vertical_flip: $vertical_flip,
-            horizontal_flip: $horizontal_flip,
-        );
-        $options['filter'] = $filter;
-        return new NDArrayDataset($this->matrixOperator, $inputs, ...$options);
+        $leftargs = [];
+        $filter = new ImageFilter($this->matrixOperator, $options, $leftargs);
+        $leftargs['filter']=$filter;
+        return new NDArrayDataset($this->matrixOperator, $inputs, $leftargs);
     }
 
-    public function ClassifiedTextDataset(string $path, ...$options)
+    public function ClassifiedTextDataset(string $path, array $options=null)
     {
-        return new ClassifiedTextDataset($this->matrixOperator, $path, ...$options);
+        return new ClassifiedTextDataset($this->matrixOperator, $path, $options);
     }
 
-    public function TextClassifiedDataset(string $path, ...$options)
+    public function TextClassifiedDataset(string $path, array $options=null)
     {
-        return new TextClassifiedDataset($this->matrixOperator, $path, ...$options);
+        return new TextClassifiedDataset($this->matrixOperator, $path, $options);
     }
 
-    public function ImageClassifiedDataset(string $path, ...$options)
+    public function ImageClassifiedDataset(string $path, array $options=null)
     {
-        return new ImageClassifiedDataset($this->matrixOperator, $path, ...$options);
+        return new ImageClassifiedDataset($this->matrixOperator, $path, $options);
     }
 }

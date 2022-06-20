@@ -2,12 +2,14 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
-use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
+use Rindow\NeuralNetworks\Model\BuildContext;
 
 class Attention extends AbstractLayerBase
 {
@@ -15,30 +17,24 @@ class Attention extends AbstractLayerBase
     use GenericUtils;
     use GradientUtils;
     protected $backend;
-    protected $scoresShape;
     //protected $returnAttentionScores;
+    protected $query;
+    protected $value;
+    protected $key;
+    protected $scores;
+    protected $attentionWeight;
+    protected $scoresShape;
 
-    //protected $query;
-    //protected $value;
-    //protected $key;
-    //protected $attentionWeight;
-
-    public function __construct(
-        object $backend,
-        array $input_shapes=null,
-        string $name=null,
-    )
+    public function __construct($backend, array $options=null)
     {
-        // defaults
-        $input_shapes = $input_shapes ?? null;
-        $name = $name ?? null;
-
+        extract($this->extractArgs([
+            'input_shapes'=>null,
+        ],$options));
         $this->backend = $K = $backend;
         $this->inputShape = $input_shapes;
-        $this->initName($name,'attention');
     }
 
-    public function build($variables=null, array $sampleWeights=null)
+    public function build($variables=null, array $options=null)
     {
         $K = $this->backend;
         $inputShapes = $this->normalizeInputShape($variables);
@@ -68,6 +64,11 @@ class Attention extends AbstractLayerBase
         }
         $this->outputShape = [$tq,$dim];
         $this->scoresShape = [$tq,$tv];
+        //if($this->returnAttentionScores) {
+        //    return [$this->outputShape,$this->scoresShape];
+        //} else {
+            return $this->createOutputDefinition([$this->outputShape]);
+        //}
     }
 
     public function getConfig() : array
@@ -135,7 +136,25 @@ class Attention extends AbstractLayerBase
         }
     }
 
-    public function backward(array $dOutputs,ArrayAccess $grads=null,array $oidsToCollect=null) : array
+    public function forward(array $inputs, bool $training, array $options=null)
+    {
+        if(BuildContext::$build) {
+            return $this->build($inputs,$options);
+        }
+        $this->assertInputShapes($inputs,'forward');
+        $outputs = $this->call($inputs,$training,$options);
+        if($options!==null &&
+            array_key_exists(self::RETURN_ATTENTION_SCORES,$options)&&
+            $options[self::RETURN_ATTENTION_SCORES]) {
+            $this->assertOutputShape($outputs[0],'forward');
+            $this->assertScoresShape($outputs[1],'forward');
+        } else {
+            $this->assertOutputShape($outputs,'forward');
+        }
+        return $outputs;
+    }
+
+    public function backward(array $dOutputs) : array
     {
         if(count($dOutputs)!=1) {
             throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
@@ -147,23 +166,20 @@ class Attention extends AbstractLayerBase
         $this->assertOutputShape($dOutputs,'backward');
         $dInputs = $this->differentiate($dOutputs);
         $this->assertInputShapes($dInputs,'backward');
-        $this->collectGradients($this->backend,array_map(null,$this->trainableVariables(),$this->getGrads()),
-            $grads,$oidsToCollect);
         return $dInputs;
     }
 
     protected function call(array $inputs, bool $training, array $options=null)
     {
         $K = $this->backend;
-        $container = $this->container();
         $query = $inputs[0];
         $value = $inputs[1];
         if(count($inputs)==3) {
             $key = $inputs[2];
-            $container->sameKey = false;
+            $this->sameKey = false;
         } else {
             $key = $inputs[1];
-            $container->sameKey = true;
+            $this->sameKey = true;
         }
         // scores = query * key
         $scores = $K->matmul($query, $key, null, $tranB=true);
@@ -172,10 +188,10 @@ class Attention extends AbstractLayerBase
         // vector = weights * value
         $contextVector = $K->matmul($attentionWeight, $value);
 
-        $container->value = $value;
-        $container->attentionWeight = $attentionWeight;
-        $container->query = $query;
-        $container->key = $key;
+        $this->value = $value;
+        $this->attentionWeight = $attentionWeight;
+        $this->query = $query;
+        $this->key = $key;
         if($options!==null &&
             array_key_exists(self::RETURN_ATTENTION_SCORES,$options) &&
             $options[self::RETURN_ATTENTION_SCORES]) {
@@ -188,20 +204,19 @@ class Attention extends AbstractLayerBase
     protected function differentiate(NDArray $dOutputs) : array
     {
         $K = $this->backend;
-        $container = $this->container();
         // forward:
         //   vector = weights (*) value
         // backward:
         //   dWeights = dVector (*) value^T
         //   dValue   = weights^T (*) dVector
-        $dAttentionWeight = $K->matmul($dOutputs,$container->value,$transA=false,$transB=true);
-        $dValue = $K->matmul($container->attentionWeight,$dOutputs,$transA=true,$transB=false);
-        $dScores = $K->dSoftmax($dAttentionWeight,$container->attentionWeight);
+        $dAttentionWeight = $K->matmul($dOutputs,$this->value,$transA=false,$transB=true);
+        $dValue = $K->matmul($this->attentionWeight,$dOutputs,$transA=true,$transB=false);
+        $dScores = $K->dSoftmax($dAttentionWeight,$this->attentionWeight);
 
-        $dQuery = $K->matmul($dScores,$container->key,$transA=false,$transB=false);
-        $dKey = $K->matmul($dScores,$container->query,$transA=true,$transB=false);
+        $dQuery = $K->matmul($dScores,$this->key,$transA=false,$transB=false);
+        $dKey = $K->matmul($dScores,$this->query,$transA=true,$transB=false);
 
-        if($container->sameKey) {
+        if($this->sameKey) {
             $K->update_add($dValue,$dKey);
             return [$dQuery,$dValue];
         } else {
@@ -211,56 +226,44 @@ class Attention extends AbstractLayerBase
 
     protected function numOfOutputs($options)
     {
-        if($options[self::RETURN_ATTENTION_SCORES] ?? false) {
+        if(isset($options[self::RETURN_ATTENTION_SCORES]) &&
+                $options[self::RETURN_ATTENTION_SCORES]) {
             return 2;
         }
         return 1;
     }
-
-    public function __invoke($inputs, $training, $options=null)
-    {
-        $outputs = $this->forward($inputs, $training, $options);
-        return $outputs;
-    }
-
     /**
     *  @param array<Variable>  $inputs
     *  @return array<Variable>|Variable
     */
-    public function forward(array $inputs, Variable|bool $training, array $options=null)
+    public function __invoke($inputs, bool $training, array $options=null)
     {
-        //$outputs = null;
+        $outputs = null;
         if(!is_array($inputs)) {
             throw new InvalidArgumentException('inputs must be list of Variable');
         }
-        [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
-        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
-        if(!$this->built) {
-            $this->build($inputs);
-            $this->built = true;
+        if($this->outputShape==null) {
+            $outputs = $this->build($inputs);
         }
         $numOfOutputs = $this->numOfOutputs($options);
-        $session = $this->preGradientProcessOnSession($inputs);
-        $session->begin();
-        try {
-            $this->assertInputShapes($rawInputs,'forward');
-            $rawOutputs = $this->call($rawInputs,$rawTraining,$options);
-            if($options!==null &&
-                array_key_exists(self::RETURN_ATTENTION_SCORES,$options)&&
-                $options[self::RETURN_ATTENTION_SCORES]) {
-                $this->assertOutputShape($rawOutputs[0],'forward');
-                $this->assertScoresShape($rawOutputs[1],'forward');
-            } else {
-                $this->assertOutputShape($rawOutputs,'forward');
+        if($inputs[0] instanceof Undetermined) {
+            if($outputs===null) {
+                throw new InvalidArgumentException('Undetermined is found in second calling.');
             }
-        } finally{
-            $session->end();
+            if($numOfOutputs>1) {
+                $scoresShape = $this->scoresShape;
+                array_unshift($scoresShape,1);
+                $outputs = [$outputs, new UndeterminedNDArray($scoresShape)];
+            }
+            return $outputs;
         }
+        $rawInputs = array_map(function($value){return $value->value();},$inputs);
+        $outputs = $this->forward($rawInputs,$training,$options);
         if($numOfOutputs>1) {
-            [$rawOutputs,$scores] = $rawOutputs;
+            [$outputs,$scores] = $outputs;
         }
-        $outputs = $this->postGradientProcessOnSession(
-            $this->backend, $session,$inputs, [$rawOutputs]);
+        $outputs = $this->postGradientProcess(
+            $this->backend, $inputs, [$outputs]);
         if($numOfOutputs>1) {
             array_push($outputs,$scores);
             return $outputs;
@@ -268,20 +271,4 @@ class Attention extends AbstractLayerBase
             return $outputs[0];
         }
     }
-
-    /**
-     * Call from SessionFunc in compiled graph
-     */
-    public function _rawCall(array $inputs,array $options)
-    {
-        $training = $options['training'] ?? false;
-        $opts=[];
-        $opts[self::RETURN_ATTENTION_SCORES] = $options[self::RETURN_ATTENTION_SCORES] ?? false;
-        $outputs = $this->call($inputs, $training, $opts);
-        if(!is_array($outputs)) {
-            $outputs = [$outputs];
-        }
-        return $outputs;
-    }
-
 }

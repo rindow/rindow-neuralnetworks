@@ -44,8 +44,10 @@ class Test extends TestCase
 
         $dataset = $nn->data()->TextClassifiedDataset(
             __DIR__.'/../Dataset/text',
-            pattern: '@.*\\.txt@',
-            batch_size: 2,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>2,
+            ]
         );
         $dataset->fitOnTexts();
         $this->assertEquals(5,$dataset->datasetSize());
@@ -116,9 +118,11 @@ class Test extends TestCase
 
         $dataset = $nn->data()->TextClassifiedDataset(
             __DIR__.'/../Dataset/text',
-            pattern: '@.*\\.txt@',
-            batch_size: 2,
-            //verbose: 1,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>2,
+                //'verbose'=>1,
+            ]
         );
 
         [$inputs,$tests] = $dataset->loadData();
@@ -149,9 +153,11 @@ class Test extends TestCase
 
         $dataset = $nn->data()->TextClassifiedDataset(
             __DIR__.'/../Dataset/text',
-                pattern: '@.*\\.txt@',
-                batch_size: 2,
-                //verbose: 1,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>2,
+                //'verbose'=>1,
+            ]
         );
 
         [$inputs,$tests] = $dataset->loadData();
@@ -160,11 +166,13 @@ class Test extends TestCase
         $val_dataset = new TextClassifiedDataset(
             $mo,
             __DIR__.'/../Dataset/text',
-                pattern: '@.*\\.txt@',
-                batch_size: 2,
-                //'verbose: 1,
-                tokenizer: $tokenizer,
-                classnames: $classnames,
+            [
+                'pattern'=>'@.*\\.txt@',
+                'batch_size'=>2,
+                //'verbose'=>1,
+                'tokenizer'=>$tokenizer,
+                'classnames'=>$classnames,
+            ]
         );
 
         [$val_inputs,$val_tests] = $val_dataset->loadData();

@@ -49,13 +49,13 @@ class HDASqliteIterator implements Iterator
         return !$this->eof;
     }
 
-    public function current() : mixed
+    public function current()
     {
         $this->fetch();
         return $this->value;
     }
 
-    public function key() : mixed
+    public function key()
     {
         $this->fetch();
         return $this->key;

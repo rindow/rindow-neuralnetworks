@@ -1,6 +1,7 @@
 <?php
 require __DIR__.'/../vendor/autoload.php';
 
+use Rindow\NeuralNetworks\Support\GenericUtils;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Layer\AbstractRNNLayer;
 use Rindow\NeuralNetworks\Model\AbstractModel;
@@ -173,31 +174,31 @@ if(file_exists($modelFilePath)) {
 
     $model = $nn->models()->Sequential([
         $nn->layers()->Embedding(count($input_dic), $WORD_VECTOR,
-            input_length:$input_length
+            ['input_length'=>$input_length]
         ),
         # Encoder
-        $nn->layers()->GRU($UNITS,go_backwards:$REVERSE),
+        $nn->layers()->GRU($UNITS,['go_backwards'=>$REVERSE]),
         # Expand to answer length and peeking hidden states
         $nn->layers()->RepeatVector($output_length),
         # Decoder
-        $nn->layers()->GRU($UNITS,
-            return_sequences:true,
-            go_backwards:$REVERSE,
-            #reset_after:false,
-        ),
+        $nn->layers()->GRU($UNITS, [
+            'return_sequences'=>true,
+            'go_backwards'=>$REVERSE,
+            #'reset_after'=>false,
+        ]),
         # Output
         $nn->layers()->Dense(
             count($target_dic),
-            activation:'softmax'
+            ['activation'=>'softmax']
         ),
     ]);
 
     echo "Compile model...\n";
 
-    $model->compile(
-        loss:'sparse_categorical_crossentropy',
-        optimizer:'adam',
-        );
+    $model->compile([
+        'loss'=>'sparse_categorical_crossentropy',
+        'optimizer'=>'adam',
+        ]);
     $model->summary();
 
     # Train the model
@@ -206,9 +207,11 @@ if(file_exists($modelFilePath)) {
     $history = $model->fit(
         $x_train,
         $y_train,
-        epochs:$EPOCHS,
-        batch_size:$BATCH_SIZE,
-        validation_data:[$x_val, $y_val],
+        [
+            'epochs'=>$EPOCHS,
+            'batch_size'=>$BATCH_SIZE,
+            'validation_data'=>[$x_val, $y_val],
+        ]
     );
 
     $model->save($modelFilePath);

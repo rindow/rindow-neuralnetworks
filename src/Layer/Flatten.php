@@ -5,32 +5,27 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Flatten extends AbstractLayer
+class Flatten extends AbstractLayer implements Layer
 {
     use GenericUtils;
     protected $backend;
 
-    public function __construct(
-        object $backend,
-        array $input_shape=null,
-        string $name=null,
-    )
+    public function __construct($backend,array $options=null)
     {
-        $input_shape = $input_shape ?? null;
-        $name = $name ?? null;
-
-        $this->backend = $backend;
+        extract($this->extractArgs([
+            'input_shape'=>null,
+        ],$options));
         $this->inputShape = $input_shape;
-        $this->initName($name,'flatten');
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build($variable=null, array $options=null)
     {
         $K = $this->backend;
 
         $inputShape = $this->normalizeInputShape($variable);
         $outputShape = (int)array_product($inputShape);
         $this->outputShape = [$outputShape];
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array

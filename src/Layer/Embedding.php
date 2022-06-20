@@ -5,7 +5,7 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class Embedding extends AbstractLayer
+class Embedding extends AbstractLayer implements Layer
 {
     use GenericUtils;
     protected $backend;
@@ -16,24 +16,16 @@ class Embedding extends AbstractLayer
 
     protected $kernel;
     protected $dKernel;
-    //protected $inputs;
-    //protected $originalShape;
-    //protected $flattenOutputsShape;
+    protected $inputs;
+    protected $originalShape;
+    protected $flattenOutputsShape;
 
-    public function __construct(
-        object $backend,
-        int $inputDim,
-        int $outputDim,
-        int $input_length=null,
-        string|callable $kernel_initializer=null,
-        string $name=null,
-    )
+    public function __construct($backend,int $inputDim,int $outputDim, array $options=null)
     {
-        // defaults
-        $input_length = $input_length ?? null;
-        $kernel_initializer = $kernel_initializer ?? 'random_uniform';
-        $name = $name ?? null;
-        
+        extract($this->extractArgs([
+            'input_length'=>null,
+            'kernel_initializer'=>'random_uniform',
+        ],$options));
         $this->backend = $K = $backend;
         if($input_length!=null){
             $this->inputShape = [$input_length];
@@ -43,12 +35,13 @@ class Embedding extends AbstractLayer
         $this->outputDim = $outputDim;
         $this->kernelInitializer = $K->getInitializer($kernel_initializer);
         $this->kernelInitializerName = $kernel_initializer;
-        $this->initName($name,'embedding');
-        $this->allocateWeights(1);
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build($variable=null, array $options=null)
     {
+        extract($this->extractArgs([
+            'sampleWeights'=>null,
+        ],$options));
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
 
@@ -57,19 +50,17 @@ class Embedding extends AbstractLayer
             throw new InvalidArgumentException(
                 'Unsuppored input shape: ['.implode(',',$inputShape).']');
         }
-        if($this->kernel===null) {
-            if($sampleWeights) {
-                $this->kernel = $sampleWeights[0];
-            } else {
-                $this->kernel = $kernelInitializer(
-                    [$this->inputDim,$this->outputDim],
-                    [$this->inputDim,$this->outputDim]
-                );
-            }
+        if($sampleWeights) {
+            $this->kernel = $sampleWeights[0];
+        } else {
+            $this->kernel = $kernelInitializer(
+                [$this->inputDim,$this->outputDim],
+                [$this->inputDim,$this->outputDim]
+            );
         }
         $this->dKernel = $K->zerosLike($this->kernel);
         $this->outputShape = array_merge($inputShape,[$this->outputDim]);
-        $this->syncWeightVariables();
+        return $this->createOutputDefinition([$this->outputShape]);
     }
 
     public function getParams() : array
@@ -80,11 +71,6 @@ class Embedding extends AbstractLayer
     public function getGrads() : array
     {
         return [$this->dKernel];
-    }
-
-    public function reverseSyncWeightVariables() : void
-    {
-        $this->kernel = $this->weights[0]->value();
     }
 
     public function getConfig() : array
@@ -102,13 +88,12 @@ class Embedding extends AbstractLayer
     protected function call(NDArray $inputs, bool $training) : NDArray
     {
         $K = $this->backend;
-        $container = $this->container();
-        $container->originalShape = $inputs->shape();
-        $container->inputs = $inputs->reshape(
+        $this->originalShape = $inputs->shape();
+        $this->inputs = $inputs->reshape(
             [$inputs->size()]);
-        $outputs = $K->gather($this->kernel,$container->inputs);
-        $container->flattenOutputsShape = $outputs->shape();
-        $shape = $container->originalShape;
+        $outputs = $K->gather($this->kernel,$this->inputs);
+        $this->flattenOutputsShape = $outputs->shape();
+        $shape = $this->originalShape;
         array_push($shape,$this->outputDim);
         return $outputs->reshape($shape);
     }
@@ -116,10 +101,9 @@ class Embedding extends AbstractLayer
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        $container = $this->container();
-        $dOutputs = $dOutputs->reshape($container->flattenOutputsShape);
+        $dOutputs = $dOutputs->reshape($this->flattenOutputsShape);
         $K->clear($this->dKernel);
-        $K->scatterAdd($this->dKernel,$container->inputs, $dOutputs);
-        return $container->inputs->reshape($container->originalShape);//dummy
+        $K->scatterAdd($this->dKernel,$this->inputs, $dOutputs);
+        return $this->inputs->reshape($this->originalShape);//dummy
     }
 }

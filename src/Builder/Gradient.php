@@ -2,10 +2,10 @@
 namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
-use Rindow\NeuralNetworks\Gradient\Core\GraphFunction;
 use Rindow\NeuralNetworks\Gradient\Func\Square;
 use Rindow\NeuralNetworks\Gradient\Func\Sqrt;
 use Rindow\NeuralNetworks\Gradient\Func\Exp;
@@ -15,35 +15,19 @@ use Rindow\NeuralNetworks\Gradient\Func\Sub;
 use Rindow\NeuralNetworks\Gradient\Func\Mul;
 use Rindow\NeuralNetworks\Gradient\Func\Div;
 use Rindow\NeuralNetworks\Gradient\Func\Matmul;
-use Rindow\NeuralNetworks\Gradient\Func\ReduceMean;
 
 class Gradient
 {
     protected $backend;
 
-    public function __construct(object $backend)
+    public function __construct($backend)
     {
         $this->backend = $backend;
     }
 
-    public function Variable($variable, ...$options)
+    public function Variable(NDArray $variable,array $options=null)
     {
-        if(GraphFunction::$mode==GraphFunction::EXECUTING) {
-            return $variable;
-        }
-        return new Variable($this->backend,$variable,...$options);
-    }
-
-    public function toVariables(array $values, ...$options) : array
-    {
-        if(GraphFunction::$mode==GraphFunction::EXECUTING) {
-            return $values;
-        }
-        $variables = [];
-        foreach($values as $value) {
-            $variables[] = new Variable($this->backend,$value,...$options);
-        }
-        return $variables;
+        return new Variable($this->backend,$variable,$options);
     }
 
     public function GradientTape($persistent=null)
@@ -51,19 +35,24 @@ class Gradient
         return new GradientTape($this->backend,$persistent);
     }
 
-    public function Function(callable $func, ...$options)
-    {
-        return new GraphFunction($this->backend, $func, ...$options);
-    }
-
     public function isUndetermined($variable) : bool
     {
-        if($variable instanceof VariableInterface) {
-            if($variable->isUndetermined()) {
-                return true;
-            }
+        if(($variable instanceof Undetermined)||
+            ($variable instanceof UndeterminedNDArray)) {
+            return true;
+        } else {
+            return false;
         }
-        return false;
+    }
+
+    public function Undetermined()
+    {
+        return new Undetermined();
+    }
+
+    public function UndeterminedNDArray()
+    {
+        return new UndeterminedNDArray();
     }
 
     public function square($x)
@@ -114,30 +103,10 @@ class Gradient
         return $func($x,$y);
     }
 
-    public function matmul(
-        $x,$y,
-        bool $transpose_a=null,
-        bool $transpose_b=null,
-    )
+    public function matmul($x,$y,array $options=null)
     {
-        $func = new Matmul(
-            $this->backend,
-            transpose_a:$transpose_a,
-            transpose_b:$transpose_b,
-        );
+        $func = new Matmul($this->backend,$options);
         return $func($x,$y);
-    }
-
-    public function reduceMean(
-        $x,
-        int $axis=null,
-    )
-    {
-        $func = new ReduceMean(
-            $this->backend,
-            axis:$axis,
-        );
-        return $func($x);
     }
 
 }

@@ -3,9 +3,11 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
+use Rindow\NeuralNetworks\Support\GenericUtils;
 
 class LSTMCell extends AbstractRNNCell
 {
+    use GenericUtils;
     protected $backend;
     protected $units;
     protected $useBias;
@@ -25,31 +27,21 @@ class LSTMCell extends AbstractRNNCell
     protected $dBias;
     protected $inputs;
 
-    public function __construct(
-        object $backend,
-        int $units,
-        array $input_shape=null,
-        string|object $activation=null,
-        string|object $recurrent_activation=null,
-        bool $use_bias=null,
-        string|callable $kernel_initializer=null,
-        string|callable $recurrent_initializer=null,
-        string|callable $bias_initializer=null,
-        bool $unit_forget_bias=null,
-    )
+    public function __construct($backend,int $units, array $options=null)
     {
-        $input_shape = $input_shape ?? null;
-        $activation = $activation ?? 'tanh';
-        $recurrent_activation = $recurrent_activation ?? 'sigmoid';
-        $use_bias = $use_bias ?? true;
-        $kernel_initializer = $kernel_initializer ?? 'glorot_uniform';
-        $recurrent_initializer = $recurrent_initializer ?? 'orthogonal';
-        $bias_initializer = $bias_initializer ?? 'zeros';
-        $unit_forget_bias = $unit_forget_bias ?? true;
-        //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
-        //'activity_regularizer'=null,
-        //'kernel_constraint'=null, 'bias_constraint'=null,
-        
+        extract($this->extractArgs([
+            'input_shape'=>null,
+            'activation'=>'tanh',
+            'recurrent_activation'=>'sigmoid',
+            'use_bias'=>true,
+            'kernel_initializer'=>'glorot_uniform',
+            'recurrent_initializer'=>'orthogonal',
+            'bias_initializer'=>'zeros',
+            'unit_forget_bias'=>true,
+            //'kernel_regularizer'=>null, 'bias_regularizer'=>null,
+            //'activity_regularizer'=null,
+            //'kernel_constraint'=null, 'bias_constraint'=null,
+        ],$options));
         $this->backend = $K = $backend;
         $this->units = $units;
         $this->inputShape = $input_shape;
@@ -66,8 +58,11 @@ class LSTMCell extends AbstractRNNCell
         $this->biasInitializerName = $bias_initializer;
     }
 
-    public function build($inputShape=null, array $sampleWeights=null)
+    public function build($inputShape=null, array $options=null)
     {
+        extract($this->extractArgs([
+            'sampleWeights'=>null,
+        ],$options));
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
         $recurrentInitializer = $this->recurrentInitializer;
@@ -80,31 +75,47 @@ class LSTMCell extends AbstractRNNCell
         //}
         $shape = $inputShape;
         $inputDim = array_pop($shape);
-        if($this->kernel===null) {
-            if($sampleWeights) {
-                $this->kernel = $sampleWeights[0];
-                $this->recurrentKernel = $sampleWeights[1];
-                $this->bias = $sampleWeights[2];
-            } else {
-                $this->kernel = $kernelInitializer([
-                    $inputDim,$this->units*4],
-                    [$inputDim,$this->units]);
-                $this->recurrentKernel = $recurrentInitializer(
-                    [$this->units,$this->units*4],
-                    [$this->units,$this->units]);
-                if($this->useBias) {
-                    $this->bias = $biasInitializer([$this->units*4]);
-                }
+        if($sampleWeights) {
+            $this->kernel = $sampleWeights[0];
+            $this->recurrentKernel = $sampleWeights[1];
+            $this->bias = $sampleWeights[2];
+        } else {
+            $this->kernel = $kernelInitializer([
+                $inputDim,$this->units*4],
+                [$inputDim,$this->units]);
+            $this->recurrentKernel = $recurrentInitializer(
+                [$this->units,$this->units*4],
+                [$this->units,$this->units]);
+            if($this->useBias) {
+                $this->bias = $biasInitializer([$this->units*4]);
             }
         }
         $this->dKernel = $K->zerosLike($this->kernel);
         $this->dRecurrentKernel = $K->zerosLike($this->recurrentKernel);
-        if($this->useBias) {
+        if($this->bias) {
             $this->dBias = $K->zerosLike($this->bias);
         }
         array_push($shape,$this->units);
         $this->outputShape = $shape;
         return $this->outputShape;
+    }
+
+    public function getParams() : array
+    {
+        if($this->bias) {
+            return [$this->kernel,$this->recurrentKernel,$this->bias];
+        } else {
+            return [$this->kernel,$this->recurrentKernel];
+        }
+    }
+
+    public function getGrads() : array
+    {
+        if($this->bias) {
+            return [$this->dKernel,$this->dRecurrentKernel,$this->dBias];
+        } else {
+            return [$this->dKernel,$this->dRecurrentKernel];
+        }
     }
 
     public function getConfig() : array
@@ -129,7 +140,7 @@ class LSTMCell extends AbstractRNNCell
         $prev_h = $states[0];
         $prev_c = $states[1];
 
-        if($this->useBias){
+        if($this->bias){
             $outputs = $K->batch_gemm($inputs, $this->kernel,1.0,1.0,$this->bias);
         } else {
             $outputs = $K->gemm($inputs, $this->kernel);
@@ -146,22 +157,22 @@ class LSTMCell extends AbstractRNNCell
             [0,$this->units*3],[-1,$this->units]);
 
         if($this->activation){
-            $calcState->ac_c = new \stdClass();
-            $x_c = $this->activation->forward($calcState->ac_c,$x_c,$training);
+            $x_c = $this->activation->forward($x_c,$training);
+            $calcState->ac_c = $this->activation->getStates();
         }
         if($this->recurrentActivation){
-            $calcState->ac_i = new \stdClass();
-            $x_i = $this->recurrentActivation->forward($calcState->ac_i,$x_i,$training);
-            $calcState->ac_f = new \stdClass();
-            $x_f = $this->recurrentActivation->forward($calcState->ac_f,$x_f,$training);
-            $calcState->ac_o = new \stdClass();
-            $x_o = $this->recurrentActivation->forward($calcState->ac_o,$x_o,$training);
+            $x_i = $this->recurrentActivation->forward($x_i,$training);
+            $calcState->ac_i = $this->recurrentActivation->getStates();
+            $x_f = $this->recurrentActivation->forward($x_f,$training);
+            $calcState->ac_f = $this->recurrentActivation->getStates();
+            $x_o = $this->recurrentActivation->forward($x_o,$training);
+            $calcState->ac_o = $this->recurrentActivation->getStates();
         }
         $next_c = $K->add($K->mul($x_f,$prev_c),$K->mul($x_i,$x_c));
         $ac_next_c = $next_c;
         if($this->activation){
-            $calcState->ac = new \stdClass();
-            $ac_next_c = $this->activation->forward($calcState->ac,$ac_next_c,$training);
+            $ac_next_c = $this->activation->forward($ac_next_c,$training);
+            $calcState->ac = $this->activation->getStates();
         }
         // next_h = o * ac_next_c
         $next_h = $K->mul($x_o,$ac_next_c);
@@ -187,7 +198,8 @@ class LSTMCell extends AbstractRNNCell
 
         $dAc_next_c = $K->mul($calcState->x_o,$dNext_h);
         if($this->activation){
-            $dAc_next_c = $this->activation->backward($calcState->ac,$dAc_next_c);
+            $this->activation->setStates($calcState->ac);
+            $dAc_next_c = $this->activation->backward($dAc_next_c);
         }
         $dNext_c = $K->add($dNext_c, $dAc_next_c);
 
@@ -199,12 +211,16 @@ class LSTMCell extends AbstractRNNCell
         $dx_c = $K->mul($dNext_c,$calcState->x_i);
 
         if($this->recurrentActivation){
-            $dx_i = $this->recurrentActivation->backward($calcState->ac_i,$dx_i);
-            $dx_f = $this->recurrentActivation->backward($calcState->ac_f,$dx_f);
-            $dx_o = $this->recurrentActivation->backward($calcState->ac_o,$dx_o);
+            $this->recurrentActivation->setStates($calcState->ac_i);
+            $dx_i = $this->recurrentActivation->backward($dx_i);
+            $this->recurrentActivation->setStates($calcState->ac_f);
+            $dx_f = $this->recurrentActivation->backward($dx_f);
+            $this->recurrentActivation->setStates($calcState->ac_o);
+            $dx_o = $this->recurrentActivation->backward($dx_o);
         }
         if($this->activation){
-            $dx_c = $this->activation->backward($calcState->ac_c,$dx_c);
+            $this->activation->setStates($calcState->ac_c);
+            $dx_c = $this->activation->backward($dx_c);
         }
 
         $dOutputs = $K->stack(
@@ -220,7 +236,7 @@ class LSTMCell extends AbstractRNNCell
             $this->dRecurrentKernel,true,false);
         $K->gemm($calcState->inputs, $dOutputs,1.0,1.0,
             $this->dKernel,true,false);
-        if($this->useBias) {
+        if($this->dBias) {
             $K->update_add($this->dBias,$K->sum($dOutputs, $axis=0));
         }
 

@@ -4,10 +4,9 @@ namespace Rindow\NeuralNetworks\Model;
 use InvalidArgumentException;
 use UnexpectedValueException;
 use LogicException;
-use ReflectionClass;
-use ArrayAccess;
+use Rindow\NeuralNetworks\Support\GenericUtils;
 use Rindow\NeuralNetworks\Optimizer\Optimizer;
-use Rindow\NeuralNetworks\Layer\Layer;
+use Rindow\NeuralNetworks\Layer\LayerBase;
 use Rindow\NeuralNetworks\Activation\Softmax;
 use Rindow\NeuralNetworks\Activation\Sigmoid;
 use Rindow\NeuralNetworks\Loss\Loss;
@@ -17,32 +16,32 @@ use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
 use Rindow\NeuralNetworks\Callback\CallbackList;
 use Rindow\NeuralNetworks\Data\Dataset\Dataset;
 use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
-use Rindow\NeuralNetworks\Gradient\Variable;
-use Rindow\NeuralNetworks\Gradient\Module;
-use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
+use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 use Interop\Polite\Math\Matrix\NDArray;
 
 abstract class AbstractModel implements Model
 {
+    use GenericUtils;
+
     protected $backend;
     protected $builder;
     protected $hda;
     protected $name;
+    protected $layers = [];
+    protected $lastLayer;
     protected $optimizer;
     protected $metrics;
     protected $lossFunction;
+    protected $params = [];
+    protected $grads = [];
     protected $built = false;
     protected $shapeInspection=true;
-    protected $backupShapeInspection;
     protected $inputsVariables;
     protected $outputsVariables;
-    protected $weightVariables = [];
-    protected $trainableVariables;
-    protected $generation;
-    protected $graph = [];
-    protected $weights;
 
-    public function __construct(object $backend,object $builder,$hda=null)
+    public function __construct($backend,$builder,$hda=null)
     {
         $this->backend = $backend;
         $this->builder = $builder;
@@ -58,11 +57,6 @@ abstract class AbstractModel implements Model
         if(defined('STDERR')) {
             fwrite(STDERR,$message);
         }
-    }
-
-    protected function display($message)
-    {
-        echo $message;
     }
 
     public function setName($name)
@@ -90,23 +84,38 @@ abstract class AbstractModel implements Model
         return $this->optimizer;
     }
 
+    public function params() : array
+    {
+        return $this->params;
+    }
+
+    public function grads() : array
+    {
+        return $this->grads;
+    }
+
+    //protected function getLastLayer()
+    //{
+    //    return $this->lastLayer;
+    //}
+
+    //protected function setLastLayer($lastLayer)
+    //{
+    //    $this->lastLayer = $lastLayer;
+    //}
     protected function basename($object) : string
     {
         $classname = get_class($object);
         return substr($classname,strrpos($classname,'\\')+1);
     }
 
-    public function compile(
-        string|object $optimizer=null,
-        string|object $loss=null,
-        array $metrics=null,
-        int $numInputs=null,
-    ) : void
+    public function compile(array $options=null) : void
     {
-        $optimizer = $optimizer ?? 'SGD';
-        $loss = $loss ?? 'SparseCategoricalCrossEntropy';
-        $metrics = $metrics ?? ['loss','accuracy'];
-        $numInputs = $numInputs ?? 1;
+        extract($this->extractArgs([
+            'optimizer'=>'SGD',
+            'loss'=>'SparseCategoricalCrossEntropy',
+            'metrics'=>['loss','accuracy'],
+        ],$options));
 
         // resolve optimizer
         if(is_string($optimizer)) {
@@ -155,46 +164,67 @@ abstract class AbstractModel implements Model
         }
         $this->metrics = $metrics;
 
+        // build pipeline of layers
+        $this->buildLayers($options);
+
+        $layerNames = [];
+        foreach ($this->layers() as $layer) {
+            $name = $this->basename($layer);
+            if(isset($layerNames[$name])) {
+                $i = 1;
+                $base = $name;
+                while(true) {
+                    if(!isset($layerNames[$base.'_'.$i])) {
+                        $name = $base.'_'.$i;
+                        break;
+                    }
+                    $i++;
+                }
+            }
+            $layerNames[$name] = true;
+            $layer->setName($name);
+        }
+        $this->built = true;
     }
 
-    public function fit(
-        $inputs,
-        NDArray $tests=null,
-        int $batch_size=null,
-        int $epochs=null,
-        int $verbose=null,
-        array|Dataset $validation_data=null,
-        array $callbacks=null,
-        bool $shuffle=null,
-        object $filter=null,
-    ) : array
+    public function setShapeInspection(bool $enable)
     {
-        if($this->optimizer==null || $this->lossFunction==null) {
-            throw new LogicException('Not yet compile');
+        if($this->shapeInspection==$enable)
+            return;
+        foreach ($this->layers as $layer) {
+            $layer->setShapeInspection($enable);
+        }
+        $this->shapeInspection = $enable;
+    }
+
+    public function fit($inputs, NDArray $tests=null, array $options=null) : array
+    {
+        if(!$this->built) {
+            throw new LogicException('Not yet built');
         }
         $K = $this->backend;
         $mo = $K->localMatrixOperator();
         $localLA = $K->localLA();
-
-        // defaults
-        $batch_size = $batch_size ?? 32;
-        $epochs = $epochs ?? 1;
-        $verbose = $verbose ?? 1;
-        $validation_data = $validation_data ?? null;
-        $callbacks = $callbacks ?? null;
-        $shuffle = $shuffle ?? true;
-        $filter = $filter ?? null;
-
-        if($inputs instanceof NDArray||is_array($inputs)) {
-            $dataset = new NDArrayDataset(
-                $K->localMatrixOperator(),
-                $inputs,
-                batch_size: $batch_size,
-                shuffle: $shuffle,
-                filter: $filter,
-                tests: $tests,
-            );
-            $inputCount = $dataset->datasetSize();
+        extract($this->extractArgs([
+            'batch_size'=>32,
+            'epochs'=>1,
+            'verbose'=>1,
+            'validation_data'=>null,
+            'callbacks'=>null,
+            'shuffle'=>true,
+            'filter'=>null,
+        ],$options,$leftargs));
+        if($inputs instanceof NDArray) {
+            $options = [
+                'batch_size'=>$batch_size,
+                'shuffle'=>$shuffle,
+                'filter'=>$filter,
+            ];
+            if($tests!==null) {
+                $options['tests'] = $tests;
+            }
+            $dataset = new NDArrayDataset($K->localMatrixOperator(),$inputs,$options);
+            $inputCount = count($inputs);
         } elseif($inputs instanceof Dataset) {
             if($tests!=null) {
                 throw new InvalidArgumentException('The tests must be specified in the Dataset.');
@@ -237,7 +267,6 @@ abstract class AbstractModel implements Model
             $this->console("\n");
         }
         $totalSteps = count($dataset);
-        $this->backupShapeInspection = $this->shapeInspection;
         $callbacks->onTrainBegin();
         for($epoch=0;$epoch<$epochs;$epoch++) {
             $callbacks->onEpochBegin($epoch);
@@ -260,7 +289,7 @@ abstract class AbstractModel implements Model
             $logs = ['loss'=>$totalLoss,'accuracy'=>$totalAccuracy];
             if($val_inputs) {
                 [$loss, $accuracy] = $this->evaluate($val_inputs, $val_test,
-                    batch_size:$batch_size, verbose:0, callbacks:$callbacks);
+                    ['batch_size'=>$batch_size,'verbose'=>0,'callbacks'=>$callbacks]);
                 $history['val_loss'][] = $loss;
                 $history['val_accuracy'][] = $accuracy;
                 $logs = ['val_loss'=>$loss,'val_accuracy'=>$accuracy];
@@ -275,9 +304,7 @@ abstract class AbstractModel implements Model
             }
             $callbacks->onEpochEnd($epoch,$logs);
         }
-        if($this->backupShapeInspection) {
-            $this->setShapeInspection(true);
-        }
+        $this->setShapeInspection(true);
         return $history;
     }
 
@@ -313,16 +340,7 @@ abstract class AbstractModel implements Model
             $callbacks->onTrainBatchBegin($batchIndex);
             ////
             [$inputs,$trues] = $data;
-            if(!is_array($inputs)) {
-                $inputs = $K->array($inputs);
-            } else {
-                $newInputs = [];
-                foreach ($inputs as $value) {
-                    $newInputs[] = $K->array($value);
-                }
-                $inputs = $newInputs;
-                unset($newInputs);
-            }
+            $inputs = $K->array($inputs);
             $trues = $K->array($trues);
 
             [$loss, $accuracy] = $this->trainStep($inputs, $trues);
@@ -340,6 +358,28 @@ abstract class AbstractModel implements Model
             $this->console(".");
         }
         return [$totalLoss,$totalAccuracy];
+    }
+
+    protected function trainStep($inputs, $trues)
+    {
+        $preds = $this->forward($inputs, $training=true, $trues);
+        $trues = $this->trueValuesFilter($trues);
+        $loss  = $this->loss($trues,$preds);
+        if(is_nan($loss)) {
+            throw new UnexpectedValueException("loss is unexpected value");
+        }
+        //$this->backwardStep($this->lossFunction->differentiateLoss());
+        $this->backward($this->lossFunction->backward([1]));
+
+        if(in_array('accuracy',$this->metrics)) {
+            //$preds = $this->forwardLastlayer($preds);
+            $accuracy = $this->accuracy($trues,$preds);
+        } else {
+            $accuracy = 0;
+        }
+
+        $this->optimizer->update($this->params, $this->grads);
+        return [$loss,$accuracy];
     }
 
     protected function progressBar($epoch,$epochs,$startTime,$batchIndex,$batchIndexCount,$maxDot)
@@ -383,23 +423,14 @@ abstract class AbstractModel implements Model
         return $this->lossFunction->accuracy($trues,$preds);
     }
 
-    public function evaluate(
-        $inputs,
-        NDArray $trues=null,
-        int $batch_size=null,
-        int $verbose=null,
-        object|array $callbacks=null,
-    ) : array
+    public function evaluate($x, NDArray $t=null, array $options=null) : array
     {
-        // defaults
-        $batch_size = $batch_size ?? 32;
-        $verbose = $verbose ?? 0;
-        $callbacks = $callbacks ?? null;
-
-        $x = $inputs; unset($inputs);
-        $t = $trues; unset($trues);
-
         $K = $this->backend;
+        extract($this->extractArgs([
+            'batch_size'=>32,
+            'verbose'=>0,
+            'callbacks'=>null,
+        ],$options));
         $totalLoss = 0.0;
         $totalAccuracy = 0.0;
         if(!($callbacks instanceof CallbackList)) {
@@ -408,9 +439,9 @@ abstract class AbstractModel implements Model
         if($verbose>=1) {
             $startTime = time();
         }
-        if($x instanceof NDArray||is_array($x)) {
-            $dataset = new NDArrayDataset(
-                $K->localMatrixOperator(),$x, tests: $t, batch_size: $batch_size);
+        if($x instanceof NDArray) {
+            $options = ['tests'=>$t,'batch_size'=>$batch_size];
+            $dataset = new NDArrayDataset($K->localMatrixOperator(),$x,$options);
         } elseif($x instanceof Dataset) {
             if($t!=null) {
                 throw new InvalidArgumentException('The tests must be specified in the Dataset.');
@@ -426,16 +457,7 @@ abstract class AbstractModel implements Model
             }
             $callbacks->onTestBatchBegin($batchIndex);
             [$inputs,$trues] = $data;
-            if(!is_array($inputs)) {
-                $inputs = $K->array($inputs);
-            } else {
-                $newInputs = [];
-                foreach ($inputs as $value) {
-                    $newInputs[] = $K->array($value);
-                }
-                $inputs = $newInputs;
-                unset($newInputs);
-            }
+            $inputs = $K->array($inputs);
             $trues = $K->array($trues);
 
             [$loss,$accuracy] = $this->evaluateStep($inputs,$trues);
@@ -461,240 +483,213 @@ abstract class AbstractModel implements Model
         return [$totalLoss,$totalAccuracy];
     }
 
-    public function predict(
-        $inputs,
-        array|object $callbacks=null,
-        ...$options
-    ) : NDArray
+    protected function evaluateStep($inputs,$trues)
     {
-        //if(!$this->built) {
-        //    throw new LogicException('Not yet built');
-        //}
-        $callbacks = $callbacks ?? null;
+        $preds = $this->forward($inputs,$training=false,$trues);
+        $trues = $this->trueValuesFilter($trues);
+        $loss  = $this->loss($trues,$preds);
+        //$preds = $this->forwardLastlayer($preds);
+        $accuracy = $this->accuracy($trues,$preds);
+        return [$loss,$accuracy];
+    }
+
+    public function predict(NDArray $inputs, array $options=null) : NDArray
+    {
+        extract($this->extractArgs([
+            'callbacks'=>null,
+        ],$options));
 
         if(!($callbacks instanceof CallbackList)) {
             $callbacks = new CallbackList($this,$callbacks);
         }
-        if(!is_array($inputs)) {
-            $inputs = $this->backend->array($inputs);
-        } else {
-            $newInputs = [];
-            foreach ($inputs as $value) {
-                $newInputs[] = $this->backend->array($value);
-            }
-            $inputs = $newInputs;
-            unset($newInputs);
-        }
+        $inputs = $this->backend->array($inputs);
         $callbacks->onPredictBegin();
         $outputs = $this->predictStep($inputs,$options);
         $callbacks->onPredictEnd();
         $outputs = $this->backend->ndarray($outputs);
         return $outputs;
+        //return $this->forwardLastlayer($outputs);
     }
 
-    /**
-    *  @return int
-    */
-    public function generation() : int
+    protected function predictStep($inputs,$options)
     {
-        return $this->generation;
+        return $this->forward($inputs, $training=false, $trues=null);
     }
-    /**
-    *  @return array<Variable>
-    */
+
+/*
+    protected function forwardLastlayer($x)
+    {
+        $layers = $this->layers;
+        $lastLayer = array_pop($layers);
+        if(method_exists($lastLayer,'incorporatedLoss') &&
+            $lastLayer->incorporatedLoss()) {
+                $lastLayer->setIncorporatedLoss(false);
+                $x = $lastLayer->forward($x,false);
+                $lastLayer->setIncorporatedLoss(true);
+        }
+        return $x;
+    }
+*/
     public function inputs()
     {
         return $this->inputsVariables;
     }
 
-    /**
-    *  @return array<Variable>
-    */
     public function outputs()
     {
         return $this->outputsVariables;
     }
 
-    protected function getModelGraph()
+    /*
+    *  static step interfaces
+    */
+    //protected function extractWeights($weights)
+    //{
+    //    if($weights instanceof LayerBase){
+    //        $this->params = array_merge($this->params,$weights->getParams());
+    //        $this->grads  = array_merge($this->grads, $weights->getGrads());
+    //        return;
+    //    }else{
+    //        throw new InvalidArgumentException('invalid type to add weights');
+    //    }
+    //}
+
+    //protected function registerLayer(LayerBase $layer,array $inputShape=null) : array
+    //{
+    //    $this->layers[] = $layer;
+    //    $outputShape = $layer->build($inputShape);
+    //    $this->extractWeights($layer);
+    //    return $outputShape;
+    //}
+
+    protected function buildLayers(array $options=null) : void
     {
-        if(isset($this->graph['model'])) {
-            return $this->graph['model'];
-        }
+        $nn = $this->builder;
+        $inputs = new Undetermined();
+        $trues = new Undetermined();
         $model = $this;
-        $func = function($x,$training,$t) use ($model) {
-            return $model->forward($x,$training,$t);
-        };
-        //$options = ['alternateCreator'=>$this];
-        //[$weights,$grads] = $this->initWeights();
-        //if(count($weights)) {
-        //    $options['weights'] = $weights;
-        //    $options['grads'] = $grads;
-        //}
-        $this->graph['model'] = $this->builder->gradient->function(
-            $func,alternateCreator:$this);
-        return $this->graph['model'];
-    }
-
-    public function shapeInspection() : bool
-    {
-        return $this->shapeInspection;
-    }
-
-    public function setShapeInspection(bool $enable)
-    {
-        if($this->shapeInspection==$enable)
-            return;
-        foreach ($this->submodules() as $module) {
-            $module->setShapeInspection($enable);
+        $outputs = $nn->with($ctx=new BuildContext(),
+            function() use ($model,$inputs,$trues) {
+                $outputs = $model->forward($inputs,true,$trues);
+                return $outputs;
+            }
+        );
+        if(!($outputs instanceof Variable)) {
+            if(is_object($outputs)) {
+                $type = get_class($outputs);
+            } else {
+                $type = gettype($outputs);
+            }
+            throw new LogicException('root model must output single Variable: '.$type);
         }
-        $this->shapeInspection = $enable;
-    }
+        $this->outputsVariables = [$outputs->reference()];
 
-    public function submodules() : array
-    {
-        $modules = [];
-        foreach (get_object_vars($this) as $func) {
-            if($func instanceof Module) {
-                $modules[] = $func;
+        $funcs = [$outputs->creator()];
+        $pipeline = [];
+        $used = [];
+
+        while(count($funcs)>0) {
+            $func = array_pop($funcs);
+            $pipeline[] = $func;
+            foreach($func->inputs() as $input) {
+                $creator = $input->creator();
+                if($creator!=null) {
+                    $oid = spl_object_hash($creator);
+                    if(!array_key_exists($oid,$used)) {
+                        $used[$oid] = true;
+                        $funcs[] = $creator;
+                        usort($funcs,function($a,$b){return $a->generation()-$b->generation();});
+                    }
+                }
             }
         }
-        return $modules;
+        $this->pipeline = [];
+        foreach($pipeline as $func) {
+            $oid = spl_object_hash($func);
+            $this->pipeline[$oid] = $func;
+        }
+        $this->layers = [];
+        foreach ($ctx->getList() as $layer) {
+            $oid = spl_object_hash($layer);
+            if(array_key_exists($oid,$this->pipeline)) {
+                $this->layers[] = $layer;
+            }
+        }
+        $this->params = [];
+        $this->grads = [];
+        foreach($this->layers as $weights) {
+            $this->params = array_merge($this->params,$weights->getParams());
+            $this->grads  = array_merge($this->grads, $weights->getGrads());
+        }
+    }
+
+    public function forward(...$inputs)
+    {
+        return $this->call(...$inputs);
+    }
+
+    protected function backward(array $dOutputs) : array
+    {
+        $K = $this->backend;
+        if(count($dOutputs)!=1) {
+            throw new InvalidArgumentException('The dOutputs must be a list containing one NDArray.');
+        }
+        [$dOutputs] = $dOutputs;
+        if(!($dOutputs instanceof NDArray)) {
+            throw new InvalidArgumentException('The dOutputs must be a list containing one NDArray.');
+        }
+        $batchSize = $dOutputs->shape()[0];
+        $oid = $this->outputs()[0]->oid();
+        $grads[$oid] = $dOutputs;
+        unset($dOutputs);
+        $funcs = $this->pipeline;
+        foreach ($funcs as $func) {
+            $dOutputs = [];
+            foreach($func->outputs() as $o) {
+                $oid = $o->oid();
+                if(array_key_exists($oid,$grads)) {
+                    $dOutputs[] = $grads[$oid];
+                    // *** CAUTION ***
+                    // Outputs are not used after being used backwards.
+                    // grads should also be released. See dynamic mode.
+                    unset($grads[$oid]);
+                } else {
+                    $shape = $o->valueShape();
+                    $dtype = $o->dtype();
+                    array_unshift($shape,$batchSize);
+                    $dOutputs[] = $K->zeros($shape,$dtype);
+                }
+            }
+            $tmpdInputs = $func->backward($dOutputs);
+            unset($dOutputs);
+
+            $dDatas = array_map(null,$func->inputs(),$tmpdInputs);
+            unset($tmpdInputs);
+
+            foreach ($dDatas as $dData) {
+                [$dInputs,$dx] = $dData;
+                $oid = spl_object_hash($dInputs);
+                if(array_key_exists($oid,$grads)) {
+                    $K->update_add($grads[$oid],$dx);
+                } else {
+                    $grads[$oid] = $dx;
+                }
+            }
+        }
+        return []; // No reverse
     }
 
     public function layers() : array
     {
         $layers = [];
-        $modules = $this->submodules();
-
-        while($mdl = array_shift($modules)) {
-            if($mdl instanceof Layer) {
-                $layers[] = $mdl;
+        foreach ($this->layers as $layer) {
+            if($layer instanceof LayerBase) {
+                $layers[] = $layer;
             } else {
-                $modules = array_merge($mdl->submodules(),$modules);
+                $layers = array_merge($layers,$layer->layers());
             }
         }
         return $layers;
-    }
-
-    public function variables() : array
-    {
-        $variables = [];
-        foreach ($this->submodules() as $module) {
-            $variables = array_merge($variables,$module->variables());
-        }
-        foreach(get_object_vars($this) as $var) {
-            if($var instanceof Variable) {
-                $variables[] = $var;
-            }
-        }
-
-        return $variables;
-    }
-
-    public function trainableVariables() : array
-    {
-        return array_filter($this->variables(),fn($v)=>$v->isTrainable());
-    }
-
-    public function reverseSyncWeightVariables() : void
-    {
-    }
-
-    public function __invoke(...$inputs)
-    {
-        $outputs = $this->forward(...$inputs);
-        return $outputs;
-    }
-
-    public function forward(...$inputs)
-    {
-        $outputs = $this->call(...$inputs);
-        $this->built = true;
-        return $outputs;
-    }
-
-    public function _rawCall($inputs)
-    {
-        return $this->graph['model']->_rawCall($inputs);
-    }
-
-    public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
-    {
-        return $this->graph['model']->backward($dOutputs, $grads, $oidsToCollect);
-    }
-
-    protected function trainStep($inputs, $trues)
-    {
-        $K = $this->backend;
-        $nn = $this->builder;
-        $g = $nn->gradient();
-        if(!is_array($inputs)) {
-            $inputs = [$inputs];
-        }
-        $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
-        $inputs[] = $g->Variable(true);
-        $inputs[] = $g->Variable($trues);
-        $trues = $this->trueValuesFilter($trues);
-        $model = $this->getModelGraph();
-        $lossfunc = $this->lossFunction;
-        [$loss,$preds] = $nn->with($tape=$g->GradientTape(),
-            function() use ($K,$model,$lossfunc,$inputs,$trues) {
-                $predicts = $model(...$inputs);
-                return [$lossfunc($trues,$predicts),$predicts];
-            }
-        );
-        $lossValue = $K->scalar($loss->value());
-        if(is_nan($lossValue)) {
-            throw new UnexpectedValueException("loss is unexpected value");
-        }
-        $params = $this->trainableVariables();
-        $gradients = $tape->gradient($loss, $params);
-        $this->optimizer->update($params, $gradients);
-
-        if(in_array('accuracy',$this->metrics)) {
-            //$preds = $this->forwardLastlayer($preds);
-            $accuracy = $this->lossFunction->accuracy($trues,$preds->value());
-        } else {
-            $accuracy = 0;
-        }
-        return [$lossValue,$accuracy];
-    }
-
-    protected function evaluateStep($inputs,$trues)
-    {
-        $nn = $this->builder;
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        if(!is_array($inputs)) {
-            $inputs = [$inputs];
-        }
-        $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
-        $inputs[] = $g->Variable(false); // training
-        $inputs[] = $g->Variable($trues);
-
-        $trues = $this->trueValuesFilter($trues);
-        $model = $this->getModelGraph();
-        $lossfunc = $this->lossFunction;
-        $predicts = $model(...$inputs);
-        $loss = $lossfunc($trues,$predicts);
-        $loss = $K->scalar($loss->value());
-        $accuracy = $this->lossFunction->accuracy($trues,$predicts->value());
-        return [$loss,$accuracy];
-    }
-
-    protected function predictStep($inputs,$options)
-    {
-        $nn = $this->builder;
-        $g = $nn->gradient();
-        if(!is_array($inputs)) {
-            $inputs = [$inputs];
-        }
-        $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
-        $inputs[] = $g->Variable(false); // training
-        $inputs[] = $g->Variable(false); // trues
-        $model = $this->getModelGraph();
-        $predicts = $model(...$inputs);
-        return $predicts->value();
     }
 
     public function parameterVariables() : array
@@ -702,129 +697,151 @@ abstract class AbstractModel implements Model
         return [];
     }
 
-    public function build(...$inputShapes) : void
-    {
-        if($this->built) {
-            return;
-        }
-        $K = $this->backend;
-        $inputs = [];
-        foreach($inputShapes as $inputShape) {
-            if(is_array($inputShape)) {
-                $inputs[] = $K->zeros($inputShape);
-            } else {
-                $inputs[] = $inputShape;
-            }
-        }
-        $this->forward(...$inputs);
-    }
-
     public function summary()
     {
-        if(!$this->built) {
-            throw new LogicException('You need to build the model before you can see the summary.');
-        }
-        $this->display(
-            str_pad('Layer(type)',29).
+        echo str_pad('Layer(type)',29).
             str_pad('Output Shape',27).
-            str_pad('Param #',10).
-            "\n");
-        $this->display(str_repeat('=',29+27+10)."\n");
+            str_pad('Param #',10)."\n";
+        echo str_repeat('=',29+27+10)."\n";
         $totalParams = 0;
         foreach ($this->layers() as $layer) {
             $type = $this->basename($layer);
-            $this->display(substr(str_pad($layer->getName().'('.$type.')',29),0,29));
+            echo substr(str_pad($layer->getName().'('.$type.')',29),0,29);
             $outputShape = $layer->outputShape();
-            if(count($outputShape)>0 && is_array($outputShape[0])) {
+            if(is_array($outputShape[0])) {
                 $outputShape = $outputShape[0];
             }
-            $this->display(str_pad('('.implode(',',$outputShape).')',27));
+            echo str_pad('('.implode(',',$outputShape).')',27);
             $nump = 0;
             foreach($layer->getParams() as $p) {
                 $nump += $p->size();
             }
-            $this->display(str_pad($nump,10));
-            $this->display("\n");
+            echo str_pad($nump,10);
+            echo "\n";
             $totalParams += $nump;
         }
         $params = $this->parameterVariables();
         if(count($params)) {
-            $this->display(str_repeat('=',29+27+10)."\n");
-            $this->display(
-                str_pad('Weights',29).
+            echo str_repeat('=',29+27+10)."\n";
+            echo str_pad('Weights',29).
                 str_pad('Shape',27).
-                str_pad('Param #',10).
-                "\n");
-            $this->display(str_repeat('=',29+27+10)."\n");
+                str_pad('Param #',10)."\n";
+            echo str_repeat('=',29+27+10)."\n";
             foreach($params as $param) {
                 $name = $param->name();
                 if(!$name) {
                     $name = 'No name';
                 }
-                $this->display(str_pad($name,29));
-                $this->display(str_pad('('.implode(',',$param->shape()).')',27));
+                echo str_pad($name,29);
+                echo str_pad('('.implode(',',$param->shape()).')',27);
                 $nump = $param->size();
-                $this->display(str_pad($nump,10));
-                $this->display("\n");
+                echo str_pad($nump,10);
+                echo "\n";
                 $totalParams += $nump;
             }
         }
-        $this->display(str_repeat('=',29+27+10)."\n");
-        $this->display('Total params: '.$totalParams."\n");
+        echo str_repeat('=',29+27+10)."\n";
+        echo 'Total params: '.$totalParams."\n";
+    }
+
+    protected function generateLayersConfig() : array
+    {
+        $layerNames = [];
+        $layers = [];
+
+        foreach ($this->layers() as $layer) {
+            $name = $layer->getName();
+            $layerNames[] = $name;
+            $layers[$name] = [
+                'class'  => get_class($layer),
+                'config' => $layer->getConfig(),
+            ];
+        }
+        return [$layerNames,$layers];
     }
 
     public function saveWeights(&$modelWeights,$portable=null) : void
     {
         $K = $this->backend;
-        $modelWeights['weights'] = $modelWeights['weights'] ?? [];
-        foreach($this->variables() as $idx => $weights) {
-            $param = $weights->value();
+        if(!isset($modelWeights['layers']))
+            $modelWeights['layers'] = [];
+        foreach($this->params() as $idx => $param) {
             $param=$K->ndarray($param);
             if($portable)
                 $param = $this->converPortableSaveMode($param);
-            $modelWeights['weights'][$idx] = serialize($param);
+            $modelWeights['layers'][$idx] = serialize($param);
         }
-        $optimizerWeights = $this->optimizer()->getWeights();
-        $modelWeights['optimizerNumWeight'] = count($optimizerWeights);
-        $modelWeights['optimizer'] = $modelWeights['optimizer'] ?? [];
-        foreach ($optimizerWeights as $idx => $weights) {
+        $optimizer = $this->optimizer();
+        if(!isset($modelWeights['optimizer']))
+            $modelWeights['optimizer'] = [];
+        foreach ($optimizer->getWeights() as $idx => $weights) {
             $weights=$K->ndarray($weights);
             $modelWeights['optimizer'][$idx] = serialize($weights);
         }
     }
-    
-    public function loadWeights($modelWeights) : void
+/*
+    public function saveWeights(&$modelWeights,$portable=null) : void
     {
         $K = $this->backend;
-        $nn = $this->builder;
-        $g = $nn->gradient();
-        $model = $this;
-        $lossfunc = $this->lossFunction;
-        foreach($this->variables() as $idx => $weights) {
-            $data = unserialize($modelWeights['weights'][$idx]);
-            $data = $K->array($data);
-            $weights->assign($K->copy($data));
-        }
-        $stack = [$this];
-        while($module=array_pop($stack)) {
-            $module->reverseSyncWeightVariables();
-            foreach($module->submodules() as $m) {
-                array_push($stack,$m);
+        if(!isset($modelWeights['layers']))
+            $modelWeights['layers'] = [];
+        foreach($this->layers() as $layer) {
+            if(!isset($modelWeights['layers'][$layer->getName()]))
+                $modelWeights['layers'][$layer->getName()] = [];
+            foreach($layer->getParams() as $idx => $param) {
+                $param=$K->ndarray($param);
+                if($portable)
+                    $param = $this->converPortableSaveMode($param);
+                $modelWeights['layers'][$layer->getName()][$idx] = serialize($param);
             }
         }
         $optimizer = $this->optimizer();
-        //$optimizer->build($this->params());
-        $optimizerNumWeight = $modelWeights['optimizerNumWeight'];
-        $params = [];
-        for($idx=0;$idx<$optimizerNumWeight;$idx++) {
+        if(!isset($modelWeights['optimizer']))
+            $modelWeights['optimizer'] = [];
+        foreach ($optimizer->getWeights() as $idx => $weights) {
+            $weights=$K->ndarray($weights);
+            $modelWeights['optimizer'][$idx] = serialize($weights);
+        }
+    }
+*/
+
+    public function loadWeights($modelWeights) : void
+    {
+        $K = $this->backend;
+        foreach($this->params() as $idx => $param) {
+            $data = unserialize($modelWeights['layers'][$idx]);
+            $data = $K->array($data);
+            $K->copy($data,$param);
+        }
+        $optimizer = $this->optimizer();
+        $optimizer->build($this->params());
+        foreach ($optimizer->getWeights() as $idx => $weights) {
             $data = unserialize($modelWeights['optimizer'][$idx]);
             $data = $K->array($data);
-            //$K->copy($data,$weights);
-            $params[] = $data;
+            $K->copy($data,$weights);
         }
-        $optimizer->loadWeights($params);
     }
-
+/*
+    public function loadWeights($modelWeights) : void
+    {
+        $K = $this->backend;
+        foreach($this->layers() as $layer) {
+            $weights = $modelWeights['layers'][$layer->getName()];
+            foreach($layer->getParams() as $idx => $param) {
+                $data = unserialize($weights[$idx]);
+                $data = $K->array($data);
+                $K->copy($data,$param);
+            }
+        }
+        $optimizer = $this->optimizer();
+        $optimizer->build($this->params());
+        foreach ($optimizer->getWeights() as $idx => $weights) {
+            $data = unserialize($modelWeights['optimizer'][$idx]);
+            $data = $K->array($data);
+            $K->copy($data,$weights);
+        }
+    }
+*/
     protected function converPortableSaveMode($ndarray) : NDArray
     {
         if($ndarray instanceof \Rindow\Math\Matrix\NDArrayPhp) {
@@ -845,26 +862,5 @@ abstract class AbstractModel implements Model
     {
         $f = $this->hda->open($filepath,'r');
         $this->loadWeights($f['modelWeights']);
-    }
-
-    public function __clone()
-    {
-        $props = get_object_vars($this);
-        foreach ($props as $name => $value) {
-            if($value instanceof Layer) {
-                $this->$name = clone $value;
-            } elseif($value instanceof Model) {
-                $this->$name = clone $value;
-            }
-        }
-        $this->built = false;
-        //$this->params = [];
-        //$this->grads = [];
-        $this->pipeline = [];
-        $this->layers = [];
-        $this->outputsVariables = null;
-        $this->optimizer = null;
-        $this->lossFunction = null;
-        $this->metrics = null;
     }
 }

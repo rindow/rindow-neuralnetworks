@@ -1,25 +1,21 @@
 <?php
 namespace RindowTest\NeuralNetworks\Layer\GRUCellTest;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
-use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\GRUCell;
+use InvalidArgumentException;
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Activation\Tanh;
 
 class Test extends TestCase
 {
-    public function newMatrixOperator()
+    public function newBackend($mo)
     {
-        return new MatrixOperator();
-    }
-
-    public function newNeuralNetworks($mo)
-    {
-        return new NeuralNetworks($mo);
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
     }
 
     public function verifyGradient($mo, $K, $function, NDArray $x,array $states)
@@ -42,17 +38,16 @@ class Test extends TestCase
 
     public function testDefaultInitialize()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3]
-            );
+            [
+                'input_shape'=>[3]
+            ]);
 
-        $layer->build([3]);
+        $layer->build();
         $params = $layer->getParams();
         $this->assertCount(3,$params);
         $this->assertEquals([3,12],$params[0]->shape());
@@ -64,9 +59,6 @@ class Test extends TestCase
         $this->assertEquals([3,12],$grads[0]->shape());
         $this->assertEquals([4,12],$grads[1]->shape());
         $this->assertEquals([2,12],$grads[2]->shape());
-        $this->assertInstanceOf(
-            Tanh::class, $layer->getActivation()
-        );
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([4],$layer->outputShape());
@@ -74,18 +66,17 @@ class Test extends TestCase
 
     public function testInitializeWithoutResetAfter()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3],
-            reset_after:false,
-            );
+            [
+                'input_shape'=>[3],
+                'reset_after'=>false,
+            ]);
 
-        $layer->build([3]);
+        $layer->build();
         $params = $layer->getParams();
         $this->assertCount(3,$params);
         $this->assertEquals([3,12],$params[0]->shape());
@@ -102,54 +93,50 @@ class Test extends TestCase
         $this->assertEquals([4],$layer->outputShape());
     }
 
+    public function testNotspecifiedInputShape()
+    {
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
+        $layer = new GRUCell(
+            $backend,
+            $units=4,
+            [
+            ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Input shape is not defined');
+        $layer->build();
+    }
+
     public function testSetInputShape()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $mo = new MatrixOperator();
+        $backend = $this->newBackend($mo);
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=4,
-            );
+            [
+            ]);
         $layer->build($inputShape=[3]);
 
         //$this->assertEquals([3],$layer->inputShape());
         $this->assertEquals([4],$layer->outputShape());
     }
 
-    public function testUnmatchSpecifiedInputShape()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $layer = new GRUCell(
-            $K,
-            $units=4,
-            input_shape:[3],
-            );
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [3] but [4] given in GRUCell');
-        $layer->build([4]);
-    }
-
     public function testNormalForwardAndBackward()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3]
-            );
+            [
+                'input_shape'=>[3]
+            ]);
 
-        $layer->build([3]);
+        $layer->build();
         $grads = $layer->getGrads();
 
 
@@ -161,7 +148,8 @@ class Test extends TestCase
         $states = [$K->ones([2,4])];
         $object = new \stdClass();
         $copyInputs = $K->copy($inputs);
-        $copyStates = [$K->copy($states[0])];
+        $copyStates = [
+            $K->copy($states[0])];
         [$outputs,$nextStates] = $layer->forward($inputs, $states,$training=true,$object);
         //
         $this->assertEquals([2,4],$outputs->shape());
@@ -181,7 +169,8 @@ class Test extends TestCase
 
         $copydOutputs = $K->copy(
             $dOutputs);
-        $copydStates = [$K->copy($dStates[0])];
+        $copydStates = [
+            $K->copy($dStates[0])];
         [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates,$object);
         // 2 batch
         $this->assertEquals([2,3],$dInputs->shape());
@@ -203,25 +192,24 @@ class Test extends TestCase
 
     public function testOutputsAndGradsWithResetAfter()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3],
-            activation:'linear',
-            recurrent_activation:'linear',
-            );
+            [
+                'input_shape'=>[3],
+                'activation'=>null,
+                'recurrent_activation'=>null,
+            ]);
 
         $kernel = $K->ones([3,4*3]);
         $recurrent = $K->ones([4,4*3]);
         $bias = $K->ones([2,4*3]);
-        $layer->build([3],
-            sampleWeights:[$kernel,$recurrent,$bias]
+        $layer->build(null,
+            ['sampleWeights'=>[$kernel,$recurrent,$bias]]
         );
         $this->assertNull($layer->getActivation());
         $grads = $layer->getGrads();
@@ -300,26 +288,25 @@ class Test extends TestCase
 
     public function testOutputsAndGradsWithoutResetAfter()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=4,
-            input_shape:[3],
-            activation:'linear',
-            recurrent_activation:'linear',
-            reset_after:false,
-            );
+            [
+                'input_shape'=>[3],
+                'activation'=>null,
+                'recurrent_activation'=>null,
+                'reset_after'=>false,
+            ]);
 
         $kernel = $K->ones([3,4*3]);
         $recurrent = $K->ones([4*3,4]);
         $bias = $K->ones([4*3]);
-        $layer->build([3],
-            sampleWeights:[$kernel,$recurrent,$bias]
+        $layer->build(null,
+            ['sampleWeights'=>[$kernel,$recurrent,$bias]]
         );
         $this->assertNull($layer->getActivation());
         $grads = $layer->getGrads();
@@ -395,19 +382,18 @@ class Test extends TestCase
 
     public function testVerifyGradientResetAfter()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=3,
-            input_shape:[10],
-            #activation:'linear',
-            );
-        $layer->build([10]);
+            [
+                'input_shape'=>[10],
+                #'activation'=>null,
+            ]);
+        $layer->build();
         $weights = $layer->getParams();
 
         $x = $K->array([
@@ -424,20 +410,19 @@ class Test extends TestCase
 
     public function testVerifyGradientWithoutResetAfter()
     {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-        $fn = $K;
+        $mo = new MatrixOperator();
+        $K = $backend = $this->newBackend($mo);
+        $fn = $backend;
 
         $layer = new GRUCell(
-            $K,
+            $backend,
             $units=3,
-            input_shape:[10],
-            #activation:'linear',
-            reset_after:false,
-            );
-        $layer->build([10]);
+            [
+                'input_shape'=>[10],
+                #'activation'=>null,
+                'reset_after'=>false,
+            ]);
+        $layer->build();
         $weights = $layer->getParams();
 
         $x = $K->array([

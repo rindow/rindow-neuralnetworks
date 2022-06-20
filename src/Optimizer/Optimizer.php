@@ -13,6 +13,5 @@ interface Optimizer
     public function build(array $params) : void;
     public function update(array $params, array $grads) : void;
     public function getWeights() : array;
-    public function loadWeights(array $params) : void;
     public function getConfig() : array;
 }

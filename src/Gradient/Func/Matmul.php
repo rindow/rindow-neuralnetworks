@@ -2,23 +2,22 @@
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
+use Rindow\NeuralNetworks\Support\GenericUtils;
 
 class Matmul extends AbstractFunction
 {
+    use GenericUtils;
     protected $numOfInputs = 2;
     protected $transA;
     protected $transB;
 
-    public function __construct(
-        object $backend,
-        bool $transpose_a=null,
-        bool $transpose_b=null,
-    )
+    public function __construct($backend, array $options=null)
     {
-        $transpose_a = $transpose_a ?? false;
-        $transpose_b = $transpose_b ?? false;
-
-        parent::__construct($backend);
+        extract($this->extractArgs([
+            'transpose_a'=>false,
+            'transpose_b'=>false,
+        ],$options));
+        parent::__construct($backend, $options);
         $this->transA = $transpose_a;
         $this->transB = $transpose_b;
     }
@@ -26,8 +25,6 @@ class Matmul extends AbstractFunction
     protected function call(array $inputs) : array
     {
         $K = $this->backend;
-        $container = $this->container();
-        $container->inputs = $inputs;
         [$x0, $x1] = $inputs;
         $outputs = $K->matmul($x0,$x1,$this->transA,$this->transB);
         return [$outputs];
@@ -36,10 +33,10 @@ class Matmul extends AbstractFunction
     protected function differentiate(array $dOutputs) : array
     {
         $K = $this->backend;
-        $container = $this->container();
-        [$x0, $x1] = $container->inputs;
+        $inputs = $this->inputsVariables;
+        [$x0, $x1] = $inputs;
 
-        $dx0 = $K->matmul($dOutputs[0], $x1,$this->transB,!$this->transB);
+        $dx0 = $K->matmul($dOutputs[0], $x1->value(),$this->transB,!$this->transB);
         if($this->transA) {
             if($dx0->ndim()<3) {
                 $dx0 = $K->transpose($dx0);
@@ -47,7 +44,7 @@ class Matmul extends AbstractFunction
                 $dx0 = $K->batch_transpose($dx0);
             }
         }
-        $dx1 = $K->matmul($x0, $dOutputs[0],!$this->transA,$this->transA);
+        $dx1 = $K->matmul($x0->value(), $dOutputs[0],!$this->transA,$this->transA);
         if($this->transB) {
             if($dx1->ndim()<3) {
                 $dx1 = $K->transpose($dx1);

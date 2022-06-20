@@ -1,44 +1,27 @@
 <?php
 namespace Rindow\NeuralNetworks\Gradient\Core;
 
-use WeakReference;
-use Interop\Polite\Math\Matrix\NDArray;
-
 class VariableReference
 {
-    //protected $oid;
-    protected $ref;
+    protected $oid;
     protected $shape;
     protected $dtype;
 
     public function __construct(Variable $variable)
     {
-        //$this->oid = spl_object_id($variable);
-        $this->ref = WeakReference::create($variable);
+        $this->oid = spl_object_hash($variable);
         $value = $variable->value();
-        if($value instanceof NDArray) {
+        if($value!==null &&
+           !($value instanceof UndeterminedNDArray &&
+             $value->isNull())) {
             $this->shape = $value->shape();
             $this->dtype = $value->dtype();
         }
     }
 
-    //public function oid()
-    //{
-    //    return $this->oid;
-    //}
-
-    public function ref()
+    public function oid()
     {
-        return $this->ref;
-    }
-    public function get()
-    {
-        return $this->ref->get();
-    }
-
-    public function _setShape(array $shape) : void
-    {
-        $this->shape = $shape;
+        return $this->oid;
     }
 
     public function shape()

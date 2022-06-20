@@ -10,6 +10,8 @@ use Rindow\NeuralNetworks\Activation\Softmax;
 use Rindow\NeuralNetworks\Activation\Tanh;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Rindow\NeuralNetworks\Gradient\Core\Undetermined;
+use Rindow\NeuralNetworks\Gradient\Core\UndeterminedNDArray;
 
 class Test extends TestCase
 {
@@ -18,16 +20,23 @@ class Test extends TestCase
         return new MatrixOperator();
     }
 
-    public function newNeuralNetworks($mo)
+    public function newBackend($mo)
     {
-        return new NeuralNetworks($mo);
+        $builder = new NeuralNetworks($mo);
+        return $builder->backend();
+    }
+
+    public function newInputShape($inputShape)
+    {
+        array_unshift($inputShape,1);
+        $variable = new Undetermined(new UndeterminedNDArray($inputShape));
+        return $variable;
     }
 
     public function testResolveFunctions()
     {
         $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
+        $K = $this->newBackend($mo);
         $activation = new Activation($K,'tanh');
         $this->assertInstanceOf(Tanh::class,$activation->getActivation());
         $activation = new Activation($K,'relu');
@@ -60,12 +69,9 @@ class Test extends TestCase
     public function testNormalwithReLU()
     {
         $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
+        $K = $this->newBackend($mo);
         $layer = new Activation($K,'relu');
-        $inputs = $g->Variable($K->zeros([1,5]));
-        $layer->build($inputs);
+        $layer->build($this->newInputShape([5]));
 
         $inputs = $mo->array([
             [-1.0,-0.5,0.0,0.5,1.0],
@@ -75,13 +81,8 @@ class Test extends TestCase
         ]);
         $copyInputs = $mo->copy($inputs);
         $inputs = $K->array($inputs);
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
-                return $outputsVariable;
-            }
-        );
-        $outputs = $K->ndarray($outputsVariable);
+        $outputs = $layer->forward($inputs, $training=true);
+        $outputs = $K->ndarray($outputs);
         $inputs = $K->ndarray($inputs);
         $this->assertEquals([4,5],$outputs->shape());
         $this->assertEquals(
@@ -99,7 +100,7 @@ class Test extends TestCase
         ]);
         $copydOutputs = $mo->copy($dOutputs);
         $dOutputs = $K->array($dOutputs);
-        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
+        [$dInputs] = $layer->backward([$dOutputs]);
         $dInputs = $K->ndarray($dInputs);
         $dOutputs = $K->ndarray($dOutputs);
         $this->assertEquals([4,5],$dInputs->shape());

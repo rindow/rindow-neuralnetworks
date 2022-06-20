@@ -3,66 +3,54 @@ namespace Rindow\NeuralNetworks\Data\Sequence;
 
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
+use Rindow\NeuralNetworks\Support\GenericUtils;
 use InvalidArgumentException;
 
 class TextFilter implements DatasetFilter
 {
+    use GenericUtils;
     protected $mo;
     protected $labels = [];
     protected $labelNum = 0;
 
     public function __construct(
-        object $mo,
-        object $tokenizer=null,
-        array $classnames=null,
-        callable $analyzer=null,
-        int $num_words=null,
-        string $tokenizer_filters=null,
-        string $specials=null,
-        bool $lower=null,
-        string $split=null,
-        bool $char_level=null,
-        string $oov_token=null,
-        int $document_count=null,
-        object $preprocessor=null,
-        int $maxlen=null,
-        int $dtype=null,
-        string $padding=null,
-        string $truncating=null,
-        float|int|bool $value=null,
-    )
+        $mo,
+        array $options=null,
+        array &$leftargs=null
+        )
     {
-        $tokenizer = $tokenizer ?? null;
-        $classnames = $classnames ?? [];
-        $analyzer = $analyzer ?? null;
-        $num_words = $num_words ?? null;
-        $tokenizer_filters = $tokenizer_filters ?? "!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n\r";
-        $specials = $specials ?? null;
-        $lower = $lower ?? true;
-        $split = $split ?? " ";
-        $char_level = $char_level ?? false;
-        $oov_token = $oov_token ?? null;
-        $document_count = $document_count ?? 0;
-        $preprocessor = $preprocessor ?? null;
-        $maxlen = $maxlen ?? null;
-        $dtype = $dtype ?? NDArray::int32;
-        $padding = $padding ?? "post";
-        $truncating = $truncating ?? "post";
-        $value = $value ?? 0;
-
+        extract($this->extractArgs([
+            'tokenizer'=>null,
+            'classnames'=>[],
+            'analyzer'=>null,
+            'num_words'=>null,
+            'tokenizer_filters'=>"!\"\'#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n\r",
+            'specials'=>null,
+            'lower'=>true,
+            'split'=>" ",
+            'char_level'=>false,
+            'oov_token'=>null,
+            'document_count'=>0,
+            'preprocessor'=>null,
+            'maxlen'=>null,
+            'dtype'=>NDArray::int32,
+            'padding'=>"post",
+            'truncating'=>"post",
+            'value'=>0,
+        ],$options,$leftargs));
         $this->mo = $mo;
         if($tokenizer==null) {
-            $tokenizer = new Tokenizer($mo,
-                analyzer: $analyzer,
-                num_words: $num_words,
-                filters: $tokenizer_filters,
-                specials: $specials,
-                lower: $lower,
-                split: $split,
-                char_level: $char_level,
-                oov_token: $oov_token,
-                document_count: $document_count,
-            );
+            $tokenizer = new Tokenizer($mo,[
+                'analyzer'=>$analyzer,
+                'num_words'=>$num_words,
+                'filters'=>$tokenizer_filters,
+                'specials'=>$specials,
+                'lower'=>$lower,
+                'split'=>$split,
+                'char_level'=>$char_level,
+                'oov_token'=>$oov_token,
+                'document_count'=>$document_count,
+            ]);
         }
         $this->tokenizer = $tokenizer;
         if($preprocessor==null) {
@@ -127,13 +115,14 @@ class TextFilter implements DatasetFilter
     {
         //$this->tokenizer->fitOnTexts($inputs);
         $sequences = $this->tokenizer->textsToSequences($inputs);
-        $inputsArray = $this->preprocessor->padSequences($sequences,
-            maxlen: $this->maxlen,
-            dtype: $this->dtype,
-            padding: $this->padding,
-            truncating: $this->truncating,
-            value: $this->value,
-        );
+        $inputsArray = $this->preprocessor->padSequences($sequences,[
+            'maxlen'=>$this->maxlen,
+            'dtype'=>$this->dtype,
+            'padding'=>$this->padding,
+            'truncating'=>$this->truncating,
+            'value'=>$this->value,
+        ]);
+        //var_dump($inputsArray->toArray());
 
         $testsCount = count($tests);
         $testsArray = $this->mo->la()->alloc([$testsCount],$this->dtype);
