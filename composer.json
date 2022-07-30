@@ -6,8 +6,7 @@
     "license": "BSD-3-Clause",
     "require": {
         "php": "^8.0|^8.1",
-        "rindow/rindow-math-matrix": "~1.2.0",
-        "phpunit/phpunit": "8.5.*"
+        "rindow/rindow-math-matrix": "~1.2.0"
     },
     "require-dev": {
         "rindow/rindow-math-plot": "~1.0.6",
