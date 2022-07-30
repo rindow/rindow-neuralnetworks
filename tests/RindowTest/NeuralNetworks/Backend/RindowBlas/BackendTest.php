@@ -233,10 +233,11 @@ class Test extends TestCase
     public function testSqrt()
     {
         $mo = $this->newMatrixOperator();
+        $la = $mo->la();
         $K = $this->newBackend($mo);
         $x = $K->array([4,9]);
         $z = $K->sqrt($x); $K->finish();
-        $this->assertEquals([2,3],$z->toArray());
+        $this->assertTrue($la->isclose($la->array([2,3]),$K->ndarray($z)));
     }
 
     public function testAbs()
@@ -402,6 +403,8 @@ class Test extends TestCase
         $x = $K->array([[2,3],[1,2]]);
         $z = $K->mean($x,$axis=1); $K->finish();
         $this->assertEquals([2.5,1.5],$z->toArray());
+        $z = $K->mean($x); $K->finish();
+        $this->assertLessThan(1e-5,abs(((2+3+1+2)/4)-$z));
     }
 
     public function testOneHot()

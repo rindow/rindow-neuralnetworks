@@ -38,7 +38,7 @@ class Backend
             } elseif($options=='CPU') {
                 $options = ['deviceType' => OpenCL::CL_DEVICE_TYPE_CPU];
             } else {
-                $options = null;
+                $options = ['device' => $options];
             }
         }
         $this->la = $matrixOperator->laAccelerated('clblast',$options);
@@ -593,7 +593,7 @@ class Backend
     public function mean(NDArray $x,int $axis=null, NDArray $r=null)
     {
         if($axis===null) {
-            return $this->la->sum($x) / $x->size();
+            return $this->la->scalar($this->la->sum($x)) / $x->size();
         } else {
             return $this->la->reduceMean($x,$axis,$r);
         }
