@@ -37,8 +37,10 @@ class Backend
                 $options = ['deviceType' => OpenCL::CL_DEVICE_TYPE_GPU];
             } elseif($options=='CPU') {
                 $options = ['deviceType' => OpenCL::CL_DEVICE_TYPE_CPU];
-            } else {
+            } elseif($options!=='') {
                 $options = ['device' => $options];
+            } else {
+                $options = null;
             }
         }
         $this->la = $matrixOperator->laAccelerated('clblast',$options);
@@ -53,6 +55,11 @@ class Backend
     public function localLA()
     {
         return $this->matrixOperator->laRawMode();
+    }
+
+    public function context()
+    {
+        return $this->la->getContext();
     }
 
     public function finish()

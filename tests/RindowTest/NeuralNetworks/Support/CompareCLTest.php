@@ -375,7 +375,7 @@ class Test extends TestCase
             //    echo "w=".$mo->toString($w,'%5.3e')."\n";
             //    echo "wcl=".$mo->toString($backendCL->ndarray($wcl),'%5.3e')."\n";
             //}
-            $this->assertLessThan(1e-3,$backend->scalar($backend->amax($diff)));
+            $this->assertLessThan(1e-5,$backend->scalar($backend->amax($diff)));
         }
     }
 
