@@ -31,7 +31,7 @@ if(isset($argv[3])&&$argv[3]) {
 $inputShape = [28,28,1];
 $class_names = [0,1,2,3,4,5,6,7,8,9];
 
-echo "dataset=${dataset}\n";
+echo "dataset={$dataset}\n";
 echo "train=[".implode(',',$train_img->shape())."]\n";
 echo "test=[".implode(',',$test_img->shape())."]\n";
 
@@ -66,6 +66,8 @@ $test_label = $mo->la()->astype($test_label,NDArray::int32);
 use Rindow\NeuralNetworks\Model\AbstractModel;
 class ImageClassification extends AbstractModel
 {
+    protected $dense1;
+    protected $dense2;
     public function __construct(
         $backend,
         $builder
@@ -96,7 +98,7 @@ $model->compile(
 $model->build([1,(int)(28*28*1)],true); // This is only needed for summary
 $model->summary();
 
-$modelFilePath = __DIR__."/basic-image-classification-custom-${dataset}.model";
+$modelFilePath = __DIR__."/basic-image-classification-custom-{$dataset}.model";
 
 if(file_exists($modelFilePath)) {
     echo "loading model ...\n";

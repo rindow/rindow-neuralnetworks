@@ -231,7 +231,7 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
         $elapsed = time() - $startTime;
         if($total) {
             $completion = $done/$total;
-            $estimated = $elapsed / $completion;
+            $estimated = (int)floor($elapsed / $completion);
             $remaining = $estimated - $elapsed;
             $dot = (int)ceil($maxDot*$completion);
             $sec = $remaining % 60;

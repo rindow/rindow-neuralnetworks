@@ -17,6 +17,10 @@ class EngFraDataset
 {
     protected $baseUrl = 'http://www.manythings.org/anki/';
     protected $downloadFile = 'fra-eng.zip';
+    protected $mo;
+    protected $datasetDir;
+    protected $saveFile;
+    protected $preprocessor;
 
     public function __construct($mo,$inputTokenizer=null,$targetTokenizer=null)
     {
@@ -155,6 +159,13 @@ class EngFraDataset
 
 class Encoder extends AbstractModel
 {
+    protected $backend;
+    protected $vocabSize;
+    protected $wordVectSize;
+    protected $units;
+    protected $embedding;
+    protected $rnn;
+
     public function __construct(
         $backend,
         $builder,
@@ -200,6 +211,7 @@ class Decoder extends AbstractModel
     protected $vocabSize;
     protected $wordVectSize;
     protected $units;
+    protected $inputLength;
     protected $targetLength;
     protected $embedding;
     protected $rnn;
@@ -272,6 +284,18 @@ class Decoder extends AbstractModel
 
 class Seq2seq extends AbstractModel
 {
+    protected $encoder;
+    protected $decoder;
+    protected $out;
+    protected $mo;
+    protected $backend;
+    protected $startVocId;
+    protected $endVocId;
+    protected $inputLength;
+    protected $outputLength;
+    protected $units;
+    protected $plt;
+
     public function __construct(
         $mo,
         $backend,

@@ -19,6 +19,16 @@ $BATCH_SIZE = 8;
 
 class NumAdditionDataset
 {
+    protected $mo;
+    protected $corpus_max;
+    protected $digits;
+    protected $vocab_input;
+    protected $vocab_target;
+    protected $dict_input;
+    protected $dict_target;
+    protected $input_length;
+    protected $output_length;
+    
     public function __construct($mo,int $corpus_max,int $digits)
     {
         $this->mo = $mo;

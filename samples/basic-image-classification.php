@@ -55,7 +55,7 @@ switch($dataset) {
         exit(1);
     }
 }
-echo "dataset=${dataset}\n";
+echo "dataset={$dataset}\n";
 echo "train=[".implode(',',$train_img->shape())."]\n";
 echo "test=[".implode(',',$test_img->shape())."]\n";
 
@@ -98,7 +98,7 @@ echo "formating test images ...\n";
 $test_img  = formatingImage($mo,$test_img);
 $test_label = $mo->la()->astype($test_label,NDArray::int32);
 
-$modelFilePath = __DIR__."/basic-image-classification-${dataset}.model";
+$modelFilePath = __DIR__."/basic-image-classification-{$dataset}.model";
 
 if(file_exists($modelFilePath)) {
     echo "loading model ...\n";
