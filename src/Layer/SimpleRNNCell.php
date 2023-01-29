@@ -11,7 +11,11 @@ class SimpleRNNCell extends AbstractRNNCell
     protected $activation;
     protected $useBias;
     protected $kernelInitializer;
+    protected $recurrentInitializer;
     protected $biasInitializer;
+    protected $kernelInitializerName;
+    protected $recurrentInitializerName;
+    protected $biasInitializerName;
 
     protected $kernel;
     protected $recurrentKernel;

@@ -9,6 +9,7 @@ abstract class AbstractActivation implements Activation
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     protected $states;
+    protected $backend;
     public function __construct(object $backend)
     {
         $this->backend = $backend;

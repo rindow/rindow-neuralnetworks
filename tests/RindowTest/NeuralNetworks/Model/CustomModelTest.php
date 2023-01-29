@@ -61,6 +61,7 @@ class TestModel extends AbstractModel
 
 class TestSubModel extends AbstractModel
 {
+    protected $fc;
     public function __construct($backend,$builder)
     {
         $this->backend = $backend;
@@ -94,6 +95,10 @@ class TestRNNModel extends AbstractModel
     protected $rnn0;
     protected $embed1;
     protected $rnn1;
+    protected $attention;
+    protected $concat;
+    protected $dense;
+    protected $activation;
 
     public function __construct($backend,$builder)
     {
@@ -164,6 +169,10 @@ class TestRNNModel extends AbstractModel
 
 class TestMultiInputModel extends AbstractModel
 {
+    protected $inp1;
+    protected $inp2;
+    protected $concat;
+    protected $fc;
     public function __construct($backend,$builder)
     {
         parent::__construct(
@@ -194,6 +203,7 @@ class TestMultiInputModel extends AbstractModel
 
 class Test extends TestCase
 {
+    protected $filename;
     public function setUp() : void
     {
         $this->filename = __DIR__.'/../../../tmp/savedmodel.hda.sqlite3';

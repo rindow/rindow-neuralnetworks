@@ -1,5 +1,5 @@
 <?php
-namespace RindowTest\NeuralNetworks\Gradient\Core\GradientTapeTest;
+namespace RindowTest\NeuralNetworks\Gradient\Core\StopGradientTest;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -79,9 +79,10 @@ class AbstractTestFunction extends AbstractFunction
             $dOutputs,function($c,$v) {
                 return array_merge(
                     $c,
-                    (property_exists($v,'_debug_name')?[$v->_debug_name]:[
-                        $this->checkGetValueType($v)
-                    ]));
+                    (property_exists($v,'_debug_name')?
+                        [$v->_debug_name]:[$this->checkGetValueType($v)]
+                    )
+                );
             },[]);
         $this->logger->log('diff '.$this->name.'('.implode(',',$args).') gen='.$this->generation);
         $K = $this->backend;
@@ -194,7 +195,7 @@ class Test extends TestCase
         return new NeuralNetworks($mo);
     }
 
-    public function testPureTreeNetwork()
+    public function testSinglePath()
     {
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
@@ -203,6 +204,14 @@ class Test extends TestCase
         $logger = new Logger();
         $b = new TestBuilder($nn->backend(),$logger);
 
+        //
+        // x0 - F1 --------- F3 - y
+        //    /            /
+        // x1             /
+        // x2 - F2 - stop
+        //    /
+        // x3
+        //
         $x0 = $g->Variable($mo->array(0.5),name:'x0');
         $x1 = $g->Variable($mo->array(0.5),name:'x1');
         $x2 = $g->Variable($mo->array(0.5),name:'x2');
@@ -210,20 +219,60 @@ class Test extends TestCase
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$b,$x0,$x1,$x2,$x3){
                 $y = $b->twoInOneOut(
-                    $b->twoInOneOut(
-                        $b->twoInOneOut($x0,$x1,name:'F1'),
-                        $x2, name:'F2'),
-                    $x3, name:'F3');
+                    $b->twoInOneOut($x0,$x1,name:'F1'),
+                    $g->stopGradient($b->twoInOneOut($x2,$x3,name:'F2')),
+                name:'F3');
                 return $y;
             }
         );
 
-        $gradients = $tape->gradient($y,$x3);
+        $gradients = $tape->gradient($y,$x0);
+        // N = NDArray, U = Undetermined
+        $this->assertEquals([
+            'call F1(x0,x1)',
+            'call F2(x2,x3)',
+            'call F3(Out0@F1,)',
+            'diff F3(N) gen=2',
+            'diff F1(dIn0@F3) gen=0',
+        ],$logger->getLog());
+        $this->assertTrue(true);
+    }
+
+    public function testForkedInput()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $logger = new Logger();
+        $b = new TestBuilder($nn->backend(),$logger);
+
+        //
+        // x0 - F1 --------- F2 ---- F3 - y
+        //    /  \         /       /
+        // x1     \     x2        /
+        //         stop ---------
+        //
+        $x0 = $g->Variable($mo->array(0.5),name:'x0');
+        $x1 = $g->Variable($mo->array(0.5),name:'x1');
+        $x2 = $g->Variable($mo->array(0.5),name:'x2');
+        $y = $nn->with($tape=$g->GradientTape(),
+            function() use ($g,$b,$x0,$x1,$x2){
+                $a = $b->twoInOneOut($x0,$x1,name:'F1');
+                $y = $b->twoInOneOut(
+                    $b->twoInOneOut($a,$x2,name:'F2'),
+                    $g->stopGradient($a),
+                name:'F3');
+                return $y;
+            }
+        );
+
+        $gradients = $tape->gradient($y,$x0);
         // N = NDArray, U = Undetermined
         $this->assertEquals([
             'call F1(x0,x1)',
             'call F2(Out0@F1,x2)',
-            'call F3(Out0@F2,x3)',
+            'call F3(Out0@F2,)',
             'diff F3(N) gen=2',
             'diff F2(dIn0@F3) gen=1',
             'diff F1(dIn0@F2) gen=0',
@@ -231,132 +280,5 @@ class Test extends TestCase
         $this->assertTrue(true);
     }
 
-    public function testBroadcastNetwork1()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $g = $nn->gradient();
-        $logger = new Logger();
-        $b = new TestBuilder($nn->backend(),$logger);
 
-        $x0 = $g->Variable($mo->array(0.5),name:'x0');
-        $y = $nn->with($tape=$g->GradientTape(),
-            function() use ($g,$b,$x0){
-                $y = $b->twoInOneOut(
-                    $b->twoInOneOut(
-                        $b->twoInOneOut($x0,$x0,name:'F1'),
-                        $x0,name:'F2'),
-                    $x0, name:'F3');
-                return $y;
-            }
-        );
-
-        $gradients = $tape->gradient($y,$x0);
-        // N = NDArray, U = Undetermined
-        $this->assertEquals([
-            'call F1(x0,x0)',
-            'call F2(Out0@F1,x0)',
-            'call F3(Out0@F2,x0)',
-            'diff F3(N) gen=2',
-            'diff F2(dIn0@F3) gen=1',
-            'diff F1(dIn0@F2) gen=0',
-        ],$logger->getLog());
-        $this->assertTrue(true);
-    }
-
-    public function testBroadcastOutputs()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $g = $nn->gradient();
-        $logger = new Logger();
-        $b = new TestBuilder($nn->backend(),$logger);
-
-        $x0 = $g->Variable($mo->array(0.5),name:'x0');
-        $y = $nn->with($tape=$g->GradientTape(),
-            function() use ($g,$b,$x0){
-                $y0 = $b->twoInOneOut($x0,$x0,name:'F1');
-                $y1 = $b->twoInOneOut($x0,$y0,name:'F2');
-                $y = $b->twoInOneOut($y0,$y1,name:'F3');
-                return $y;
-            }
-        );
-
-        $gradients = $tape->gradient($y,$x0);
-        // N = NDArray, U = Undetermined
-        $this->assertEquals([
-            'call F1(x0,x0)',
-            'call F2(x0,Out0@F1)',
-            'call F3(Out0@F1,Out0@F2)',
-            'diff F3(N) gen=2',
-            'diff F2(dIn1@F3) gen=1',
-            'diff F1(N) gen=0', // <=  Add dIn0@F3,dIn1@F2
-        ],$logger->getLog());
-        $this->assertTrue(true);
-    }
-
-    public function testForkNetwork()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $g = $nn->gradient();
-        $logger = new Logger();
-        $b = new TestBuilder($nn->backend(),$logger);
-
-        $x0 = $g->Variable($mo->array(0.5),name:'x0');
-        $x1 = $g->Variable($mo->array(0.5),name:'x1');
-        $y = $nn->with($tape=$g->GradientTape(),
-            function() use ($g,$b,$x0,$x1){
-                $y0 = $b->twoInOneOut($x0,$x1,name:'F1');
-                [$y1,$y2] = $b->oneInTwoOut($y0,name:'F2');
-                $y3 = $b->twoInOneOut($y1,$x0,name:'F3');
-                $y = $b->twoInOneOut($y2,$y3,name:'F4');
-                return $y;
-            }
-        );
-
-        $gradients = $tape->gradient($y,$x0);
-        // N = NDArray, U = Undetermined
-        $this->assertEquals([
-            'call F1(x0,x1)',
-            'call F2(Out0@F1)',
-            'call F3(Out0@F2,x0)',
-            'call F4(Out1@F2,Out0@F3)',
-            'diff F4(N) gen=3',
-            'diff F3(dIn1@F4) gen=2',
-            'diff F2(dIn0@F3,dIn0@F4) gen=1',
-            'diff F1(dIn0@F2) gen=0',
-        ],$logger->getLog());
-        $this->assertTrue(true);
-    }
-
-    public function testOpenedForkNetwork1()
-    {
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $g = $nn->gradient();
-        $logger = new Logger();
-        $b = new TestBuilder($nn->backend(),$logger);
-
-        $x0 = $g->Variable($mo->array(0.5),name:'x0');
-        $x1 = $g->Variable($mo->array(0.5),name:'x1');
-        $y = $nn->with($tape=$g->GradientTape(),
-            function() use ($g,$b,$x0,$x1){
-                [$y0,$y1] = $b->oneInTwoOut($x0,name:'F1');
-                $y = $b->twoInOneOut($x1,$y0,name:'F2');
-                // $y1 is not used
-                return $y;
-            }
-        );
-
-        $gradients = $tape->gradient($y,$x0);
-        // N = NDArray, U = Undetermined, UN = UndeterminedNDArray, Z = Zero
-        $this->assertEquals([
-            'call F1(x0)',
-            'call F2(x1,Out0@F1)',
-            'diff F2(N) gen=1',
-            'diff F1(dIn1@F2,Z) gen=0',
-        ],$logger->getLog());
-        $this->assertTrue(true);
-    }
 }

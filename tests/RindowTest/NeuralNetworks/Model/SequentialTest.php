@@ -16,6 +16,8 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class WeightLog extends AbstractCallback
 {
+    protected $mo;
+    protected $prev_w;
     protected $gradlog = [];
     public function __construct($mo)
     {
@@ -70,6 +72,7 @@ class WeightLog extends AbstractCallback
 
 class TestFilter implements DatasetFilter
 {
+    protected $mo;
     public function __construct($mo = null)
     {
         $this->mo = $mo;

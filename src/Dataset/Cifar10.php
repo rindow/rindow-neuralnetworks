@@ -9,7 +9,7 @@ use PharData;
 
 class Cifar10
 {
-    protected $mo;
+    protected $matrixOperator;
     protected $baseUrl = 'https://www.cs.toronto.edu/~kriz/';
     protected $downloadFile = 'cifar-10-binary.tar.gz';
     protected $keyFiles = [

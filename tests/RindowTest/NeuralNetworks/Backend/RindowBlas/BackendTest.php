@@ -407,6 +407,17 @@ class Test extends TestCase
         $this->assertLessThan(1e-5,abs(((2+3+1+2)/4)-$z));
     }
 
+    public function testStd()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,3],[1,4]]);
+        $z = $K->std($x,$axis=1); $K->finish();
+        $this->assertEquals([0.5,1.5],$z->toArray());
+        $z = $K->std($x); $K->finish();
+        $this->assertLessThan(1e-5, 1.1180339-$z);
+    }
+
     public function testOneHot()
     {
         $mo = $this->newMatrixOperator();

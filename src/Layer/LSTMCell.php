@@ -10,7 +10,12 @@ class LSTMCell extends AbstractRNNCell
     protected $units;
     protected $useBias;
     protected $kernelInitializer;
+    protected $recurrentInitializer;
     protected $biasInitializer;
+    protected $kernelInitializerName;
+    protected $recurrentInitializerName;
+    protected $biasInitializerName;
+    protected $recurrentActivation;
     protected $ac;
     protected $ac_i;
     protected $ac_f;

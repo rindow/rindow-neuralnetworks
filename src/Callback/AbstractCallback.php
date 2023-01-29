@@ -8,6 +8,7 @@ use Rindow\NeuralNetworks\Model\Model;
  */
 abstract class AbstractCallback implements Callback
 {
+    protected $model;
     public function __construct($model=null)
     {
         if($model)

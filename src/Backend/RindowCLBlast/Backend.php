@@ -62,6 +62,11 @@ class Backend
         return $this->la->getContext();
     }
 
+    public function queue()
+    {
+        return $this->la->getQueue();
+    }
+
     public function finish()
     {
         $this->la->finish();
@@ -604,6 +609,24 @@ class Backend
         } else {
             return $this->la->reduceMean($x,$axis,$r);
         }
+    }
+
+    public function std(NDArray $x,int $axis=null)
+    {
+        $la = $this->la;
+        /// std = sqrt((x - mean(x))**2 / N)
+        if($axis===null) {
+            $n = $x->size();
+            $mean = $la->scalar($la->sum($x)) / $n;
+            $dsum = $la->scalar($la->asum($la->square($la->increment($la->copy($x),-$mean))));
+            $std = sqrt($dsum/$n);
+        } else {
+            $mean = $la->reduceMean($x,$axis);
+            $dsum = $la->reduceSum($la->square($la->add($mean,$la->copy($x),-1,true)),$axis);
+            $n = $x->size()/$dsum->size();
+            $std = $la->sqrt($la->scal(1/$n,$dsum));
+        }
+        return $std;
     }
 
     public function max(NDArray $x,int $axis=null, NDArray $r=null)

@@ -13,6 +13,7 @@ use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 
 class TestModel1 extends AbstractModel
 {
+    protected $dense;
     public function __construct(
         $backend,
         $builder
@@ -32,6 +33,8 @@ class TestModel1 extends AbstractModel
 
 class TestModel2 extends AbstractModel
 {
+    protected $dense1;
+    protected $dense2;
     public function __construct(
         $backend,
         $builder
@@ -56,6 +59,7 @@ class TestModel2 extends AbstractModel
 
 class Test3Mini1 extends AbstractModel
 {
+    protected $dense1;
     public function __construct(
         $backend,
         $builder
@@ -76,6 +80,7 @@ class Test3Mini1 extends AbstractModel
 
 class Test3Mini2 extends AbstractModel
 {
+    protected $dense2;
     public function __construct(
         $backend,
         $builder
@@ -94,6 +99,8 @@ class Test3Mini2 extends AbstractModel
 
 class Test3Main extends AbstractModel
 {
+    protected $model1;
+    protected $model2;
     public function __construct(
         $backend,
         $builder
@@ -116,6 +123,8 @@ class Test3Main extends AbstractModel
 
 class TestRNNEncoder extends AbstractModel
 {
+    protected $embed;
+    protected $rnn;
     public function __construct(
         $backend,
         $builder
@@ -144,6 +153,12 @@ class TestRNNEncoder extends AbstractModel
 
 class TestRNNDecoder extends AbstractModel
 {
+    protected $embed;
+    protected $rnn;
+    protected $attention;
+    protected $concat;
+    protected $dense;
+    protected $attentionScores;
     public function __construct(
         $backend,
         $builder
@@ -190,6 +205,10 @@ class TestRNNDecoder extends AbstractModel
 
 class TestRNNMain extends AbstractModel
 {
+    protected $mo;
+    protected $encoder;
+    protected $decoder;
+    protected $out;
     public function __construct(
         $mo,
         $backend,
@@ -300,6 +319,9 @@ class TestRNNMain extends AbstractModel
 
 class TestVariableMini1 extends AbstractModel
 {
+    protected $linearWeight;
+    protected $linearBias;
+    protected $activation;
     public function __construct(
         $backend,
         $builder
@@ -330,6 +352,8 @@ class TestVariableMini1 extends AbstractModel
 
 class TestVariableMini2 extends AbstractModel
 {
+    protected $linearWeight;
+    protected $linearBias;
     public function __construct(
         $backend,
         $builder
@@ -357,6 +381,8 @@ class TestVariableMini2 extends AbstractModel
 
 class TestVariableMain extends AbstractModel
 {
+    protected $model1;
+    protected $model2;
     public function __construct(
         $backend,
         $builder
@@ -380,6 +406,8 @@ class TestVariableMain extends AbstractModel
 class TestGraphMode extends AbstractModel
 {
     protected $log = [];
+    protected $in;
+    protected $fc;
 
     public function __construct(
         $backend,
@@ -535,7 +563,7 @@ class Test extends TestCase
 
         $history = $model->fit(
             $train_inputs, $train_tests,
-            batch_size:2, epochs: 1/*00*/, shuffle:true, verbose:0);
+            batch_size:2, epochs: 100, shuffle:true, verbose:0);
 
         if($this->plot) {
             $plt->plot($mo->array($history['loss']),null,null,'loss');

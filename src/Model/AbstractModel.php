@@ -267,7 +267,7 @@ abstract class AbstractModel implements Model
             }
             if($verbose>=1) {
                 $sec = time() - $startTime;
-                $this->console("- ${sec} sec.\n");
+                $this->console("- {$sec} sec.\n");
                 foreach ($history as $key => $value) {
                     $this->console(' '.$key.':'.sprintf('%2.4f',array_pop($value)));
                 }
@@ -346,7 +346,7 @@ abstract class AbstractModel implements Model
     {
         $epoch++;
         if($batchIndex==0) {
-            $this->console("\rEpoch ${epoch}/${epochs} ");
+            $this->console("\rEpoch {$epoch}/{$epochs} ");
             return;
         }
         $elapsed = time() - $startTime;
@@ -365,7 +365,7 @@ abstract class AbstractModel implements Model
             $this->console($maxDot."\n");
         }
         $this->console("\rEpoch $epoch/$epochs [".str_repeat('.',$dot).str_repeat(' ',$maxDot-$dot).
-            "] ${elapsed} sec. remaining:${rem_string}  ");
+            "] {$elapsed} sec. remaining:{$rem_string}  ");
     }
 
     protected function trueValuesFilter(NDArray $trues) : NDArray
@@ -858,10 +858,6 @@ abstract class AbstractModel implements Model
             }
         }
         $this->built = false;
-        //$this->params = [];
-        //$this->grads = [];
-        $this->pipeline = [];
-        $this->layers = [];
         $this->outputsVariables = null;
         $this->optimizer = null;
         $this->lossFunction = null;

@@ -6,6 +6,7 @@ use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GraphFunction;
+use Rindow\NeuralNetworks\Gradient\Core\StopGradient;
 use Rindow\NeuralNetworks\Gradient\Func\Square;
 use Rindow\NeuralNetworks\Gradient\Func\Sqrt;
 use Rindow\NeuralNetworks\Gradient\Func\Exp;
@@ -16,6 +17,8 @@ use Rindow\NeuralNetworks\Gradient\Func\Mul;
 use Rindow\NeuralNetworks\Gradient\Func\Div;
 use Rindow\NeuralNetworks\Gradient\Func\Matmul;
 use Rindow\NeuralNetworks\Gradient\Func\ReduceMean;
+use Rindow\NeuralNetworks\Gradient\Func\ReduceSum;
+use Rindow\NeuralNetworks\Gradient\Func\ClipByValue;
 
 class Gradient
 {
@@ -64,6 +67,12 @@ class Gradient
             }
         }
         return false;
+    }
+
+    public function stopGradient($variable)
+    {
+        $func = new StopGradient($this->backend);
+        return $func($variable);
     }
 
     public function square($x)
@@ -136,6 +145,32 @@ class Gradient
         $func = new ReduceMean(
             $this->backend,
             axis:$axis,
+        );
+        return $func($x);
+    }
+
+    public function reduceSum(
+        $x,
+        int $axis=null,
+    )
+    {
+        $func = new ReduceSum(
+            $this->backend,
+            axis:$axis,
+        );
+        return $func($x);
+    }
+
+    public function clipByValue(
+        $x,
+        float $min,
+        float $max,
+    )
+    {
+        $func = new ClipByValue(
+            $this->backend,
+            $min,
+            $max,
         );
         return $func($x);
     }

@@ -10,6 +10,8 @@ class Max extends AbstractLayer
     use GenericUtils;
     protected $backend;
     protected $axis;
+    protected $realAxis;
+    protected $reduceNumClass;
 
     public function __construct(
         object $backend,

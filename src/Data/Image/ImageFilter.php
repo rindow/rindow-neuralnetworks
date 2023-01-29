@@ -7,13 +7,22 @@ use InvalidArgumentException;
 class ImageFilter implements DatasetFilter
 {
     protected $mo;
+    protected $channelsFirst;
+    protected $heightShift;
+    protected $widthShift;
+    protected $verticalFlip;
+    protected $horizontalFlip;
     protected $inputs;
     protected $tests;
     protected $batchSize;
     protected $shuffle;
     protected $filter;
     protected $heightShiftInteger;
+    protected $heightShiftLow;
+    protected $heightShiftHigh;
     protected $widthShiftInteger;
+    protected $widthShiftLow;
+    protected $widthShiftHigh;
 
     public function __construct(
         object $mo,

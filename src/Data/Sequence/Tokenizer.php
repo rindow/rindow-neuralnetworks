@@ -61,6 +61,7 @@ class Tokenizer
     protected $analyzer;
     protected $numWords;
     protected $filters;
+    protected $specials;
     protected $lower;
     protected $split;
     protected $charLevel;

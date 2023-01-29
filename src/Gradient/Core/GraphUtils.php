@@ -11,10 +11,12 @@ trait GraphUtils
 {
     protected function buildPipeline(array $graphOutputs) : array
     {
+        // compile forward
         $funcs = array_map(function($o){return $o->creator();},$graphOutputs);
         usort($funcs,function($a,$b){return $a->generation()-$b->generation();});
         $pipeline = [];
         $constants = [];
+        $backprop = [];
         $used = new WeakMap();
         foreach($funcs as $func) {
             $used[$func] = true;
@@ -40,7 +42,34 @@ trait GraphUtils
                 }
             }
         }
-        return [$pipeline,$constants];
+
+        // compile backward
+        $args = [];
+        foreach($graphOutputs as $o) {
+            if($o instanceof VariableReference) {
+                $o = $o->get();
+            }
+            $args[spl_object_id($o)] = true;
+        }
+        foreach($pipeline as $func) {
+            if($func instanceof StopGradient) {
+                continue;
+            }
+            $available = false;
+            foreach($func->outputs() as $o) {
+                if($o->get()!=null && isset($args[spl_object_id($o->get())])) {
+                    $available = true;
+                }
+            }
+            if($available) {
+                foreach($func->inputs() as $o) {
+                    $args[spl_object_id($o)] = true;
+                }
+                $backprop[] = $func;
+            }
+        }
+        $pipeline = array_reverse($pipeline);
+        return [$pipeline,$backprop,$constants];
     }
 
     public function backwardPipeline(

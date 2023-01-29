@@ -33,6 +33,8 @@ class BatchNormalization extends AbstractLayer
     //protected $xc;
     //protected $xn;
     //protected $std;
+    protected $orignalShape1;
+    protected $orignalShape2;
     protected $transformShapePhase1Pre;
     protected $transformShapePhase1Post;
     protected $transformShapePhase2Pre;

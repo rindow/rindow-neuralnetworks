@@ -225,7 +225,7 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
     protected function progressBar($done,$total,$startTime,$maxDot)
     {
         if($done==0) {
-            $this->console("\r${done}/${total} ");
+            $this->console("\r{$done}/{$total} ");
             return;
         }
         $elapsed = time() - $startTime;
@@ -243,7 +243,7 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
             $rem_string = '????';
             $this->console($maxDot."\n");
         }
-        $this->console("\r${done}/${total} [".str_repeat('.',$dot).str_repeat(' ',$maxDot-$dot).
-            "] ${elapsed} sec. remaining:${rem_string}  ");
+        $this->console("\r{$done}/{$total} [".str_repeat('.',$dot).str_repeat(' ',$maxDot-$dot).
+            "] {$elapsed} sec. remaining:{$rem_string}  ");
     }
 }

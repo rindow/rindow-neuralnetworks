@@ -9,9 +9,11 @@ class Embedding extends AbstractLayer
 {
     use GenericUtils;
     protected $backend;
+    protected $inputLength;
     protected $inputDim;
     protected $outputDim;
     protected $kernelInitializer;
+    protected $kernelInitializerName;
     protected $input_length;
 
     protected $kernel;

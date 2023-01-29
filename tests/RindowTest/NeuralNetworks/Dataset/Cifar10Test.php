@@ -14,6 +14,7 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 class Test extends TestCase
 {
     protected $plot = false;
+    protected $pickleFile;
 
     public function setUp() : void
     {

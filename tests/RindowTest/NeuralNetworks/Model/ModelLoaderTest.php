@@ -115,6 +115,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $backend = $K = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
+        $K = $nn->backend();
 
         $REVERSE = True;
         $WORD_VECTOR = 16;
@@ -197,15 +198,15 @@ class Test extends TestCase
         $gruvals2 = $layers2[1]->getParams();
         $gru2vals2 = $layers2[3]->getParams();
         $densevals2 = $layers2[4]->getParams();
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($embvals[0],'-',$embvals2[0]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($gruvals[0],'-',$gruvals2[0]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($gruvals[1],'-',$gruvals2[1]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($gruvals[2],'-',$gruvals2[2]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($gru2vals[0],'-',$gru2vals2[0]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($gru2vals[1],'-',$gru2vals2[1]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($gru2vals[2],'-',$gru2vals2[2]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($densevals[0],'-',$densevals2[0]))));
-        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($densevals[1],'-',$densevals2[1]))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($embvals[0]),'-',$K->NDArray($embvals2[0])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($gruvals[0]),'-',$K->NDArray($gruvals2[0])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($gruvals[1]),'-',$K->NDArray($gruvals2[1])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($gruvals[2]),'-',$K->NDArray($gruvals2[2])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($gru2vals[0]),'-',$K->NDArray($gru2vals2[0])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($gru2vals[1]),'-',$K->NDArray($gru2vals2[1])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($gru2vals[2]),'-',$K->NDArray($gru2vals2[2])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($densevals[0]),'-',$K->NDArray($densevals2[0])))));
+        $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($K->NDArray($densevals[1]),'-',$K->NDArray($densevals2[1])))));
 
         $this->assertNotEquals(spl_object_id($embvals[0]),spl_object_id($embvals2[0]));
         $this->assertNotEquals(spl_object_id($gruvals[0]),spl_object_id($gruvals2[0]));

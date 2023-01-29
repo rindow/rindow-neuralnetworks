@@ -12,7 +12,11 @@ class GRUCell extends AbstractRNNCell
     protected $units;
     protected $useBias;
     protected $kernelInitializer;
+    protected $recurrentInitializer;
     protected $biasInitializer;
+    protected $kernelInitializerName;
+    protected $recurrentInitializerName;
+    protected $biasInitializerName;
     protected $resetAfter;
     protected $activation;
     protected $recurrentActivation;

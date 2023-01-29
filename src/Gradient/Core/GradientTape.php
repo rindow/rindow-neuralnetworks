@@ -90,7 +90,7 @@ class GradientTape implements Context
     protected function calcGradient($grads,$target,$sourceIds) : void
     {
         $graphOutputs = [$target];
-        [$pipeline,$constants] = $this->buildPipeline($graphOutputs);
-        $this->backwardPipeline($this->backend,$pipeline,$grads,$sourceIds);
+        [$pipeline,$backprop,$constants] = $this->buildPipeline($graphOutputs);
+        $this->backwardPipeline($this->backend,$backprop,$grads,$sourceIds);
     }
 }

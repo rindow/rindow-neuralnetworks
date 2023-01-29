@@ -22,6 +22,8 @@ abstract class AbstractConv extends AbstractImage
     protected $useBias;
     protected $kernelInitializer;
     protected $biasInitializer;
+    protected $kernelInitializerName;
+    protected $biasInitializerName;
     protected $defaultLayerName;
 
     protected $kernel;

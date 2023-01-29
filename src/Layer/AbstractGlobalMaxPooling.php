@@ -9,6 +9,8 @@ class AbstractGlobalMaxPooling extends AbstractImage
 {
     use GenericUtils;
     protected $backend;
+    protected $data_format;
+    protected $reduceShape;
     protected $pool_mode = 'max';
     protected $channels_first = false;
     protected $defaultLayerName;

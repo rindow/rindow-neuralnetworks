@@ -9,6 +9,7 @@ use Rindow\NeuralNetworks\Model\Model;
 class CallbackList
 {
     protected $callbacks;
+    protected $model;
     public function __construct(Model $model, array $callbacks=null)
     {
         $this->model = $model;

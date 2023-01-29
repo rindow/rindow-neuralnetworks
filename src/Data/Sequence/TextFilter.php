@@ -8,8 +8,16 @@ use InvalidArgumentException;
 class TextFilter implements DatasetFilter
 {
     protected $mo;
+    protected $tokenizer;
     protected $labels = [];
+    protected $preprocessor;
+    protected $maxlen;
+    protected $dtype;
+    protected $padding;
+    protected $truncating;
+    protected $value;
     protected $labelNum = 0;
+    
 
     public function __construct(
         object $mo,

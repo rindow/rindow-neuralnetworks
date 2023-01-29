@@ -8,7 +8,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Mnist
 {
-    protected $mo;
+    protected $matrixOperator;
     protected $urlBase = 'http://yann.lecun.com/exdb/mnist/';
     protected $keyFiles = [
         'train_images'=>'train-images-idx3-ubyte.gz',

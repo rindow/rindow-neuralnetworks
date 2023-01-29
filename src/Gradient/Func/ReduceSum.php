@@ -5,7 +5,7 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
-class ReduceMean extends AbstractFunction
+class ReduceSum extends AbstractFunction
 {
     protected $axis;
     
@@ -23,11 +23,11 @@ class ReduceMean extends AbstractFunction
         $K = $this->backend;
         $container = $this->container();
         $container->inputs = $inputs;
-        $mean = $K->mean($inputs[0],$this->axis);
-        if(!($mean instanceof NDArray)) {
-            $mean = $this->backend->array($mean);
+        $sum = $K->sum($inputs[0],$this->axis);
+        if(!($sum instanceof NDArray)) {
+            $sum = $K->array($sum);
         }
-        return [$mean];
+        return [$sum];
     }
 
     protected function differentiate(array $dOutputs) : array
@@ -45,8 +45,7 @@ class ReduceMean extends AbstractFunction
             $shape = $x->shape();
             $n = $shape[$axis];
         }
-        $dSum = $K->scale(1/$n,$dOutputs[0]);
-        $dInput = $K->repeat($dSum,$n,$axis);
+        $dInput = $K->repeat($dOutputs[0],$n,$axis);
         if($axis===null) {
             $dInput = $dInput->reshape($x->shape());
         }

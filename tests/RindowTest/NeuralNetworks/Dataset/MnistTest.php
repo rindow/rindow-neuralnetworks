@@ -19,6 +19,7 @@ class Test extends TestCase
 {
     protected $plot = false;
     protected $pickleFilename = '/rindow/nn/datasets/mnist/mnist.pkl';
+    protected $pickleFile;
 
     public function setUp() : void
     {

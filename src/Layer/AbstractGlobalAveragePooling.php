@@ -9,6 +9,8 @@ class AbstractGlobalAveragePooling extends AbstractImage
 {
     use GenericUtils;
     protected $backend;
+    protected $data_format;
+    protected $reduceShape;
     protected $pool_mode = 'avg';
     protected $channels_first = false;
     protected $defaultLayerName;

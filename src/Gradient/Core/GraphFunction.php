@@ -53,9 +53,14 @@ class GraphFunction
     protected $endOutputOids;
 
     /**
-    *  @var array<AbstractFunction>   graph pipeline
+    *  @var array<AbstractFunction>   graph forward pipeline
     */
     protected $pipeline;
+
+    /**
+    *  @var array<AbstractFunction>   graph backward pipeline
+    */
+    protected $backprop;
 
     /**
     *  @var Dict<NDArray>    constants for input oid in the graph
@@ -205,7 +210,7 @@ class GraphFunction
 
         $this->endOutputOids = $graphOutputs;
 
-        [$pipeline,$tmpconsts] = $this->buildPipeline($graphOutputs);
+        [$pipeline,$backprop,$tmpconsts] = $this->buildPipeline($graphOutputs);
         $constants = [];
         foreach($tmpconsts as $c) {
             if(!in_array($c,$this->startInputOids,true)) {
@@ -214,7 +219,8 @@ class GraphFunction
         }
         unset($tmpconsts);
         $this->constants = $constants; // NDArray
-        $this->pipeline = array_reverse($pipeline); // Func
+        $this->pipeline = $pipeline; // Func
+        $this->backprop = $backprop; // Func
         $this->built = true;
         $outputs = $this->repackVariables($this->backend,$graphOutputs);
         foreach($pipeline as $func) {
@@ -256,8 +262,8 @@ class GraphFunction
         unset($oset);
         unset($dOutputs);
 
-        $pipeline = array_reverse($this->pipeline);
-        $this->backwardPipeline($this->backend, $pipeline, $grads, $oidsToCollect);
+        $backprop = $this->backprop;
+        $this->backwardPipeline($this->backend, $backprop, $grads, $oidsToCollect);
 
         foreach($this->startInputOids as $oid) {
             if(!isset($grads[$oid])) {

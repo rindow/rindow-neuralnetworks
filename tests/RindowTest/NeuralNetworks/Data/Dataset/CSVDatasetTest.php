@@ -11,6 +11,7 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
 class TestFilter implements DatasetFilter
 {
+    protected $mo;
     public function __construct($mo = null)
     {
         $this->mo = $mo;
