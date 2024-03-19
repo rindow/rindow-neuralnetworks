@@ -789,6 +789,8 @@ abstract class AbstractModel implements Model
         $modelWeights['optimizer'] = $modelWeights['optimizer'] ?? [];
         foreach ($optimizerWeights as $idx => $weights) {
             $weights=$K->ndarray($weights);
+            if($portable)
+                $weights = $this->converPortableSaveMode($weights);
             $modelWeights['optimizer'][$idx] = serialize($weights);
         }
     }
@@ -796,9 +798,6 @@ abstract class AbstractModel implements Model
     public function loadWeights($modelWeights) : void
     {
         $K = $this->backend;
-        $nn = $this->builder;
-        $g = $nn->gradient();
-        $model = $this;
         $lossfunc = $this->lossFunction;
         foreach($this->variables() as $idx => $weights) {
             $data = unserialize($modelWeights['weights'][$idx]);
