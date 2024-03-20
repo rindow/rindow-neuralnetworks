@@ -34,7 +34,7 @@ class TestFilter implements DatasetFilter
     }
 }
 
-class Test extends TestCase
+class CSVDatasetTest extends TestCase
 {
     public function testNormal()
     {

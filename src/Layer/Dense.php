@@ -137,7 +137,7 @@ class Dense extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();
@@ -156,7 +156,7 @@ class Dense extends AbstractLayer
         $outputs = $outputs->reshape($shape);
         if($this->activation) {
             $container->activation = new \stdClass();
-            $outputs = $this->activation->forward($container->activation,$outputs,$training);
+            $outputs = $this->activation->forward($container->activation,$outputs,training:$training);
         }
         return $outputs;
     }
@@ -175,7 +175,7 @@ class Dense extends AbstractLayer
         // update params
         $K->gemm($container->inputs, $dOutputs,1.0,0.0,$this->dKernel,true,false);
         if($this->dBias)
-            $K->copy($K->sum($dOutputs, $axis=0),$this->dBias);
+            $K->sum($dOutputs, axis:0,output:$this->dBias);
 
         return $dInputs->reshape($container->origInputsShape);
     }

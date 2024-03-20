@@ -57,7 +57,7 @@ class TestClass
     }
 }
 
-class Test extends TestCase
+class GraphFunctionTest extends TestCase
 {
     public function newMatrixOperator()
     {

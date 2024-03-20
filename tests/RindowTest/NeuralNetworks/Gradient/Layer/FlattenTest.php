@@ -7,7 +7,7 @@ use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use InvalidArgumentException;
 
-class Test extends TestCase
+class FlattenTest extends TestCase
 {
     public function newMatrixOperator()
     {

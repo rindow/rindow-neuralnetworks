@@ -5,6 +5,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
+use function Rindow\Math\Matrix\R;
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
@@ -35,15 +36,15 @@ echo "dataset={$dataset}\n";
 echo "train=[".implode(',',$train_img->shape())."]\n";
 echo "test=[".implode(',',$test_img->shape())."]\n";
 
-if($shrink||!extension_loaded('rindow_openblas')) {
+if($shrink||!$mo->isAdvanced()) {
     // Shrink data
     $trainSize = 2000;
     $testSize  = 200;
     echo "Shrink data ...\n";
-    $train_img = $train_img[[0,$trainSize-1]];
-    $train_label = $train_label[[0,$trainSize-1]];
-    $test_img = $test_img[[0,$testSize-1]];
-    $test_label = $test_label[[0,$testSize-1]];
+    $train_img = $train_img[R(0,$trainSize)];
+    $train_label = $train_label[R(0,$trainSize)];
+    $test_img = $test_img[R(0,$testSize)];
+    $test_label = $test_label[R(0,$testSize)];
     echo "Shrink train=[".implode(',',$train_img->shape())."]\n";
     echo "Shrink test=[".implode(',',$test_img->shape())."]\n";
 }
@@ -69,11 +70,10 @@ class ImageClassification extends AbstractModel
     protected $dense1;
     protected $dense2;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->dense1 = $builder->layers->Dense($units=128,
             input_shape:[(int)array_product([28,28,1])],
             kernel_initializer:'he_normal',
@@ -82,20 +82,22 @@ class ImageClassification extends AbstractModel
         $this->dense2 = $builder->layers->Dense($units=10);
     }
 
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
-        $x = $this->dense1->forward($inputs,$training);
-        $outputs = $this->dense2->forward($x,$training);
+        $x = $this->dense1->forward($inputs);
+        $outputs = $this->dense2->forward($x);
         return $outputs;
     }
 }
+
+echo "device type: ".$nn->deviceType()."\n";
 $model = new ImageClassification($nn->backend(),$nn);
 echo "creating model ...\n";
 $model->compile(
     loss:$nn->losses()->SparseCategoricalCrossentropy(from_logits:true),
     optimizer:'adam',
 );
-$model->build([1,(int)(28*28*1)],true); // This is only needed for summary
+$model->build([1,(int)(28*28*1)]); // This is only needed for summary
 $model->summary();
 
 $modelFilePath = __DIR__."/basic-image-classification-custom-{$dataset}.model";
@@ -116,8 +118,8 @@ if(file_exists($modelFilePath)) {
     $plt->title($dataset);
 }
 
-$images = $test_img[[0,7]];
-$labels = $test_label[[0,7]];
+$images = $test_img[R(0,8)];
+$labels = $test_label[R(0,8)];
 $predicts = $model->predict($images);
 // for from_logits
 $predicts = $nn->backend->array($predicts);

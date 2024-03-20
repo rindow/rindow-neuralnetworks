@@ -8,16 +8,18 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-/**
- * @requires extension rindow_openblas
- */
-class Test extends TestCase
+class Cifar10Test extends TestCase
 {
     protected $plot = false;
     protected $pickleFile;
 
     public function setUp() : void
     {
+        $mo = new MatrixOperator();
+        if(!$mo->isAdvanced()) {
+            $this->markTestSkipped("The service is not Advanced.");
+            return;
+        }
         $this->plot = true;
         $this->pickleFile = sys_get_temp_dir().'/rindow/nn/datasets/cifar-10-batches-bin/cifar10.pkl';
     }
@@ -26,7 +28,7 @@ class Test extends TestCase
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 

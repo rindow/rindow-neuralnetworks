@@ -8,7 +8,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Dense;
 
-class Test extends TestCase
+class DenseTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -24,14 +24,14 @@ class Test extends TestCase
     {
         $f = function($x) use ($mo,$K,$function){
             $x = $K->array($x);
-            $y = $function->forward($x,$training=true);
+            $y = $function->forward($x);
             return $K->ndarray($y);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
 
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($function,$x) {
-                $outputsVariable = $function->forward($x, $training=true);
+                $outputsVariable = $function->forward($x);
                 return $outputsVariable;
             }
         );
@@ -129,7 +129,7 @@ class Test extends TestCase
         $inputs = $K->array($inputs);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
+                $outputsVariable = $layer->forward($inputs);
                 return $outputsVariable;
             }
         );
@@ -226,7 +226,7 @@ class Test extends TestCase
         $inputs = $K->array($inputs);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
+                $outputsVariable = $layer->forward($inputs);
                 return $outputsVariable;
             }
         );

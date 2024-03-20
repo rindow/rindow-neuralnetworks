@@ -80,11 +80,11 @@ class Max extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();
-        $outputs = $K->max($inputs,$this->realAxis);
+        $outputs = $K->max($inputs,axis:$this->realAxis);
         $container->inputs = $inputs;
         return $outputs;
     }
@@ -93,7 +93,7 @@ class Max extends AbstractLayer
     {
         $K = $this->backend;
         $container = $this->container();
-        $argMax = $K->argMax($container->inputs,$this->realAxis);
+        $argMax = $K->argMax($container->inputs,axis:$this->realAxis);
         $dInputs = $K->scatter(
             $argMax,
             $dOutputs,

@@ -6,7 +6,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Data\Sequence\Tokenizer;
 
-class Test extends TestCase
+class TokenizerTest extends TestCase
 {
     public function testNormal()
     {

@@ -8,6 +8,8 @@ use ArrayAccess;
 use Traversable;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
+use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
+use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
 
 
 class Variable implements VariableInterface
@@ -19,27 +21,32 @@ class Variable implements VariableInterface
     protected $value;
     protected $creator;
     protected $generation=0;
+    protected $unbackpropagatable;
+    protected $mask;
 
     public function __construct(
         object $backend,
-        $value,
+        mixed $value,
         string $name=null,
         bool $reference=null,
         bool $trainable=null,
         bool $undetermined=null,
+        bool $unbackpropagatable=null,
+        NDArray $mask=null,
     )
     {
         $this->backend = $backend;
-        $this->undetermined = $undetermined;
+        $this->undetermined = $undetermined ?? false;
         $this->name = $name;
         $this->trainable = $trainable ?? true;
-        $undetermined = $undetermined ?? false;
-        if(!$undetermined) {
+        $this->unbackpropagatable = $unbackpropagatable ?? false;
+        if(!$this->undetermined) {
             $this->assign($value, reference:$reference);
         }
     }
 
-    public function assign($value, bool $reference=null) : void
+    public function assign(
+        mixed $value, bool $reference=null, NDArray $mask=null) : void
     {
         $K = $this->backend;
         $reference = $reference ?? false;
@@ -56,10 +63,25 @@ class Variable implements VariableInterface
             $this->value = $value;
         } elseif(is_array($value)||is_numeric($value)) {
             $this->value = $K->array($value);
+        } elseif($value instanceof ArrayShapeInterface) {
+            $this->value = $value;
+        } elseif($value instanceof ScalarInterface) {
+            $this->value = $value;
         } else {
             throw new InvalidArgumentException('Invalid vaule type:'.gettype($value));
         }
+        $this->mask = $mask;
         $this->undetermined = false;
+    }
+
+    public function mask() : NDArray
+    {
+        return $this->mask;
+    }
+
+    public function setMask(NDArray $mask) : void
+    {
+        $this->mask = $mask;
     }
 
     public function isTrainable() : bool
@@ -70,6 +92,11 @@ class Variable implements VariableInterface
     public function isUndetermined() : bool
     {
         return $this->undetermined;
+    }
+
+    public function isbackpropagatable() : bool
+    {
+        return !$this->unbackpropagatable;
     }
 
     public function value()
@@ -160,8 +187,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             return [];
+        } elseif($value instanceof NDArray) {
+            return $value->shape();
         }
-        return $value->shape();
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function ndim() : int
@@ -172,8 +201,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             return 0;
+        } elseif($value instanceof NDArray) {
+            return $value->ndim();
         }
-        return $value->ndim();
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function size() : int
@@ -184,8 +215,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             return 0;
+        } elseif($value instanceof NDArray) {
+            return $value->size();
         }
-        return $value->size();
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function buffer() : ArrayAccess
@@ -196,8 +229,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             throw new LogicException('unsupported operation on boolean type');
+        } elseif($value instanceof NDArray) {
+            return $value->buffer();
         }
-        return $value->buffer();
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function offset() : int
@@ -208,8 +243,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             throw new LogicException('unsupported operation on boolean type');
+        } elseif($value instanceof NDArray) {
+            return $value->offset();
         }
-        return $value->offset();
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function reshape(array $shape) : NDArray
@@ -220,8 +257,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             throw new LogicException('unsupported operation on boolean type');
+        } elseif($value instanceof NDArray) {
+            return new self($this->backend,$value->reshape($shape), reference:true);
         }
-        return new self($this->backend,$value->reshape($shape), reference:true);
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function toArray()
@@ -232,8 +271,10 @@ class Variable implements VariableInterface
         }
         if(is_bool($value)) {
             return $value;
+        } elseif($value instanceof NDArray) {
+            return $value->toArray();
         }
-        return $value->toArray();
+        throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
     public function offsetExists( $offset ) : bool

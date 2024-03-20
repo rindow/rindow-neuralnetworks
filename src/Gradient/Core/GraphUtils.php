@@ -26,6 +26,10 @@ trait GraphUtils
             $pipeline[] = $func;
             $args = array_merge($func->inputs(),array_values($func->options()));
             foreach($args as $input) {
+                if(!is_a($input,Variable::class)) {
+                    $typename = is_object($input) ? get_class($input) : gettype($input);
+                    throw new InvalidArgumentException("Invalid Argument for constant on ".$func->name().". gives $typename.");
+                }
                 $creator = $input->creator();
                 if($creator!=null) {
                     //$oid = spl_object_id($creator);
@@ -35,9 +39,6 @@ trait GraphUtils
                         usort($funcs,function($a,$b){return $a->generation()-$b->generation();});
                     }
                 } else {
-                    if($input===null) {
-                        throw new InvalidArgumentException("Invalid Argument for constant on ".$func->name().". gived NULL");
-                    }
                     $constants[] = $input;
                 }
             }
@@ -52,12 +53,11 @@ trait GraphUtils
             $args[spl_object_id($o)] = true;
         }
         foreach($pipeline as $func) {
-            if($func instanceof StopGradient) {
-                continue;
-            }
             $available = false;
             foreach($func->outputs() as $o) {
-                if($o->get()!=null && isset($args[spl_object_id($o->get())])) {
+                $v = $o->get();
+                if($v!=null && $v->isbackpropagatable() &&
+                    isset($args[spl_object_id($v)])) {
                     $available = true;
                 }
             }
@@ -78,10 +78,13 @@ trait GraphUtils
     {
         $K = $backend;
         foreach($pipeline as $func) {
+            //echo "count(grads)=".count($grads)."\n";
+            //echo "func=".basename(get_class($func))."\n";
             $dOutputs = [];
             foreach($func->outputs() as $o) {
                 $oid = $o->get();
                 if($oid!==null && isset($grads[$oid])) {
+                    //echo 'grads('.spl_object_id($oid).')'."\n";
                     $dOutputs[] = $grads[$oid];
                     // *** CAUTION ***
                     // Outputs are released as soon as the func object is
@@ -93,6 +96,7 @@ trait GraphUtils
                         unset($grads[$oid]);
                     }
                 } else {
+                    //echo 'grads('.spl_object_id($oid).') not found'."\n";
                     //$shape = $o->valueShape();
                     //$dtype = $o->dtype();
                     //array_unshift($shape,$batchSize);
@@ -102,6 +106,7 @@ trait GraphUtils
             }
     
             $tmpdInputs = $func->backward($dOutputs,$grads,$oidsToCollect);
+            //echo "after backword: count(grads)=".count($grads)."\n";
     
             unset($dOutputs);
 
@@ -119,8 +124,12 @@ trait GraphUtils
                     // Don't use "update_add"!
                     // Because sometime grad and dx are same instace.
                     // Using update_add causes problems when branching function output more than once.
+                    //echo "add grads(".spl_object_id($oid).")<=";
+                    //echo "[".implode(',',$grads[$oid]->toArray())."]+";
+                    //echo "[".implode(',',$dx->toArray())."]\n";
                     $grads[$oid] = $K->add($grads[$oid],$dx);
                 } else {
+                    //echo "set grads(".spl_object_id($oid).")\n";
                     $grads[$oid] = $dx;
                 }
             }

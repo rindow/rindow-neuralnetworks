@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class SquareTest extends TestCase
 {
     public function newMatrixOperator()
     {

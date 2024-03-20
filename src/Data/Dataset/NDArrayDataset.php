@@ -6,6 +6,7 @@ use InvalidArgumentException;
 use Countable;
 use IteratorAggregate;
 use Traversable;
+use function Rindow\Math\Matrix\R;
 
 class NDArrayDataset implements Countable,IteratorAggregate,Dataset
 {
@@ -106,17 +107,17 @@ class NDArrayDataset implements Countable,IteratorAggregate,Dataset
         for($i=0;$i<$steps;$i++) {
             $idx = $choice[$i];
             $start = $idx*$batchSize;
-            $end = ($idx+1)*$batchSize-1;
-            if($end>=$count) {
-                $end = $count-1;
+            $end = ($idx+1)*$batchSize;
+            if($end>$count) {
+                $end = $count;
             }
             $inputs = [];
             foreach ($this->inputs as $value) {
-                $inputs[] = $value[[$start,$end]];
+                $inputs[] = $value[R($start,$end)];
             }
             $tests = null;
             if($this->tests) {
-                $tests = $this->tests[[$start,$end]];
+                $tests = $this->tests[R($start,$end)];
             }
             if($this->filter) {
                 if($this->multiInputs) {
@@ -127,7 +128,7 @@ class NDArrayDataset implements Countable,IteratorAggregate,Dataset
                 }
             }
             if($this->shuffle) {
-                $size = $end-$start+1;
+                $size = $end-$start;
                 if($size>1) {
                     $choiceItem = $la->randomSequence($size);
                 } else {

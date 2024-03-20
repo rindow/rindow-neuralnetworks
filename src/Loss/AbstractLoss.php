@@ -10,7 +10,7 @@ use InvalidArgumentException;
 use DomainException;
 use ArrayAccess;
 
-abstract class AbstractLoss //implements Loss
+abstract class AbstractLoss implements Loss
 {
     use GradientUtils;
     protected $generation;
@@ -19,6 +19,41 @@ abstract class AbstractLoss //implements Loss
 
     abstract protected function call(NDArray $trues, NDArray $predicts) : NDArray;
     abstract protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array;
+
+    protected $backend;
+    protected $fromLogits = false;
+    protected $reduction = 'sum';
+
+    public function __construct(
+        object $backend,
+        bool $from_logits=null,
+        string $reduction=null,
+        )
+    {
+        // defaults
+        $from_logits = $from_logits ?? false;
+        $reduction = $reduction ?? 'sum';
+
+        $this->backend = $backend;
+        $this->fromLogits = $from_logits;
+        $this->reduction = $reduction;
+    }
+
+    public function setFromLogits(bool $fromLogits)
+    {
+        $this->fromLogits = $fromLogits;
+    }
+
+    public function fromLogits()
+    {
+        return $this->fromLogits;
+    }
+
+    public function getConfig() : array
+    {
+        return [
+        ];
+    }
 
     /*
     *  dinamic step interfaces
@@ -44,6 +79,93 @@ abstract class AbstractLoss //implements Loss
     public function outputs()
     {
         return $this->outputsVariables;
+    }
+
+    protected function flattenShapes(NDArray $trues, NDArray $predicts) : array
+    {
+        $origTrueShape = $trues->shape();
+        $origPredictsShape = $predicts->shape();
+        if($trues->ndim()<$predicts->ndim()) {
+            $shape = $trues->shape();
+            array_push($shape,1);
+            $trues = $trues->reshape($shape);
+        }
+        if($trues->shape()!=$predicts->shape()){
+            throw new InvalidArgumentException('trues and predicts must be same shape of dimensions. '.
+                'trues,predicts are ['.implode(',',$origTrueShape).'],['.implode(',',$predicts->shape()).']');
+        }
+        if($predicts->ndim()==1) {
+            $size = $predicts->size();
+            $predicts = $predicts->reshape([1,$size]);
+            $trues = $trues->reshape([1,$size]);
+        }
+        //$origPredictsShape = $predicts->shape();
+        //$orgTruesShape = $trues->shape();
+        $batchShape = $predicts->shape();
+        $feature = array_pop($batchShape);
+        $batchSize = array_product($batchShape);
+        $container = $this->container();
+        $container->predictsShape = $origPredictsShape;
+        $container->batchShape = $batchShape;
+        $container->batchSize = $batchSize;
+        $container->batchShape = $batchShape;
+        $container->feature = $feature;
+        $trues = $trues->reshape([$batchSize,$feature]);
+        $predicts = $predicts->reshape([$batchSize,$feature]);
+        return [$trues,$predicts];
+    }
+
+    protected function reshapeLoss($loss) : mixed
+    {
+        $container = $this->container();
+        if($this->reduction=='none') {
+            $loss = $loss->reshape($container->batchShape);
+        }
+        return $loss;
+    }
+
+    protected function flattenLoss($loss) : mixed
+    {
+        $container = $this->container();
+        if($this->reduction=='none') {
+            if(($loss instanceof NDArray)&&$loss->ndim()>0) {
+                $loss = $loss->reshape([$container->batchSize]);
+            } else {
+                throw new InvalidArgumentException('loss must not be scaler. ');
+            }
+        }
+        return $loss;
+    }
+
+    protected function reshapePredicts(NDArray $predicts) : NDArray
+    {
+        $container = $this->container();
+        $predicts = $predicts->reshape($container->predictsShape);
+        return $predicts;
+    }
+
+    protected function flattenShapesForSparse(NDArray $trues, NDArray $predicts) : array
+    {
+        $origTrueShape = $trues->shape();
+        $origPredictsShape = $trues->shape();
+
+        $batchShape = $predicts->shape();
+        $feature = array_pop($batchShape);
+        $batchSize = array_product($batchShape);
+        if($trues->shape()!=$batchShape){
+            throw new InvalidArgumentException('trues and predicts must be same batch-shape of dimensions. '.
+                'trues,predicts are ['.implode(',',$origTrueShape).'],['.implode(',',$origPredictsShape->shape()).']');
+        }
+
+        $container = $this->container();
+        $container->predictsShape = $predicts->shape();
+        $container->batchShape = $batchShape;
+        $container->batchSize = $batchSize;
+        $container->batchShape = $batchShape;
+        $container->feature = $feature;
+        $trues = $trues->reshape([$batchSize]);
+        $predicts = $predicts->reshape([$batchSize,$feature]);
+        return [$trues,$predicts];
     }
 
     public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
@@ -75,9 +197,6 @@ abstract class AbstractLoss //implements Loss
         $session = $this->preGradientProcessOnSession([$trues,$predicts]);
         $session->begin();
         try {
-            $container = $this->container();
-            $container->truesShape = $rawTrues->shape();
-            $container->truesDtype = $rawTrues->dtype();
             $loss = $this->call($rawTrues,$rawPredicts);
             $rawOutputs = $this->packVariable($K,$loss);
         } finally {

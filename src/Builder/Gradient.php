@@ -4,6 +4,7 @@ namespace Rindow\NeuralNetworks\Builder;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\Modules;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GraphFunction;
 use Rindow\NeuralNetworks\Gradient\Core\StopGradient;
@@ -19,6 +20,22 @@ use Rindow\NeuralNetworks\Gradient\Func\Matmul;
 use Rindow\NeuralNetworks\Gradient\Func\ReduceMean;
 use Rindow\NeuralNetworks\Gradient\Func\ReduceSum;
 use Rindow\NeuralNetworks\Gradient\Func\ClipByValue;
+use Rindow\NeuralNetworks\Gradient\Func\Equal;
+use Rindow\NeuralNetworks\Gradient\Func\NotEqual;
+use Rindow\NeuralNetworks\Gradient\Func\Cast;
+use Rindow\NeuralNetworks\Gradient\Func\ZerosLike;
+use Rindow\NeuralNetworks\Gradient\Func\Reshape;
+use Rindow\NeuralNetworks\Gradient\Func\Transpose;
+use Rindow\NeuralNetworks\Gradient\Func\Shape;
+use Rindow\NeuralNetworks\Gradient\Func\Get;
+use Rindow\NeuralNetworks\Gradient\Func\Scale;
+use Rindow\NeuralNetworks\Gradient\Func\Zeros;
+use Rindow\NeuralNetworks\Gradient\Func\Ones;
+use Rindow\NeuralNetworks\Gradient\Func\Bandpart;
+use Rindow\NeuralNetworks\Gradient\Func\Increment;
+use Rindow\NeuralNetworks\Gradient\Func\Greater;
+use Rindow\NeuralNetworks\Gradient\Func\Less;
+use Rindow\NeuralNetworks\Gradient\Func\Repeat;
 
 class Gradient
 {
@@ -47,6 +64,11 @@ class Gradient
             $variables[] = new Variable($this->backend,$value,...$options);
         }
         return $variables;
+    }
+
+    public function modules($modules=null)
+    {
+        return new Modules($modules);
     }
 
     public function GradientTape($persistent=null)
@@ -140,11 +162,13 @@ class Gradient
     public function reduceMean(
         $x,
         int $axis=null,
+        int $keepdims=null,
     )
     {
         $func = new ReduceMean(
             $this->backend,
             axis:$axis,
+            keepdims:$keepdims,
         );
         return $func($x);
     }
@@ -152,11 +176,13 @@ class Gradient
     public function reduceSum(
         $x,
         int $axis=null,
+        int $keepdims=null,
     )
     {
         $func = new ReduceSum(
             $this->backend,
             axis:$axis,
+            keepdims:$keepdims,
         );
         return $func($x);
     }
@@ -173,6 +199,146 @@ class Gradient
             $max,
         );
         return $func($x);
+    }
+
+    public function equal($x,$y)
+    {
+        $func = new Equal($this->backend);
+        return $func($x,$y);
+    }
+
+    public function notEqual($x,$y)
+    {
+        $func = new NotEqual($this->backend);
+        return $func($x,$y);
+    }
+
+    public function cast($x,$dtype)
+    {
+        $func = new Cast($this->backend,$dtype);
+        return $func($x);
+    }
+
+    public function zerosLike($x)
+    {
+        $func = new ZerosLike($this->backend);
+        return $func($x);
+    }
+
+    public function reshape($x, $shape)
+    {
+        $func = new Reshape($this->backend);
+        return $func($x,$shape);
+    }
+
+    public function transpose(
+        $x,
+        array $perm=null,
+    )
+    {
+        $func = new Transpose(
+            $this->backend,
+            $perm,
+        );
+        return $func($x);
+    }
+
+    public function shape(
+        $x,
+    )
+    {
+        $func = new Shape($this->backend);
+        return $func($x);
+    }
+
+    public function get(
+        $x,
+        $offset,
+        $count=null,
+    )
+    {
+        if($count===null) {
+            $count = 0;
+        }
+        $func = new Get($this->backend);
+        return $func($x,$offset,$count);
+    }
+
+    public function scale(
+        $alpha,
+        $x,
+    )
+    {
+        $func = new Scale($this->backend);
+        return $func($alpha,$x);
+    }
+
+    public function zeros(
+        $shape,
+        $dtype=null,
+    )
+    {
+        $func = new Zeros($this->backend,$dtype);
+        return $func($shape);
+    }
+
+    public function ones(
+        $shape,
+        $dtype=null,
+    )
+    {
+        $func = new Ones($this->backend,$dtype);
+        return $func($shape);
+    }
+
+    public function bandpart(
+        $x,
+        $lower,
+        $upper,
+    )
+    {
+        $func = new Bandpart($this->backend,$lower,$upper);
+        return $func($x);
+    }
+
+    public function increment(
+        $x,
+        $beta,
+        $alpha=null,
+    )
+    {
+        $alpha = $alpha ?? 1.0;
+        $func = new Increment($this->backend);
+        return $func($x,$beta,$alpha);
+    }
+
+    public function greater(
+        $x,
+        $alpha,
+    )
+    {
+        $func = new Greater($this->backend);
+        return $func($x,$alpha);
+    }
+
+    public function less(
+        $x,
+        $alpha,
+    )
+    {
+        $func = new Less($this->backend);
+        return $func($x,$alpha);
+    }
+
+    public function repeat(
+        $x,
+        $repeats,
+        $axis=null,
+        $keepdims=null,
+    )
+    {
+        $func = new Repeat($this->backend,axis:$axis,keepdims:$keepdims);
+        return $func($x,$repeats);
     }
 
 }

@@ -7,7 +7,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class ImageFilterTest extends TestCase
 {
     public function testNormal()
     {

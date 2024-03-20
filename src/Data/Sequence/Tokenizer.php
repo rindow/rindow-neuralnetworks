@@ -1,7 +1,6 @@
 <?php
 namespace Rindow\NeuralNetworks\Data\Sequence;
 
-use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 use ArrayObject;
 

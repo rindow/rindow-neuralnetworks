@@ -11,11 +11,16 @@ use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 
 class Attention extends AbstractLayerBase
 {
-    const RETURN_ATTENTION_SCORES = 'return_attention_scores';
     use GenericUtils;
     use GradientUtils;
     protected $backend;
+    protected $useScale;
+    protected $doNotExpandMask;
+    protected $scale;
+    protected $dScale;
     protected $scoresShape;
+    protected ?array $unbackpropagatables = null;
+
     //protected $returnAttentionScores;
 
     //protected $query;
@@ -26,15 +31,26 @@ class Attention extends AbstractLayerBase
     public function __construct(
         object $backend,
         array $input_shapes=null,
+        bool $use_scale=null,
+        bool $do_not_expand_mask=null,
         string $name=null,
     )
     {
         // defaults
         $input_shapes = $input_shapes ?? null;
         $name = $name ?? null;
+        $use_scale = $use_scale ?? false;
+        $do_not_expand_mask = $do_not_expand_mask ?? false;
 
         $this->backend = $K = $backend;
         $this->inputShape = $input_shapes;
+        $this->useScale = $use_scale;
+        $this->doNotExpandMask = $do_not_expand_mask;
+        if($this->useScale) {
+            $this->scale = $K->array(1.0);
+            $this->dScale = $K->array(0.0);
+            $this->allocateWeights(1);
+        }
         $this->initName($name,'attention');
     }
 
@@ -46,7 +62,7 @@ class Attention extends AbstractLayerBase
             throw new InvalidArgumentException('num of inputs must be 2 or 3: inputs is '.count($inputShapes));
         }
         foreach ($inputShapes as $idx => $shape) {
-            if(!is_array($shape)||count($shape)!=2) {
+            if(!is_array($shape)||count($shape)<2) {
                 if(is_array($shape)) {
                     $type = '['.implode(',',$shape).']';
                 } else {
@@ -55,9 +71,13 @@ class Attention extends AbstractLayerBase
                 throw new InvalidArgumentException('input_shapes must be the list of shape: '.$type.' included in #'.$idx.'.');
             }
         }
-        [$tq, $dim] = $inputShapes[0];  // Query
-        [$tv, $tdim] = $inputShapes[1]; // Value
-        if($dim!=$tdim) {
+        $query = $inputShapes[0];  // Query
+        $dim = array_pop($query);
+        $tq  = array_pop($query);
+        $value = $inputShapes[1]; // Value
+        $tdim = array_pop($value);
+        $tv =   array_pop($value);
+        if($dim!=$tdim || $query!=$value) {
             throw new InvalidArgumentException('Unmatch query shape and value shape:'.
             '['.implode(',',$inputShapes[0]).'],['.implode(',',$inputShapes[1]).']');
         }
@@ -66,8 +86,27 @@ class Attention extends AbstractLayerBase
                 throw new InvalidArgumentException('value shape and key shape must be same.');
             }
         }
-        $this->outputShape = [$tq,$dim];
-        $this->scoresShape = [$tq,$tv];
+        $this->outputShape = array_merge($query,[$tq,$dim]);
+        $this->scoresShape = array_merge($query,[$tq,$tv]);
+        $this->syncWeightVariables();
+    }
+
+    public function getParams() : array
+    {
+        if($this->useScale) {
+            return [$this->scale];
+        } else {
+            return [];
+        }
+    }
+
+    public function getGrads() : array
+    {
+        if($this->useScale) {
+            return [$this->dScale];
+        } else {
+            return [];
+        }
     }
 
     public function getConfig() : array
@@ -89,29 +128,38 @@ class Attention extends AbstractLayerBase
         if(count($inputs)!=2 && count($inputs)!=3) {
             throw new InvalidArgumentException('Must have 2 or 3 arguments in '.$this->name.':'.$direction);
         }
-        $tq = $this->inputShape[0][0];
-        $dim = $this->inputShape[0][1];
-        $tv = $this->inputShape[1][0];
+        //$tq = $this->inputShape[0][0];
+        //$dim = $this->inputShape[0][1];
+        //$tv = $this->inputShape[1][0];
         $qshape = $inputs[0]->shape();
-        if($qshape[1]!=$tq||$qshape[2]!=$dim){
-            throw new InvalidArgumentException('Unmatch query shape [b,'.$tq.','.$dim.'] NDArray.'.
-                ' ['.implode(',',$qshape).'] given in '.$this->name.':'.$direction);
+        $batchNum = array_shift($qshape);
+        $vshape = $inputs[1]->shape();
+        $vbatchNum = array_shift($vshape);
+        if($batchNum!=$vbatchNum) {
+            throw new InvalidArgumentException('Unmatch batch size of query and value: '.
+                "query=[$batchNum,".implode(',',$qshape)."],".
+                "value=[$vbatchNum,".implode(',',$vshape)."]".
+                "in ".$this->name.':'.$direction);
         }
-        if($qshape[1]!=$tq||$qshape[2]!=$dim){
-            throw new InvalidArgumentException('Unmatch query shape [b,'.$tq.','.$dim.'] NDArray.'.
-                ' ['.implode(',',$qshape).'] given in '.$this->name.':'.$direction);
+        if($this->inputShape[0]!=$qshape){
+            throw new InvalidArgumentException('Unmatch query shape '.
+                ' [b,'.implode(',',$this->inputShape[0]).'] NDArray.'.
+                ' ['.$batchNum.','.implode(',',$qshape).'] given in '.$this->name.':'.$direction);
         }
-        $vshape = $inputs[0]->shape();
-        if($vshape[1]!=$tq||$vshape[2]!=$dim){
-            throw new InvalidArgumentException('Unmatch value shape [b,'.$tq.','.$dim.'] NDArray.'.
-                ' ['.implode(',',$vshape).'] given in '.$this->name.':'.$direction);
-        }
-        if($qshape[0]!=$vshape[0]) {
-            throw new InvalidArgumentException('Unmatch batch size.:'.
-                ' ['.implode(',',$qshape).'],['.implode(',',$vshape).'] given in '.$this->name.':'.$direction);
+        if($this->inputShape[1]!=$vshape){
+            throw new InvalidArgumentException('Unmatch value shape '.
+                ' [b,'.implode(',',$this->inputShape[1]).'] NDArray.'.
+                ' ['.$vbatchNum.','.implode(',',$vshape).'] given in '.$this->name.':'.$direction);
         }
         if(count($inputs)==3) {
-            $kshape = $inputs[0]->shape();
+            $kshape = $inputs[2]->shape();
+            $kbatchNum = array_shift($kshape);
+            if($vbatchNum!=$kbatchNum) {
+                throw new InvalidArgumentException('Unmatch batch size of value and key: '.
+                    "query=[$vbatchNum,".implode(',',$vshape)."],".
+                    "value=[$kbatchNum,".implode(',',$kshape)."]".
+                    "in ".$this->name.':'.$direction);
+            }
             if($kshape!=$vshape){
                 throw new InvalidArgumentException('Unmatch value shape and key shape.:'.
                     ' ['.implode(',',$vshape).'],['.implode(',',$kshape).'] in '.$this->name.':'.$direction);
@@ -137,7 +185,7 @@ class Attention extends AbstractLayerBase
 
     public function backward(array $dOutputs,ArrayAccess $grads=null,array $oidsToCollect=null) : array
     {
-        if(count($dOutputs)!=1) {
+        if(count($dOutputs)!=1&&count($dOutputs)!=2) {
             throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
         }
         $dOutputs = $dOutputs[0];
@@ -152,7 +200,29 @@ class Attention extends AbstractLayerBase
         return $dInputs;
     }
 
-    protected function call(array $inputs, bool $training, array $options=null)
+    protected function expandMask($sourceMask,$target)
+    {
+        $K = $this->backend;
+        $mask = $sourceMask;
+        $maskShape = $mask->shape();
+        $targetShape = $target->shape();
+        foreach (array_map(null,$maskShape,$targetShape) as $axis => [$mT,$T]) {
+            if($mT==1 && $T!=1) {
+                $mask = $K->repeat($mask,$T,axis:$axis,keepdims:true);
+            } elseif($mT!=$T) {
+                throw new InvalidArgumentException('Incompatible shapes for broadcasting: '.
+                    '['.implode(',',$sourceMask->shape()).'] vs. ['.implode(',',$target->shape()).']');
+            }
+        }
+        return $mask;
+    }
+
+    protected function call(
+        array $inputs,
+        bool $training=null,
+        bool $returnAttentionScores=null,
+        array $mask=null,
+        )
     {
         $K = $this->backend;
         $container = $this->container();
@@ -166,19 +236,97 @@ class Attention extends AbstractLayerBase
             $container->sameKey = true;
         }
         // scores = query * key
+        //
+        // query  = [batch_size, Tq, dim]
+        // key    = [batch_size, Tv, dim]
+        // scores = [batch_size, Tq, Tv]
         $scores = $K->matmul($query, $key, null, $tranB=true);
+        
+        if($this->useScale) {
+            // scores = scores / sqrt(qk) 
+            $scale = $K->scalar($this->scale);
+            $scores = $K->update_scale($scores,$scale);
+            $container->scale = $scale;
+            $container->scores = $K->copy($scores);
+        }
+        $queryMask = null;
+        $valueMask = null;
+        if($mask) {
+            [$queryMask,$valueMask] = $mask;
+        }
+        if($valueMask) {
+            if($valueMask->dtype()==NDArray::bool || $K->isInt($valueMask)) {
+                $valueMask = $K->cast($valueMask,$scores->dtype());
+            }
+            $valueMask = $K->less($valueMask,0.5);              // (mask<0.5)>1.0 , (mask>0.5)=>0.0
+            // scores += (-1e9*valueMask)
+            if(!$this->doNotExpandMask) { // Broadcasting 
+                // scores = [batch_size, Tq, Tv]
+                // valueMask = [batch_size, Tv]
+                $scoresShape = $scores->shape();
+                $Tv = array_pop($scoresShape);
+                $Tq = array_pop($scoresShape);
+                $maskShape = $valueMask->shape();
+                $mTv = array_pop($maskShape);
+                if($maskShape!=$scoresShape||$Tv!=$mTv) {
+                    throw new InvalidArgumentException('unmatch inputs and queryMask.'.
+                    ' scores:['.implode(',',$scores->shape()).']'.
+                    ' given mask:['.implode(',',$valueMask->shape()).']');
+                }
+                // scores = [batch_size, Tq, Tv]
+                // valueMask = [batch_size, Tv] =repeat=> [batch_size, Tq, Tv]
+                $valueMask = $K->repeat($valueMask,$Tq,axis:-1);
+            } else { // No Broadcasting 
+                // scores += (-1e9*valueMask)
+                $valueMask = $this->expandMask($valueMask,$scores);
+            }
+            $K->update_add($scores,$valueMask,alpha:-1e9);
+        }
         // weights = softmax(scores)
         $attentionWeight = $K->softmax($scores);
+
         // vector = weights * value
+        // scores = [batch_size, Tq, Tv]
+        // value  = [batch_size, Tv, dim]
+        // vector = [batch_size, Tq, dim]
         $contextVector = $K->matmul($attentionWeight, $value);
+
+        if($queryMask) {
+            if($K->isFloat($queryMask)) {
+                $queryMask = $K->greater($queryMask,0.5);
+            } else {
+                $queryMask = $K->cast($queryMask,$contextVector->dtype());
+            }
+            if(!$this->doNotExpandMask) { // Broadcasting 
+                // queryMask = [batch_size, Tq]
+                // vector = [batch_size, Tq, dim] => [dim, batch_size, Tq]
+                $shape = $contextVector->shape();
+                $orgShape = $shape;
+                $dim = array_pop($shape);
+                if($queryMask->shape()!=$shape) {
+                    throw new InvalidArgumentException('unmatch inputs and queryMask.'.
+                    ' contextVector:['.implode(',',$contextVector->shape()).']'.
+                    ' given mask:['.implode(',',$queryMask->shape()).']');
+                }
+                $Tq = array_pop($shape);
+                $batchSize = (int)array_product($shape);
+                $queryMask = $queryMask->reshape([(int)array_product($queryMask->shape())]);
+                $contextVector = $contextVector->reshape([$batchSize*$Tq, $dim]);
+                $contextVector = $K->update_mul($contextVector, $queryMask, trans:true);
+                $contextVector = $contextVector->reshape($orgShape);
+            } else { // No Broadcasting 
+                $queryMask = $this->expandMask($queryMask,$contextVector);
+                $contextVector = $K->update_mul($contextVector, $queryMask);
+            }
+            $container->queryMask = $queryMask;
+        }
 
         $container->value = $value;
         $container->attentionWeight = $attentionWeight;
         $container->query = $query;
         $container->key = $key;
-        if($options!==null &&
-            array_key_exists(self::RETURN_ATTENTION_SCORES,$options) &&
-            $options[self::RETURN_ATTENTION_SCORES]) {
+        if($returnAttentionScores) {
+            $this->unbackpropagatables = [false,true];
             return [$contextVector,$attentionWeight];
         } else {
             return $contextVector;
@@ -194,9 +342,41 @@ class Attention extends AbstractLayerBase
         // backward:
         //   dWeights = dVector (*) value^T
         //   dValue   = weights^T (*) dVector
+
+        if(isset($container->queryMask)) {
+            if(!$this->doNotExpandMask) { // Broadcasting 
+                // queryMask = [batch_size*Tq]
+                // vector = [batch_size, Tq, dim] => [dim, batch_size, Tq]
+                $batchShape = $dOutputs->shape();
+                $dim = array_pop($batchShape);
+                $Tq = array_pop($batchShape);
+                $batchSize = (int)array_product($batchShape);
+                $dOutputs = $K->copy($dOutputs->reshape([$batchSize*$Tq, $dim]));
+                $dOutputs = $K->update_mul($dOutputs, $container->queryMask, trans:true);
+                $dOutputs = $dOutputs->reshape([$batchSize, $Tq, $dim]);
+            } else {
+                $dOutputs = $K->copy($dOutputs);
+                $dOutputs = $K->update_mul($dOutputs, $container->queryMask);
+            }
+        }
+
         $dAttentionWeight = $K->matmul($dOutputs,$container->value,$transA=false,$transB=true);
         $dValue = $K->matmul($container->attentionWeight,$dOutputs,$transA=true,$transB=false);
+
         $dScores = $K->dSoftmax($dAttentionWeight,$container->attentionWeight);
+
+        // valueMask is dAdd so it is passed through.
+
+        if(isset($container->scale)) {
+            // dScale  = sum(dScales * scales)
+            // dScores = dScores * scale 
+            $dScale = $K->sum($K->mul($dScores,$container->scores));
+            if(is_scalar($dScale)) {
+                $dScale = $K->array($dScale);
+            }
+            $K->copy($dScale,$this->dScale);
+            $K->update_scale($dScores,$container->scale);
+        }
 
         $dQuery = $K->matmul($dScores,$container->key,$transA=false,$transB=false);
         $dKey = $K->matmul($dScores,$container->query,$transA=true,$transB=false);
@@ -209,45 +389,68 @@ class Attention extends AbstractLayerBase
         }
     }
 
-    protected function numOfOutputs($options)
+    protected function numOfOutputs(?array $options)
     {
-        if($options[self::RETURN_ATTENTION_SCORES] ?? false) {
+        if($options['returnAttentionScores'] ?? false) {
             return 2;
         }
         return 1;
     }
 
-    public function __invoke($inputs, $training, $options=null)
+    final public function __invoke(...$args)
     {
-        $outputs = $this->forward($inputs, $training, $options);
-        return $outputs;
+        return $this->forward(...$args);
     }
 
     /**
     *  @param array<Variable>  $inputs
     *  @return array<Variable>|Variable
     */
-    public function forward(array $inputs, Variable|bool $training, array $options=null)
+    public function forward(
+        array $inputs, 
+        Variable|bool $training=null, 
+        Variable|bool $returnAttentionScores=null,
+        array $mask=null,
+        )
     {
         //$outputs = null;
         if(!is_array($inputs)) {
             throw new InvalidArgumentException('inputs must be list of Variable');
         }
         [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
-        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+        $options = [];
+        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training,unbackpropagatable:true);
+        [$returnAttentionScores,$rawReturnAttentionScores] = $this->packAndUnpackVariable($this->backend,$returnAttentionScores,unbackpropagatable:true);
+        $options['training'] = $training;
+        $options['returnAttentionScores'] = $returnAttentionScores;
+        $rawMask = null;
+        if($mask) {
+            if(count($mask)!=2) {
+                throw new InvalidArgumentException('mask must be list of the two of masks as queryMask and valueMask');
+            }
+            [$mask,$rawMask] = $this->packAndUnpackVariables($this->backend,$mask,unbackpropagatable:true);
+            $options['queryMask'] = $mask[0];
+            $options['valueMask'] = $mask[1];
+        }
         if(!$this->built) {
             $this->build($inputs);
             $this->built = true;
         }
+        $options = $this->cleanNullValue($options);
+        
         $numOfOutputs = $this->numOfOutputs($options);
-        $session = $this->preGradientProcessOnSession($inputs);
+        $session = $this->preGradientProcessOnSession($inputs,$options);
         $session->begin();
         try {
             $this->assertInputShapes($rawInputs,'forward');
-            $rawOutputs = $this->call($rawInputs,$rawTraining,$options);
-            if($options!==null &&
-                array_key_exists(self::RETURN_ATTENTION_SCORES,$options)&&
-                $options[self::RETURN_ATTENTION_SCORES]) {
+            $this->unbackpropagatables = null;
+            $rawOutputs = $this->call(
+                $rawInputs, 
+                training:$rawTraining, 
+                returnAttentionScores:$rawReturnAttentionScores,
+                mask:$rawMask,
+                );
+            if($returnAttentionScores){
                 $this->assertOutputShape($rawOutputs[0],'forward');
                 $this->assertScoresShape($rawOutputs[1],'forward');
             } else {
@@ -256,16 +459,16 @@ class Attention extends AbstractLayerBase
         } finally{
             $session->end();
         }
-        if($numOfOutputs>1) {
-            [$rawOutputs,$scores] = $rawOutputs;
+        if($numOfOutputs==1) {
+            $rawOutputs = [$rawOutputs];
         }
         $outputs = $this->postGradientProcessOnSession(
-            $this->backend, $session,$inputs, [$rawOutputs]);
-        if($numOfOutputs>1) {
-            array_push($outputs,$scores);
-            return $outputs;
-        } else {
+            $this->backend, $session,$inputs,
+            $rawOutputs,$this->unbackpropagatables);
+        if($numOfOutputs==1) {
             return $outputs[0];
+        } else {
+            return $outputs;
         }
     }
 
@@ -274,10 +477,20 @@ class Attention extends AbstractLayerBase
      */
     public function _rawCall(array $inputs,array $options)
     {
-        $training = $options['training'] ?? false;
-        $opts=[];
-        $opts[self::RETURN_ATTENTION_SCORES] = $options[self::RETURN_ATTENTION_SCORES] ?? false;
-        $outputs = $this->call($inputs, $training, $opts);
+        $training = $options['training'] ?? null;
+        $queryMask = $options['queryMask'] ?? null;
+        $valueMask = $options['valueMask'] ?? null;
+        $mask = null;
+        if($queryMask) {
+            $mask = [$queryMask,$valueMask];
+        }
+        $returnAttentionScores = $options['returnAttentionScores'] ?? null;
+        $outputs = $this->call(
+            $inputs,
+            training:$training,
+            returnAttentionScores:$returnAttentionScores,
+            mask:$mask,
+        );
         if(!is_array($outputs)) {
             $outputs = [$outputs];
         }

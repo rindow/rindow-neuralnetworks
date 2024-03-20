@@ -8,12 +8,16 @@ class StopGradient extends AbstractFunction
 {
     protected function call(array $inputs) : array
     {
-        return [$this->backend->copy($inputs[0])];
+        $K = $this->backend;
+        $outputs = [$K->copy($inputs[0])];
+        $this->unbackpropagatables = [true];
+        return $outputs;
     }
 
     protected function differentiate(array $dOutputs) : array
     {
-        $dInput = $this->backend->zerosLike($dOutputs[0]);
-        return [$dInput];
+        $K = $this->backend;
+        $dInputs = [$K->zerosLike($dOutputs[0])];
+        return $dInputs;
     }
 }

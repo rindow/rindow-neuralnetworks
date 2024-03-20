@@ -75,7 +75,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         return $dInputs;
     }
 
-    protected function call(array $inputs,bool $training)
+    protected function call(array $inputs,bool $training=null)
     {
         $K = $this->backend;
         $container = $this->container();
@@ -112,9 +112,9 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             [$this->cell,'forward'],
             $inputs,
             $initialStates,
-            $training,
-            $outputs,
-            $this->goBackwards
+            training:$training,
+            outputs:$outputs,
+            goBackwards:$this->goBackwards
         );
         $container->calcStates = $calcStates;
         $container->origInputsShape = $inputs->shape();
@@ -172,25 +172,30 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     *  @param Variable  $inputs
     *  @param bool      $training
     *  @param array<Variable> $initialStates
-    *  @param array     $options
     *  @return array<Variable>
     *       outputs
     */
-    final public function forward(object $inputs, Variable|bool $training, array $initialStates=null,array $options=null)
+    final public function forward(object $inputs, Variable|bool $training=null, array $initialStates=null)
     {
         $inputs = [$inputs];
         if($initialStates!==null) {
             $inputs = array_merge($inputs,$initialStates);
         }
         [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
-        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+        if($training===null) {
+            $rawTraining = null;
+            $options = null;
+        } else {
+            [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+            $options = ['training'=>$training];
+        }
 
         if(!$this->built) {
             $this->build($inputs);
             $this->built = true;
         }
 
-        $session = $this->preGradientProcessOnSession($inputs,['training'=>$training]);
+        $session = $this->preGradientProcessOnSession($inputs,$options);
         $session->begin();
         try {
             $rawInitialStates = $rawInputs;
@@ -201,7 +206,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             }
             unset($tmpRawInputs);
             unset($rawInitialStates);
-            $rawOutputs = $this->call($rawInputs,$rawTraining);
+            $rawOutputs = $this->call($rawInputs,training:$rawTraining);
             $rawStates = $rawOutputs;
             $tmpRawOutputs = array_shift($rawStates);
             if(count($rawStates)>0) {
@@ -232,7 +237,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     public function _rawCall(array $inputs,array $options)
     {
         $training = $options['training'] ?? false;
-        $results = $this->call($inputs,$training);
+        $results = $this->call($inputs,training:$training);
         return $results;
     }
 

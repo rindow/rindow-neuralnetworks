@@ -7,7 +7,7 @@ class ReLU extends AbstractActivation
 {
     #protected $mask;
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $this->states->inputs = $inputs;

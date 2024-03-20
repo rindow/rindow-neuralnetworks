@@ -9,7 +9,7 @@ use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use InvalidArgumentException;
 
-class Test extends TestCase
+class BackendTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -25,7 +25,7 @@ class Test extends TestCase
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 
@@ -326,15 +326,117 @@ class Test extends TestCase
         $K = $this->newBackend($mo);
         $x = $K->array([4,9],NDArray::float32);
         $y = $K->array([9,9],NDArray::float32);
+        $x_backup = $K->copy($x); $K->finish();
+        $y_backup = $K->copy($y); $K->finish();
+
         $z = $K->equal($x,$y); $K->finish();
         $this->assertEquals([0,1],$z->toArray());
         $this->assertEquals(NDArray::float32,$z->dtype());
+        $this->assertEquals($x_backup->toArray(),$x->toArray());
+        $this->assertEquals($y_backup->toArray(),$y->toArray());
 
         $x = $K->array([4,9],NDArray::int32);
         $y = $K->array([9,9],NDArray::int32);
+        $x_backup = $K->copy($x); $K->finish();
+        $y_backup = $K->copy($y); $K->finish();
+
         $z = $K->equal($x,$y); $K->finish();
         $this->assertEquals([0,1],$z->toArray());
         $this->assertEquals(NDArray::int32,$z->dtype());
+        $this->assertEquals($x_backup->toArray(),$x->toArray());
+        $this->assertEquals($y_backup->toArray(),$y->toArray());
+    }
+
+    public function testNotEqual()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([4,9],NDArray::float32);
+        $y = $K->array([9,9],NDArray::float32);
+        $x_backup = $K->copy($x); $K->finish();
+        $y_backup = $K->copy($y); $K->finish();
+
+        $z = $K->notEqual($x,$y); $K->finish();
+        $this->assertEquals([1,0],$z->toArray());
+        $this->assertEquals(NDArray::float32,$z->dtype());
+        $this->assertEquals($x_backup->toArray(),$x->toArray());
+        $this->assertEquals($y_backup->toArray(),$y->toArray());
+
+        $x = $K->array([4,9],NDArray::int32);
+        $y = $K->array([9,9],NDArray::int32);
+        $x_backup = $K->copy($x); $K->finish();
+        $y_backup = $K->copy($y); $K->finish();
+
+        $z = $K->notEqual($x,$y); $K->finish();
+        $this->assertEquals([1,0],$z->toArray());
+        $this->assertEquals(NDArray::int32,$z->dtype());
+        $this->assertEquals($x_backup->toArray(),$x->toArray());
+        $this->assertEquals($y_backup->toArray(),$y->toArray());
+    }
+
+    public function testNot()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([4,0],NDArray::float32);
+        $x_backup = $K->copy($x); $K->finish();
+
+        $z = $K->not($x); $K->finish();
+        $this->assertEquals([0,1],$z->toArray());
+        $this->assertEquals(NDArray::float32,$z->dtype());
+        $this->assertEquals($x_backup->toArray(),$x->toArray());
+
+        $x = $K->array([0,9],NDArray::int32);
+        $x_backup = $K->copy($x); $K->finish();
+
+        $z = $K->not($x); $K->finish();
+        $this->assertEquals([1,0],$z->toArray());
+        $this->assertEquals(NDArray::int32,$z->dtype());
+        $this->assertEquals($x_backup->toArray(),$x->toArray());
+    }
+
+    public function testSin()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $la = $K->localLA();
+        $x = $K->array([M_PI,M_PI*0.5],NDArray::float32);
+        $y = $K->ndarray($K->sin($x));
+        $this->assertTrue($la->isclose(
+            $mo->array([0,1]),$y));
+    }
+
+    public function testCos()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $la = $K->localLA();
+        $x = $K->array([M_PI,M_PI*0.5],NDArray::float32);
+        $y = $K->ndarray($K->cos($x));
+        $this->assertTrue($la->isclose(
+            $mo->array([-1,0]),$y));
+    }
+
+    public function testTan()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $la = $K->localLA();
+        $x = $K->array([0,M_PI*0.25],NDArray::float32);
+        $y = $K->ndarray($K->tan($x));
+        $this->assertTrue($la->isclose(
+            $mo->array([0,1]),$y));
+    }
+
+    public function testTanh()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $la = $K->localLA();
+        $x = $K->array([-10,0,10],NDArray::float32);
+        $y = $K->ndarray($K->tanh($x));
+        $this->assertTrue($la->isclose(
+            $mo->array([-1,0,1]),$y));
     }
 
     public function testSum()
@@ -379,12 +481,12 @@ class Test extends TestCase
         }
 
         $x = $K->array([[2,3],[1,2]],NDArray::float32);
-        $z = $K->sum($x,$axis=1); $K->finish();
+        $z = $K->sum($x,axis:1); $K->finish();
         $this->assertEquals([5,3],$z->toArray());
         $this->assertEquals(NDArray::float32,$z->dtype());
         if($K->fp64()) {
             $x = $K->array([[2,3],[1,2]],NDArray::float64);
-            $z = $K->sum($x,$axis=1); $K->finish();
+            $z = $K->sum($x,axis:1); $K->finish();
             $this->assertEquals([5,3],$z->toArray());
             $this->assertEquals(NDArray::float64,$z->dtype());
         }
@@ -392,8 +494,8 @@ class Test extends TestCase
         /// ***** CAUTION *****
         /// OpenBLAS\Math::reduceSum not supports integer dtypes
         //$x = $mo->array([[2,3],[1,2]],NDArray::int32);
-        //$this->assertEquals([5,3],$K->sum($x,$axis=1)->toArray());
-        //$this->assertEquals(NDArray::float32,$K->sum($x,$axis=1)->dtype());
+        //$this->assertEquals([5,3],$K->sum($x,axis:1)->toArray());
+        //$this->assertEquals(NDArray::float32,$K->sum($x,axis:1)->dtype());
     }
 
     public function testMean()
@@ -401,7 +503,7 @@ class Test extends TestCase
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
         $x = $K->array([[2,3],[1,2]]);
-        $z = $K->mean($x,$axis=1); $K->finish();
+        $z = $K->mean($x,axis:1); $K->finish();
         $this->assertEquals([2.5,1.5],$z->toArray());
         $z = $K->mean($x); $K->finish();
         $this->assertLessThan(1e-5,abs(((2+3+1+2)/4)-$z));
@@ -422,7 +524,7 @@ class Test extends TestCase
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
-        $x = $K->array([0,1,2,3,0,1,2,3]);
+        $x = $K->array([0,1,2,3,0,1,2,3],dtype:NDArray::int32);
         $y = $K->oneHot($x,4); $K->finish();
         $this->assertEquals($y->toArray(),[
             [1,0,0,0],
@@ -500,7 +602,7 @@ class Test extends TestCase
         $softmax = $K->softmax($x); $K->finish();
         $this->assertLessThanOrEqual(1,$K->scalar($K->max($softmax)));
         $this->assertGreaterThanOrEqual(0,$K->scalar($K->max($softmax)));
-        $sum = $K->sum($softmax,$axis=1); $K->finish(); $sum = $sum->toArray();
+        $sum = $K->sum($softmax,axis:1); $K->finish(); $sum = $sum->toArray();
         $this->assertLessThan(0.0001,abs($sum[0]-1));
         $this->assertLessThan(0.0001,abs($sum[1]-1));
     }

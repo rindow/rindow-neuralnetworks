@@ -54,6 +54,14 @@ class GraphSession
         }
     }
 
+    public function name()
+    {
+        if(method_exists($this->func,'name')) {
+            return $this->func->name();
+        }
+        return get_class($this->func);
+    }
+
     protected function maxGeneration(array $variables)
     {
         return array_reduce($variables,function($max,$variable) {

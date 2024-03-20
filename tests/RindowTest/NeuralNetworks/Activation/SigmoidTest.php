@@ -8,7 +8,7 @@ use Rindow\NeuralNetworks\Activation\Sigmoid;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
 
-class Test extends TestCase
+class SigmoidTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -46,7 +46,7 @@ class Test extends TestCase
         $states = new \stdClass();
         $x = $mo->array([-1.0,-0.5,0.0,0.5,1.0]);
         $x = $K->array($x);
-        $y = $activation->forward($states,$x, $training=true);
+        $y = $activation->forward($states,$x);
         $y = $K->ndarray($y);
         $x = $K->ndarray($x);
 
@@ -72,6 +72,6 @@ class Test extends TestCase
 
         $inputs = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$K,$activation,$inputs,$training=true));
+            $this->verifyGradient($mo,$K,$activation,$inputs));
     }
 }

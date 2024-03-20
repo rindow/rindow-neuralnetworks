@@ -30,6 +30,13 @@ abstract class AbstractLayerBase implements Layer
     protected $weights=[];
     protected $assignedWeights = false;
     protected $built = false;
+    protected $training = false;
+    protected $callOptions = [];
+
+    public function isBuilt() : bool
+    {
+        return $this->built;
+    }
 
     public function getActivation()
     {
@@ -320,5 +327,10 @@ abstract class AbstractLayerBase implements Layer
         } else {
             return gettype($object);
         }
+    }
+
+    public function isAwareOf(string $name) : bool
+    {
+        return isset($this->callOptions);
     }
 }

@@ -23,111 +23,111 @@ class CallbackList
         }
     }
 
-    public function onTrainBegin(array $logs=null) : void
+    public function onTrainBegin(array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTrainBegin($logs);
+            $callback->onTrainBegin($metrics);
         }
     }
 
-    public function onTestBegin(array $logs=null) : void
+    public function onTestBegin(array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTestBegin($logs);
+            $callback->onTestBegin($metrics);
         }
     }
 
-    public function onPredictBegin(array $logs=null) : void
+    public function onPredictBegin(array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onPredictBegin($logs);
+            $callback->onPredictBegin($metrics);
         }
     }
 
-    public function onTrainEnd(array $logs=null) : void
+    public function onTrainEnd(array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTrainEnd($logs);
+            $callback->onTrainEnd($metrics);
         }
     }
 
-    public function onTestEnd(array $logs=null) : void
+    public function onTestEnd(array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTestEnd($logs);
+            $callback->onTestEnd($metrics);
         }
     }
 
-    public function onPredictEnd(array $logs=null) : void
+    public function onPredictEnd(array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onPredictEnd($logs);
+            $callback->onPredictEnd($metrics);
         }
     }
 
-    public function onTrainBatchBegin(int $batch, array $logs=null) : void
+    public function onTrainBatchBegin(int $batch, array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTrainBatchBegin($batch, $logs);
+            $callback->onTrainBatchBegin($batch, $metrics);
         }
     }
 
-    public function onTestBatchBegin(int $batch, array $logs=null) : void
+    public function onTestBatchBegin(int $batch, array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTestBatchBegin($batch, $logs);
+            $callback->onTestBatchBegin($batch, $metrics);
         }
     }
 
-    public function onTrainBatchEnd(int $batch, array $logs=null) : void
+    public function onTrainBatchEnd(int $batch, array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTrainBatchEnd($batch, $logs);
+            $callback->onTrainBatchEnd($batch, $metrics);
         }
     }
 
-    public function onTestBatchEnd(int $batch, array $logs=null) : void
+    public function onTestBatchEnd(int $batch, array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onTrainBatchEnd($batch, $logs);
+            $callback->onTrainBatchEnd($batch, $metrics);
         }
     }
 
-    public function onEpochBegin(int $epoch, array $logs=null) : void
+    public function onEpochBegin(int $epoch, array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onEpochBegin($epoch, $logs);
+            $callback->onEpochBegin($epoch, $metrics);
         }
     }
 
-    public function onEpochEnd(int $epoch, array $logs=null) : void
+    public function onEpochEnd(int $epoch, array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
         foreach ($this->callbacks as $callback) {
-            $callback->onEpochEnd($epoch, $logs);
+            $callback->onEpochEnd($epoch, $metrics);
         }
     }
 }

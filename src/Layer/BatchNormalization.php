@@ -5,41 +5,8 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
-class BatchNormalization extends AbstractLayer
+class BatchNormalization extends AbstractNormalization
 {
-    use GenericUtils;
-    protected $backend;
-    protected $axis;
-    protected $momentum;
-    protected $epsilon;
-    protected $center;
-    protected $scale;
-    protected $betaInitializerName;
-    protected $gammaInitializerName;
-    protected $movingMeanInitializerName;
-    protected $movingVarianceInitializerName;
-    protected $betaInitializer;
-    protected $gammaInitializer;
-    protected $movingMeanInitializer;
-    protected $movingVarianceInitializer;
-
-    protected $calcAxis;
-    protected $beta;
-    protected $gamma;
-    protected $dBeta;
-    protected $dGamma;
-    protected $movingMean;
-    protected $movingVariance;
-    //protected $xc;
-    //protected $xn;
-    //protected $std;
-    protected $orignalShape1;
-    protected $orignalShape2;
-    protected $transformShapePhase1Pre;
-    protected $transformShapePhase1Post;
-    protected $transformShapePhase2Pre;
-    protected $transformShapePhase2Post;
-
     public function __construct(
         object $backend,
         int $axis=null,
@@ -82,80 +49,18 @@ class BatchNormalization extends AbstractLayer
         $this->movingVarianceInitializer = $K->getInitializer($moving_variance_initializer);
         $this->initName($name,'batchnormalization');
         $this->allocateWeights(2,$nonTrainables=2);
+        $this->callOptions['training'] = true;
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    protected function buildNoTrainingMode(array $kernelShape) : void
     {
-        $K = $this->backend;
-        $betaInitializer = $this->betaInitializer;
-        $gammaInitializer = $this->gammaInitializer;
         $movingMeanInitializer = $this->movingMeanInitializer;
         $movingVarianceInitializer = $this->movingVarianceInitializer;
 
-        // ********* CAUTION ***********
-        //  if inappropriate, then Return old varsion shape normarization
-        $inputShape = $this->normalizeInputShape($variable);
-        $axis = $this->axis;
-        $ndim = count($inputShape);
-        if($axis<0) {
-            $axis = $ndim+1+$axis;
-        }
-        if($axis<1) {
-            throw new InvalidArgumentException('Axis must be greater than 0');
-        }
-        $featureSize = $inputShape[$axis-1];
-        $kernelShape = [$featureSize];
-        if($this->beta===null) {
-            if($sampleWeights) {
-                if($this->center) {
-                    $this->beta = $sampleWeights[0];
-                }
-                if($this->scale) {
-                    $this->gamma = $sampleWeights[1];
-                }
-            } else {
-                if($this->center) {
-                    $this->beta  = $betaInitializer($kernelShape);
-                }
-                if($this->scale) {
-                    $this->gamma = $gammaInitializer($kernelShape);
-                }
-            }
-        }
         if($this->movingMean==null) {
             $this->movingMean = $movingMeanInitializer($kernelShape);
             $this->movingVariance = $movingVarianceInitializer($kernelShape);
         }
-        if($this->center) {
-            $this->dBeta = $K->zerosLike($this->beta);
-        }
-        if($this->scale) {
-            $this->dGamma = $K->zerosLike($this->gamma);
-        }
-
-        $this->calcAxis = $axis;
-        if($ndim>$axis) {
-            $nnn = array_slice($inputShape,0,$axis);
-            $this->transformShapePhase1Pre = (int)array_product($nnn);
-            $this->transformShapePhase1Post = (int)array_product(array_slice($inputShape,$axis));
-        }
-        if($ndim>1) {
-            $this->transformShapePhase2Pre = (int)(array_product($inputShape)/$featureSize);
-            $this->transformShapePhase2Post = $featureSize;
-        }
-        $this->inputShape = $inputShape;
-        $this->outputShape = $inputShape;
-        $this->syncWeightVariables();
-    }
-
-    public function getParams() : array
-    {
-        return [$this->beta,$this->gamma,$this->movingMean,$this->movingVariance];
-    }
-
-    public function getGrads() : array
-    {
-        return [$this->dBeta,$this->dGamma];
     }
 
     public function reverseSyncWeightVariables() : void
@@ -181,52 +86,31 @@ class BatchNormalization extends AbstractLayer
         ];
     }
 
-    protected function transformShape($inputs)
+    public function getParams() : array
     {
-        $K = $this->backend;
-        $batches = $inputs->shape()[0];
-        if($this->transformShapePhase1Pre) {
-            $this->orignalShape1 = $inputs->shape();
-            $inputs = $inputs->reshape([
-                $batches*$this->transformShapePhase1Pre,
-                $this->transformShapePhase1Post,
-            ]);
-            $inputs = $K->transpose($inputs);
-        }
-        if($this->transformShapePhase2Pre) {
-            $this->orignalShape2 = $inputs->shape();
-            $inputs = $inputs->reshape([
-                $batches*$this->transformShapePhase2Pre,
-                $this->transformShapePhase2Post,
-            ]);
-        }
-        return $inputs;
+        return [$this->beta,$this->gamma,$this->movingMean,$this->movingVariance];
     }
 
-    protected function untransformShape($inputs)
+    public function getGrads() : array
     {
-        $K = $this->backend;
-        if($this->transformShapePhase2Pre) {
-            $inputs = $inputs->reshape($this->orignalShape2);
-        }
-        if($this->transformShapePhase1Pre) {
-            $inputs = $K->transpose($inputs);
-            $inputs = $inputs->reshape($this->orignalShape1);
-        }
-        return $inputs;
+        return [$this->dBeta,$this->dGamma];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
+        if($training===null) {
+            throw new InvalidArgumentException("training option must be true or false.");
+        }
         $container = $this->container();
+        // (batch,heads...,feature) => (batch*heads,feature)
         $inputs = $this->transformShape($inputs);
-
         // normalization
         if($training) {
-            $mu = $K->mean($inputs,$axis=0);
+            // xn = (x - mean(x)) / sqrt(mean( (x - mean(x))**2 ) + eps)
+            $mu = $K->mean($inputs,axis:0);
             $xc = $K->sub($inputs, $mu);
-            $v = $K->mean($K->square($xc), $axis=0);
+            $v = $K->mean($K->square($xc), axis:0);
             $std = $K->sqrt($K->increment($v, $this->epsilon));
             $xn = $K->div($xc, $std);
 
@@ -245,7 +129,8 @@ class BatchNormalization extends AbstractLayer
             //                                $K->scale(1-$this->momentum, $mu));
             //$this->movingVariance = $K->add($K->scale($this->momentum,   $this->movingVariance),
             //                                $K->scale(1-$this->momentum, $v));
-        } else {
+        } else { // not training
+            // xn = (x - movingMean) / sqrt(movingVariance + eps)
             $xc = $K->sub($inputs, $this->movingMean);
             $xn = $K->div($xc, ($K->sqrt($K->increment($this->movingVariance, $this->epsilon))));
             $container->std = null;
@@ -260,6 +145,7 @@ class BatchNormalization extends AbstractLayer
             $outputs = $K->add($outputs, $this->beta);
         }
 
+        // (batch*heads,feature) => (batch,heads...,feature)
         $outputs = $this->untransformShape($outputs);
         return $outputs;
     }
@@ -272,11 +158,11 @@ class BatchNormalization extends AbstractLayer
         $numItems = $dOutputs->shape()[0];
 
         if($this->dBeta) {
-            $dbeta = $K->sum($dOutputs,$axis=0,$this->dBeta);
+            $dbeta = $K->sum($dOutputs,axis:0,output:$this->dBeta);
             //$K->copy($dbeta,$this->dBeta);
         }
         if($this->dGamma) {
-            $dgamma = $K->sum($K->mul($container->xn, $dOutputs), $axis=0,$this->dGamma);
+            $dgamma = $K->sum($K->mul($container->xn, $dOutputs), axis:0, output:$this->dGamma);
             //$K->copy($dgamma,$this->dGamma);
             $dxn = $K->mul($this->gamma, $dOutputs);
         } else {
@@ -287,17 +173,17 @@ class BatchNormalization extends AbstractLayer
         $dxc = $K->div($dxn, $container->std);
         $dstd = $K->scale(-1.0, $K->sum(
             $K->div($K->mul($dxn, $container->xc), $K->mul($container->std, $container->std)),
-            $axis=0));
+            axis:0));
         $dvar = $K->div($K->scale(0.5, $dstd), $container->std);
         $K->update_add($dxc,
             $K->scale(2.0/$numItems, $K->mul($container->xc, $dvar)));
-        $dmu = $K->sum($dxc, $axis=0);
+        $dmu = $K->sum($dxc, axis:0);
         $dInputs = $K->sub($dxc, $K->scale(1/$numItems,$dmu));
 
         $dInputs = $this->untransformShape($dInputs);
         return $dInputs;
     }
-
+    
     public function __clone()
     {
         if(isset($this->gamma)) {

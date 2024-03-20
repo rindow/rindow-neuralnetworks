@@ -9,7 +9,7 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Plot\Plot;
 
-class Test extends TestCase
+class HuberTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -23,29 +23,39 @@ class Test extends TestCase
 
     public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
     {
-        $f = function($x) use ($mo,$K,$function,$t,$fromLogits){
+        $f = function($x) use ($mo,$K,$g,$function,$t,$fromLogits){
             $x = $K->array($x);
             //if($fromLogits) {
             //    #$x = $function->forward($x,true);
             //    $x = $K->sigmoid($x);
             //}
             $l = $function->forward($t,$x);
-            return $mo->array([$K->scalar($l)]);
+            $y = $g->mul($l,$g->Variable(5));
+            return $K->ndarray($y);
         };
         $xx = $K->ndarray($x);
         $grads = $mo->la()->numericalGradient(1e-3,$f,$xx);
-        $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($function,$t, $x) {
-                $outputsVariable = $function->forward($t, $x);
-                return $outputsVariable;
+        $y = $nn->with($tape=$g->GradientTape(),
+            function() use ($function,$t, $x, $g) {
+                $l = $function->forward($t, $x);
+                $y = $g->mul($l,$g->Variable(5));
+                return $y;
             }
         );
-        $dInputs = $outputsVariable->creator()->backward([$K->array(1.0)]);
+        $mul = $y->creator();
+        $outVar = $mul->inputs()[0];
+        $outputs = $K->scalar($y);
+        $loss = $outVar->creator();
+//echo $loss->name()."\n";
+        $dInputs = $mul->backward([$K->onesLike($y)]);
+//echo "mul dInput[0]=".$mo->toString($dInputs[0],'%5.5f',true)."\n\n";
+        $dOutputs = [$dInputs[0]];
+        $dInputs = $loss->backward($dOutputs);
+//echo "\n";
+//echo "grads=".$mo->toString($grads[0],'%5.5f',true)."\n\n";
+//echo "dInputs=".$mo->toString($dInputs[1],'%5.5f',true)."\n\n";
         $dInputs = $K->ndarray($dInputs[1]);
-#echo "\n";
-#echo "grads=".$mo->toString($grads[0],'%5.3f',true)."\n\n";
-#echo "dInputs=".$mo->toString($dInputs,'%5.3f',true)."\n\n";
-#echo $mo->asum($mo->op($grads[0],'-',$dInputs))."\n";
+//echo $mo->asum($mo->op($grads[0],'-',$dInputs))."\n";
         return $mo->la()->isclose($grads[0],$dInputs,null,1e-4);
     }
 
@@ -53,7 +63,7 @@ class Test extends TestCase
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 
@@ -84,7 +94,7 @@ class Test extends TestCase
         $K = $nn->backend();
         $g = $nn->gradient();
         $this->assertInstanceof(
-            'Rindow\NeuralNetworks\Loss\Huber',
+            Huber::class,
             $nn->losses()->Huber());
     }
 
@@ -94,16 +104,18 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
-        $func = new Huber($K);
-        $func2 = new Huber($K, delta:2.0);
+        $func = $nn->losses()->Huber();
+        $func2 = $nn->losses()->Huber(delta:2.0);
 
         //
         //  Squared Loss with delta=1.0
         //
         $x = $K->array([
             [-0.5, -0.25, 0.5, 0.25],
+            [-0.5, -0.25, 0.5, 0.25],
         ]);
         $t = $K->array([
+            [0.25, 0.25, 0.25, 0.25],
             [0.25, 0.25, 0.25, 0.25],
         ]);
         $copyx = $K->copy($x);
@@ -123,10 +135,11 @@ class Test extends TestCase
         [$dmy,$dx] = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
-        $this->assertLessThan(1e-5, abs(-0.1875-$K->scalar($dx[0][0])));
-        $this->assertLessThan(1e-5, abs(-0.125-$K->scalar($dx[0][1])));
-        $this->assertLessThan(1e-5, abs(0.0625-$K->scalar($dx[0][2])));
-        $this->assertLessThan(1e-5, abs(0-$K->scalar($dx[0][3])));
+        $dx = $K->ndarray($dx);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array([
+                [-0.093750,-0.062500, 0.031250, 0.000000],
+                [-0.093750,-0.062500, 0.031250, 0.000000],
+        ]),$dx));
 
         $accuracy = $func->accuracy($t,$x);
         $accuracy = $K->scalar($accuracy);
@@ -139,8 +152,10 @@ class Test extends TestCase
         //
         $x = $K->array([
             [0.25, 0.5, 1.0, 1.5],
+            [0.25, 0.5, 1.0, 1.5],
         ]);
         $t = $K->array([
+            [0.25, 0.25, 0.25, 0.25],
             [0.25, 0.25, 0.25, 0.25],
         ]);
         $copyx = $K->copy($x);
@@ -160,10 +175,11 @@ class Test extends TestCase
         [$dmy,$dx] = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
-        $this->assertLessThan(1e-5, abs(0.0-$K->scalar($dx[0][0])));
-        $this->assertLessThan(1e-5, abs(0.0625-$K->scalar($dx[0][1])));
-        $this->assertLessThan(1e-5, abs(0.1875-$K->scalar($dx[0][2])));
-        $this->assertLessThan(1e-5, abs(0.3125-$K->scalar($dx[0][3])));
+        $dx = $K->ndarray($dx);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array([
+            [0.0, 0.03125, 0.09375, 0.15625],
+            [0.0, 0.03125, 0.09375, 0.15625],
+        ]),$dx));
 
         $accuracy = $func->accuracy($t,$x);
         $accuracy = $K->scalar($accuracy);
@@ -176,8 +192,10 @@ class Test extends TestCase
         //
         $x = $K->array([
             [-4.0, -2.0, 4.0, 2.0],
+            [-4.0, -2.0, 4.0, 2.0],
         ]);
         $t = $K->array([
+            [1.0, 1.0, 1.0, 1.0],
             [1.0, 1.0, 1.0, 1.0],
         ]);
         $copyx = $K->copy($x);
@@ -197,10 +215,12 @@ class Test extends TestCase
         [$dmy,$dx] = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
-        $this->assertLessThan(1e-5, abs(-0.25-$K->scalar($dx[0][0])));
-        $this->assertLessThan(1e-5, abs(-0.25-$K->scalar($dx[0][1])));
-        $this->assertLessThan(1e-5, abs(0.25-$K->scalar($dx[0][2])));
-        $this->assertLessThan(1e-5, abs(0.25-$K->scalar($dx[0][3])));
+
+        $dx = $K->ndarray($dx);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array([
+            [-0.125, -0.125,  0.125,  0.125],
+            [-0.125, -0.125,  0.125,  0.125]
+        ]),$dx));
 
         $accuracy = $func->accuracy($t,$x);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
@@ -212,8 +232,10 @@ class Test extends TestCase
         //
         $x = $K->array([
             [-4.0, -2.0, 4.0, 2.0],
+            [-4.0, -2.0, 4.0, 2.0],
         ]);
         $t = $K->array([
+            [1.0, 1.0, 1.0, 0.0],
             [1.0, 1.0, 1.0, 0.0],
         ]);
         $copyx = $K->copy($x);
@@ -235,10 +257,11 @@ class Test extends TestCase
         [$dmy,$dx] = $outputsVariable->creator()->backward([$K->array(1.0)]);
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
-        $this->assertLessThan(1e-5, abs(-0.5-$K->scalar($dx[0][0])));
-        $this->assertLessThan(1e-5, abs(-0.5-$K->scalar($dx[0][1])));
-        $this->assertLessThan(1e-5, abs( 0.5-$K->scalar($dx[0][2])));
-        $this->assertLessThan(1e-5, abs( 0.5-$K->scalar($dx[0][3])));
+        $dx = $K->ndarray($dx);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array([
+            [-0.25, -0.25,  0.25,  0.25],
+            [-0.25, -0.25,  0.25,  0.25]
+        ]),$dx));
 
         $accuracy = $func->accuracy($t,$x);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
@@ -250,16 +273,88 @@ class Test extends TestCase
         //
 
         $x = $K->array([
-            [0.001,],
-            [0.999,],
-            [1.1,],
-            [1.5,],
+            [0.001,0.001],
+            [0.999,0.999],
+            [1.1,1.1],
+            [1.5,1.5],
         ]);
         $t = $K->array([
-            [0,],
-            [0,],
-            [0,],
-            [0,],
+            [0,0],
+            [0,0],
+            [0,0],
+            [0,0],
+        ]);
+        $this->assertTrue(
+            $this->verifyGradient($mo,$nn,$K,$g,$func,$t,$x));
+    }
+
+    public function testReductionNone()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $func = $nn->losses()->Huber(reduction:'none');
+        $func2 = $nn->losses()->Huber(delta:2.0,reduction:'none');
+
+        //
+        //  Squared Loss with delta=1.0
+        //
+        $x = $K->array([
+            [-0.5, -0.25, 0.5, 0.25],
+            [-0.5, -0.25, 0.5, 0.25],
+        ]);
+        $t = $K->array([
+            [0.25, 0.25, 0.25, 0.25],
+            [0.25, 0.25, 0.25, 0.25],
+        ]);
+        $copyx = $K->copy($x);
+        $copyt = $K->copy($t);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$t, $x) {
+                $outputsVariable = $func->forward($t, $x);
+                return $outputsVariable;
+            }
+        );
+        $loss = $K->ndarray($outputsVariable);
+        #$accuracy = $func->accuracy($t,$x);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array(
+            [0.109375, 0.109375],
+        ),$loss));
+        //$this->assertLessThan(1e-5, abs(0.109375-$loss));
+        $this->assertEquals($copyx->toArray(),$x->toArray());
+        $this->assertEquals($copyt->toArray(),$t->toArray());
+
+        [$dmy,$dx] = $outputsVariable->creator()->backward([$K->array([1.0,1.0])]);
+        $this->assertEquals($copyx->toArray(),$x->toArray());
+        $this->assertEquals($copyt->toArray(),$t->toArray());
+        $dx = $K->ndarray($dx);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array([
+                [-0.1875, -0.125 ,  0.0625,  0.0    ],
+                [-0.1875, -0.125 ,  0.0625,  0.0    ],
+        ]),$dx));
+
+        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $K->scalar($accuracy);
+        //$this->assertLessThan(0.0001,abs(1-$accuracy));
+        $this->assertEquals($copyx->toArray(),$x->toArray());
+        $this->assertEquals($copyt->toArray(),$t->toArray());
+
+        //
+        // verifyGradient
+        //
+
+        $x = $K->array([
+            [0.001,0.001],
+            [0.999,0.999],
+            [1.1,1.1],
+            [1.5,1.5],
+        ]);
+        $t = $K->array([
+            [0,0],
+            [0,0],
+            [0,0],
+            [0,0],
         ]);
         $this->assertTrue(
             $this->verifyGradient($mo,$nn,$K,$g,$func,$t,$x));
@@ -271,8 +366,8 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
-        $func = new Huber($K);
-        $func2 = new Huber($K, delta:2.0);
+        $func = $nn->losses()->Huber();
+        $func2 = $nn->losses()->Huber(delta:2.0);
 
         $x = $K->array([
             0.001,

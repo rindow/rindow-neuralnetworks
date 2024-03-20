@@ -5,9 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
-use Rindow\NeuralNetworks\Model\ModelLoader;
 use Rindow\NeuralNetworks\Model\AbstractModel;
-use Rindow\NeuralNetworks\Layer\AbstractLayer;
 use Rindow\NeuralNetworks\Layer\Flatten;
 use Rindow\NeuralNetworks\Layer\Dense;
 use Interop\Polite\Math\Matrix\NDArray;
@@ -19,14 +17,13 @@ class TestModel extends AbstractModel
     protected $custom;
     protected $fc;
 
-    public function __construct($backend,$builder)
+    public function __construct($builder)
     {
         parent::__construct(
-            $backend,
             $builder,
             $builder->utils()->HDA());
         $this->flatten = $builder->layers()->Flatten(input_shape:[5]);
-        $this->custom = new TestSubModel($backend,$builder);
+        $this->custom = new TestSubModel($builder);
         $this->fc = $builder->layers()->Dense(
             10,
             activation:'softmax'
@@ -41,12 +38,11 @@ class TestModel extends AbstractModel
     //    $shape = $this->registerLayer($this->fc,$shape);
     //}
 
-    protected function call($inputs, $training=null, $trues=null)
+    protected function call($inputs)
     {
-        $training = $training ?? false;
-        $flat = $this->flatten->forward($inputs,$training);
-        $customout = $this->custom->forward($flat,$training);
-        $outputs = $this->fc->forward($customout,$training);
+        $flat = $this->flatten->forward($inputs);
+        $customout = $this->custom->forward($flat);
+        $outputs = $this->fc->forward($customout);
         return $outputs;
     }
 
@@ -62,9 +58,9 @@ class TestModel extends AbstractModel
 class TestSubModel extends AbstractModel
 {
     protected $fc;
-    public function __construct($backend,$builder)
+    public function __construct($builder)
     {
-        $this->backend = $backend;
+        parent::__construct($builder);
         $this->fc = $builder->layers()->Dense(5);
     }
 
@@ -76,9 +72,9 @@ class TestSubModel extends AbstractModel
     //    return $this->outputShape;
     //}
 
-    protected function call($inputs, $training)
+    protected function call($inputs)
     {
-        $out = $this->fc->forward($inputs,$training);
+        $out = $this->fc->forward($inputs);
         return $out;
     }
 
@@ -100,10 +96,9 @@ class TestRNNModel extends AbstractModel
     protected $dense;
     protected $activation;
 
-    public function __construct($backend,$builder)
+    public function __construct($builder)
     {
         parent::__construct(
-            $backend,
             $builder,
             $builder->utils()->HDA());
         $this->embed0 = $builder->layers->Embedding(
@@ -126,18 +121,18 @@ class TestRNNModel extends AbstractModel
         $this->activation = $builder->layers->Activation('softmax');
     }
 
-    protected function call($inputs, $training=null, $trues=null)
+    protected function call($inputs, $trues=null)
     {
         // encoder
-        $x = $this->embed0->forward($inputs,$training);
-        [$encOutputs,$encStates] = $this->rnn0->forward($x,$training);
+        $x = $this->embed0->forward($inputs);
+        [$encOutputs,$encStates] = $this->rnn0->forward($x);
         // decoder
-        $targets = $this->embed1->forward($trues,$training);
-        [$rnnSequence,$states] = $this->rnn1->forward($targets,$training,$encStates);
-        $contextVector = $this->attention->forward([$rnnSequence,$encOutputs],$training);
-        $outputs = $this->concat->forward([$contextVector, $rnnSequence],$training);
-        $outputs = $this->dense->forward($outputs,$training);
-        $outputs = $this->activation->forward($outputs,$training);
+        $targets = $this->embed1->forward($trues);
+        [$rnnSequence,$states] = $this->rnn1->forward($targets,initialStates:$encStates);
+        $contextVector = $this->attention->forward([$rnnSequence,$encOutputs]);
+        $outputs = $this->concat->forward([$contextVector, $rnnSequence]);
+        $outputs = $this->dense->forward($outputs);
+        $outputs = $this->activation->forward($outputs);
         return $outputs;
     }
 
@@ -173,10 +168,9 @@ class TestMultiInputModel extends AbstractModel
     protected $inp2;
     protected $concat;
     protected $fc;
-    public function __construct($backend,$builder)
+    public function __construct($builder)
     {
         parent::__construct(
-            $backend,
             $builder,
             $builder->utils()->HDA());
         $this->inp1 = $builder->layers()->Flatten(input_shape:[2]);
@@ -185,12 +179,12 @@ class TestMultiInputModel extends AbstractModel
         $this->fc = $builder->layers()->Dense(5,activation:'softmax');
     }
 
-    protected function call($inp1,$inp2,$training)
+    protected function call($inp1,$inp2)
     {
-        $inp1 = $this->inp1->forward($inp1,$training);
-        $inp2 = $this->inp2->forward($inp2,$training);
-        $x = $this->concat->forward([$inp1,$inp2],$training);
-        $out = $this->fc->forward($x,$training);
+        $inp1 = $this->inp1->forward($inp1);
+        $inp2 = $this->inp2->forward($inp2);
+        $x = $this->concat->forward([$inp1,$inp2]);
+        $out = $this->fc->forward($x);
         return $out;
     }
 
@@ -201,7 +195,7 @@ class TestMultiInputModel extends AbstractModel
     }
 }
 
-class Test extends TestCase
+class CustomModelTest extends TestCase
 {
     protected $filename;
     public function setUp() : void
@@ -250,7 +244,7 @@ class Test extends TestCase
         $K = $this->newBackend($nn);
         $g = $nn->gradient();
 
-        $model = new TestModel($K,$nn);
+        $model = new TestModel($nn);
 
         $train = $mo->random()->randn([10,5]);
         $label = $mo->arange(10);
@@ -292,7 +286,7 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $K = $this->newBackend($nn);
 
-        $model = new TestRNNModel($K,$nn);
+        $model = new TestRNNModel($nn);
         $inputs = $mo->array(
             [[1, 3, 3], [1, 4, 3], [2, 4, 4], [3, 1, 4], [4, 1, 4], [4, 2, 2]],
             NDArray::int32
@@ -325,7 +319,7 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
 
-        $model = new TestModel($backend,$nn);
+        $model = new TestModel($nn);
 
         $train = $mo->random()->randn([10,5]);
         $label = $mo->arange(10);
@@ -352,8 +346,9 @@ class Test extends TestCase
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
+        $la = $backend->localLA();
 
-        $model = new TestModel($backend,$nn);
+        $model = new TestModel($nn);
         $train = $mo->random()->randn([10,5]);
         $label = $mo->arange(10);
         $val_train = $mo->random()->randn([10,5]);
@@ -365,10 +360,14 @@ class Test extends TestCase
 
         foreach ($model->trainableVariables() as $key => $var) {
             $value = $var->value();
-            $this->assertEquals($value->toArray(),$weightsOriginal['layers'][$key]->toArray());
+            $value = $backend->ndarray($value);
+            $orig = $backend->ndarray($weightsOriginal['layers'][$key]);
+            $this->assertTrue($la->isclose($value,$orig));
         }
         foreach ($model->optimizer()->getWeights() as $key => $value) {
-            $this->assertEquals($value->toArray(),$weightsOriginal['optimizer'][$key]->toArray());
+            $value = $backend->ndarray($value);
+            $orig = $backend->ndarray($weightsOriginal['optimizer'][$key]);
+            $this->assertTrue($la->isclose($value,$orig));
         }
     }
 
@@ -377,8 +376,9 @@ class Test extends TestCase
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
+        $la = $backend->localLA();
 
-        $model = new TestRNNModel($backend,$nn);
+        $model = new TestRNNModel($nn);
         $inputs = $mo->array(
             [[1, 3, 3], [1, 4, 3], [2, 4, 4], [3, 1, 4], [4, 1, 4], [4, 2, 2]],
             NDArray::int32
@@ -416,7 +416,7 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
 
-        $model = new TestRNNModel($backend,$nn);
+        $model = new TestRNNModel($nn);
         $inputs = $mo->array(
             [[1, 3, 3], [1, 4, 3], [2, 4, 4], [3, 1, 4], [4, 1, 4], [4, 2, 2]],
             NDArray::int32
@@ -436,10 +436,14 @@ class Test extends TestCase
 
         foreach ($model->trainableVariables() as $key => $var) {
             $value = $var->value();
-            $this->assertEquals($value->toArray(),$weightsOriginal['layers'][$key]->toArray());
+            $value = $backend->ndarray($value);
+            $orig = $backend->ndarray($weightsOriginal['layers'][$key]);
+            $this->assertTrue($la->isclose($value,$orig));
         }
         foreach ($model->optimizer()->getWeights() as $key => $value) {
-            $this->assertEquals($value->toArray(),$weightsOriginal['optimizer'][$key]->toArray());
+            $value = $backend->ndarray($value);
+            $orig = $backend->ndarray($weightsOriginal['optimizer'][$key]);
+            $this->assertTrue($la->isclose($value,$orig));
         }
     }
 
@@ -449,7 +453,7 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
 
-        $origModel = new TestModel($backend,$nn);
+        $origModel = new TestModel($nn);
 
         // before build
         $model = clone $origModel;
@@ -500,7 +504,7 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
 
-        $origModel = new TestRNNModel($backend,$nn);
+        $origModel = new TestRNNModel($nn);
 
         $model = clone $origModel;
         $origModel->compile(
@@ -562,7 +566,7 @@ class Test extends TestCase
         $nn = $this->newNeuralNetworks($mo);
         $backend = $this->newBackend($nn);
 
-        $model = new TestMultiInputModel($backend,$nn);
+        $model = new TestMultiInputModel($nn);
         $model->compile(numInputs:2);
         //$model->summary();
         $a = $mo->zeros([3,2]);
@@ -583,7 +587,7 @@ class Test extends TestCase
         $K = $nn->backend();
         $g = $nn->gradient();
 
-        $model = new TestModel($K,$nn);
+        $model = new TestModel($nn);
 
         
         $model->build([1,5]);

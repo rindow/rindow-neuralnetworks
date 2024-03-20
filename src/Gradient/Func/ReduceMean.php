@@ -8,14 +8,17 @@ use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 class ReduceMean extends AbstractFunction
 {
     protected $axis;
+    protected $keepdims;
     
     public function __construct(
         object $backend,
         int $axis=null,
+        bool $keepdims=null,
     )
     {
         parent::__construct($backend);
         $this->axis = $axis;
+        $this->keepdims = $keepdims;
     }
 
     protected function call(array $inputs) : array
@@ -23,7 +26,7 @@ class ReduceMean extends AbstractFunction
         $K = $this->backend;
         $container = $this->container();
         $container->inputs = $inputs;
-        $mean = $K->mean($inputs[0],$this->axis);
+        $mean = $K->mean($inputs[0],axis:$this->axis,keepdims:$this->keepdims);
         if(!($mean instanceof NDArray)) {
             $mean = $this->backend->array($mean);
         }
@@ -46,7 +49,7 @@ class ReduceMean extends AbstractFunction
             $n = $shape[$axis];
         }
         $dSum = $K->scale(1/$n,$dOutputs[0]);
-        $dInput = $K->repeat($dSum,$n,$axis);
+        $dInput = $K->repeat($dSum,$n,axis:$axis,keepdims:$this->keepdims);
         if($axis===null) {
             $dInput = $dInput->reshape($x->shape());
         }

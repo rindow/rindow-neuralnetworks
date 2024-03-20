@@ -5,6 +5,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
+use function Rindow\Math\Matrix\R;
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
@@ -59,15 +60,15 @@ echo "dataset={$dataset}\n";
 echo "train=[".implode(',',$train_img->shape())."]\n";
 echo "test=[".implode(',',$test_img->shape())."]\n";
 
-if($shrink||!extension_loaded('rindow_openblas')) {
+if($shrink||!$mo->isAdvanced()) {
     // Shrink data
     $trainSize = 2000;
     $testSize  = 200;
     echo "Shrink data ...\n";
-    $train_img = $train_img[[0,$trainSize-1]];
-    $train_label = $train_label[[0,$trainSize-1]];
-    $test_img = $test_img[[0,$testSize-1]];
-    $test_label = $test_label[[0,$testSize-1]];
+    $train_img = $train_img[R(0,$trainSize)];
+    $train_label = $train_label[R(0,$trainSize)];
+    $test_img = $test_img[R(0,$testSize)];
+    $test_label = $test_label[R(0,$testSize)];
     echo "Shrink train=[".implode(',',$train_img->shape())."]\n";
     echo "Shrink test=[".implode(',',$test_img->shape())."]\n";
 }
@@ -83,10 +84,10 @@ function formatingImage($mo,$train_img) {
 //echo "slice images ...\n";
 //$samples = 1000;
 //$testSamples = (int)min(ceil($samples/10),count($test_img));
-//$train_img = $train_img[[0,$samples-1]];
-//$train_label = $train_label[[0,$samples-1]];
-//$test_img = $test_img[[0,$testSamples-1]];
-//$test_label = $test_label[[0,$testSamples-1]];
+//$train_img = $train_img[R(0,$samples)];
+//$train_label = $train_label[R(0,$samples)];
+//$test_img = $test_img[R(0,$testSamples)];
+//$test_label = $test_label[R(0,$testSamples)];
 //echo "Truncated train=[".implode(',',$train_img->shape())."]\n";
 //echo "Truncated test=[".implode(',',$test_img->shape())."]\n";
 
@@ -98,6 +99,7 @@ echo "formating test images ...\n";
 $test_img  = formatingImage($mo,$test_img);
 $test_label = $mo->la()->astype($test_label,NDArray::int32);
 
+echo "device type: ".$nn->deviceType()."\n";
 $modelFilePath = __DIR__."/basic-image-classification-{$dataset}.model";
 
 if(file_exists($modelFilePath)) {
@@ -133,8 +135,8 @@ if(file_exists($modelFilePath)) {
     $plt->title($dataset);
 }
 
-$images = $test_img[[0,7]];
-$labels = $test_label[[0,7]];
+$images = $test_img[R(0,8)];
+$labels = $test_label[R(0,8)];
 $predicts = $model->predict($images);
 // for from_logits
 $K = $nn->backend();

@@ -4,6 +4,7 @@ namespace Rindow\NeuralNetworks\Data\Image;
 use Rindow\NeuralNetworks\Data\Dataset\ClassifiedDirectoryDataset;
 use Interop\Polite\Math\Matrix\NDArray;
 use ArrayObject;
+use function Rindow\Math\Matrix\R;
 
 class ImageClassifiedDataset extends ClassifiedDirectoryDataset
 {
@@ -190,8 +191,8 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
             [$batchInputs,$batchTests] = $value;
             $idx = $key*$this->batchSize;
             $batchSize = count($batchInputs);
-            $la->copy($batchInputs,$inputs[[$idx,$idx+$batchSize-1]]);
-            $la->copy($batchTests,$tests[[$idx,$idx+$batchSize-1]]);
+            $la->copy($batchInputs,$inputs[R($idx,$idx+$batchSize)]);
+            $la->copy($batchTests,$tests[R($idx,$idx+$batchSize)]);
             $nn++;
             if($nn>10) {
                 $nn=0;

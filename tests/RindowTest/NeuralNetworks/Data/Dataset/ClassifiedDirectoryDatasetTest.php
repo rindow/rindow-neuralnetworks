@@ -7,7 +7,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Data\Dataset\ClassifiedDirectoryDataset;
 
-class Test extends TestCase
+class ClassifiedDirectoryDatasetTest extends TestCase
 {
     public function testNormal()
     {

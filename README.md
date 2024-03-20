@@ -7,105 +7,113 @@ Status:
 [![License](https://img.shields.io/packagist/l/rindow/rindow-neuralnetworks)](https://packagist.org/packages/rindow/rindow-neuralnetworks)
 
 
-The Rindow Neural networks is a high-level neural networks library for deep learning.
+Rindow Neural Network Library is a high-level neural network library for deep learning.
 
-The goal is to make it easy to write network models in PHP, just like Keras on Python.
+Overview
+--------
 
-To find out more please visit our website now!
+Like Keras in Python, you can easily write network models in PHP.
 
-- [Rindow projects](https://rindow.github.io/)
-- [Rindow NeuralNetworks](https://rindow.github.io/neuralnetworks)
+Website:
+- Rindow project: https://rindow.github.io/
+- Rindow Neural Networks: https://rindow.github.io/neuralnetworks
 
-If you use the rindow_openblas php extension,
-you can calculate at speed close to CPU version of tensorflow.
-The trained model trained on your laptop is available on general web hosting.
-You can also benefit from deep learning on popular PHP web hosting services.
+Speeding up
+-----------
 
-It supports GPU acceleration using OpenCL. This is an experimental attempt. The speed is not very fast yet. Only compatible with the Windows version.
+The external libraries rindow-matlib and OpenBLAS can be used to perform calculations at speeds close to CPU versions of TensorFlow.
+Models trained on laptops are available on popular web hosting.
+Deep learning is also available on popular PHP web hosting services.
 
-It has the following features.
+GPU acceleration
+----------------
+It supports GPU acceleration using OpenCL.
+You can also use GPUs other than n-vidia if they support OpenCL. It can also be used with an integrated GPU installed in your laptop.
 
-- A high-level neural networks description
-- Cooperation with high-speed operation library
-- Designing for scalability of operation library
-- Heterogeneous model distribution
 
-Rindow Neural networks usually work with:
-
-- Rindow Math Matrix: scientific matrix operation library
-- Rindow OpenBLAS extension: PHP extension of OpenBLAS
+Linked library
+--------------
+- Rindow Math Matrix: Scientific calculation library
+- Rindow Matlib: A fast matrix calculation library suitable for machine learning
+- OpenBLAS: Fast Matrix Arithmetic Library
 - Rindow Math Plot: Visualize machine learning results
-- Rindow OpenCL extension: PHP extension of OpenCL
-- Rindow CLBlast extension: PHP extension of CLBlast PHP binding.
+- OpenCL: GPU computational programming interface
+- CLBlast: High-speed matrix calculation library using OpenCL
 
-Requires
-========
+Required environment
+--------------------
 
-- PHP 8.0 and PHP 8.1 and PHP 8.2.
-- If you want to use it in PHP 7.x environment, please use Release 1.x.
+- PHP 8.1, 8.2, 8.3
+- For PHP 7.x environments, use Release 1.x.
 
 Install
-=======
+-------
 
-## Install the Rindow Neural networks
-
-Please set up with composer.
-
+Please install using Composer.
 ```shell
 $ composer require rindow/rindow-neuralnetworks
 $ composer require rindow/rindow-math-plot
 ```
 
-### Download and setup the rindow_openblas extension
+If you use it as is, it will take time to learn. In order to increase speed, we strongly recommend that you install a high-speed calculation library.
 
-Training will take a lot of time if left untouched. It is **strongly recommended** that you set up the **rindow_openblas extension** in php for speed.
+Please set up an external library.
 
-- [Pre-build binaries](https://github.com/rindow/rindow-openblas/releases)
-- [Build from source](https://github.com/rindow/rindow-openblas)
+Prebuilt binaries:
+- Rindow-matlib: https://github.com/rindow/rindow-matlib/releases
+- OpenBLAS: https://github.com/xianyi/OpenBLAS/releases
 
-## Expansion of memory used
-You need to increase the maximum amount of memory used by PHP depending on the amount of data used.
-
-When training image data, do not be surprised that the amount of sample data is so large that it will be the maximum memory capacity that you cannot usually imagine.
-
-For example, change the memory_limit item of php.ini as follows.
+Please set up according to your environment. Click [here](https://github.com/rindow/rindow-math-matrix-matlibffi) for detailed instructions.
 
 ```shell
-memory_limit = 8G
+$ composer require rindow/rindow-math-matlibffi
 ```
 
-Describing the model
-====================
-Source code for simple image learning is provided in the sample directory.
+memory expansion:
 
-Execute as follows.
+Depending on the amount of data you use, you may need to increase the maximum amount of memory that PHP uses.
+
+Especially when dealing with image data, the amount of sample data becomes enormous and requires more memory capacity than expected.
+
+For example, change memory_limit in php.ini as follows.
+
+memory_limit = 8G
+
+Model description
+-----------------
+The sample directory provides source code for simple image learning.
+
+Please run as follows:
+
 ```shell
-$ RINDOW_MATH_PLOT_VIEWER=/some/bin/dir/png-file-viewer
+$ RINDOW_MATH_PLOT_VIEWER=/path/to/viewer
 $ export RINDOW_MATH_PLOT_VIEWER
 $ mkdir samples
 $ cd samples
 $ cp ../vendor/rindow/rindow-neuralnetworks/samples/basic-image-clasification.php .
 $ php basic-image-clasification.php
 ```
-Note: Specify viewnior etc. for RINDOW_MATH_PLOT_VIEWER
+
+*Please specify an appropriate viewer for RINDOW_MATH_PLOT_VIEWER.
 
 If done correctly, a graph of the learning process will be displayed.
 
+
 GPU/OpenCL support
-==================
+------------------
+Please download the binary.
+- CLBlast: https://github.com/CNugteren/CLBlast/releases
 
-Download binaries and setup PHP extension and libraries.
+Set up the binary files according to your environment.
+Detailed instructions here https://github.com/rindow/rindow-math-matrix-matlibffi/
 
-- [Rindow OpenCL extension](https://github.com/rindow/rindow-opencl/releases)
-- [Rindow CLBlast extension](https://github.com/rindow/rindow-clblast/releases)
-- [CLBlast library](https://github.com/CNugteren/CLBlast/releases)
-
-Set environment variable.
+Please set environment variables.
 
 ```shell
 $ RINDOW_NEURALNETWORKS_BACKEND=rindowclblast::GPU
 $ export RINDOW_NEURALNETWORKS_BACKEND
 $ cd samples
-$ php basic-image-clasification.php
+$ php basic-image-classification.php
 ```
-Note: For RINDOW_NEURALNETWORKS_BACKEND, you can specify OpenCL device type or a set of Platform-ID and Device-ID in addition to names such as rindowclblast. For example, "rindowclblast::GPU" or "rindowclblast::0,0".
+
+*For RINDOW_NEURALNETWORKS_BACKEND, you can specify not only a name such as rindowclblast, but also the OpenCL device type and a set of Platform-ID and Device-ID. For example, "rindowclblast::GPU" or "rindowclblast::0,0"

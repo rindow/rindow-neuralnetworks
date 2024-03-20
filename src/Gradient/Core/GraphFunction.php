@@ -10,6 +10,8 @@ use WeakMap;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\Control\Execute;
 use Rindow\NeuralNetworks\Gradient\Module;
+use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
+use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
 
 class GraphFunction
 {
@@ -170,13 +172,19 @@ class GraphFunction
                 if($oid!==null) {
                     $vars[$oid] = $out;
                 }
-                if((!$out instanceof NDArray)) {
+                if($out instanceof ScalarInterface) {
+                    $o->_setShape([]);
+                } elseif($out instanceof ArrayShapeInterface) {
+                    $o->_setShape([count($out)]);
+                } elseif($out instanceof NDArray) {
+                    $o->_setShape($out->shape());
+                } else {
                     echo get_class($func)."\n";
                     var_dump($func->outputs());
                     echo "--------\n";
                     var_dump($outs);
+                    throw new LogicException('Invalid data type.');
                 }
-                $o->_setShape($out->shape());
             }
         }
 
@@ -256,6 +264,7 @@ class GraphFunction
         foreach(array_map(null,$this->endOutputOids,$dOutputs) as $oset) {
             [$oid,$dOut] = $oset;
             $grads[$oid] = $dOut;
+            //echo "set grads(".spl_object_id($oid).") from endOutputs\n";
         }
         unset($output);
         unset($dOut);

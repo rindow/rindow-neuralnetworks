@@ -8,7 +8,7 @@ use Rindow\NeuralNetworks\Layer\Dropout;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
 
-class Test extends TestCase
+class DropoutTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -36,7 +36,7 @@ class Test extends TestCase
 
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {
-                $outputsVariable = $layer->forward($x, $training=true);
+                $outputsVariable = $layer->forward($x, training:true);
                 return $outputsVariable;
             }
         );

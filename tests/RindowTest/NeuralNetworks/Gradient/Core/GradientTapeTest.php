@@ -105,9 +105,11 @@ class AbstractTestFunction extends AbstractFunction
         foreach($inputs as $key => $i) {
             $v = $K->onesLike($i->value());
             if($v instanceof NDArrayCL) {
-                $v = new TestNDArrayCL($K->context(),$K->queue(),$v->buffer(),$v->dtype(),$v->shape(),$v->offset());
+                $v = new TestNDArrayCL($K->queue(),$v->buffer(),$v->dtype(),$v->shape(),$v->offset(),
+                    service:$K->localMatrixOperator()->service());
             } else {
-                $v = new TestNDArrayPhp($v->buffer(),$v->dtype(),$v->shape(),$v->offset());
+                $v = new TestNDArrayPhp($v->buffer(),$v->dtype(),$v->shape(),$v->offset(),
+                    service:$K->localMatrixOperator()->service());
             }
             $v->_debug_name = 'dIn'.$key.'@'.$this->name;
             $dInputs[] = $v;
@@ -182,7 +184,7 @@ class Logger
     }
 }
 
-class Test extends TestCase
+class GradientTapeTest extends TestCase
 {
     public function newMatrixOperator()
     {

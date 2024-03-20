@@ -7,7 +7,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Data\Sequence\TextClassifiedDataset;
 
-class Test extends TestCase
+class TextClassifiedDatasetTest extends TestCase
 {
     public function sortResult($inputs,$tests)
     {

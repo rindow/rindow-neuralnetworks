@@ -5,7 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class FunctionTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -41,6 +41,19 @@ class Test extends TestCase
 
         $x = $nn->gradient->Variable($K->array(10));
         $y = $g->square($x);
+        $this->assertEquals("100",$mo->toString($y->value()));
+    }
+
+    public function testFunctionRawData()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $x = $K->array(10);
+        $y = $g->square($x);
+        $this->assertTrue($y->isbackpropagatable());
         $this->assertEquals("100",$mo->toString($y->value()));
     }
 

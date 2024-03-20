@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Optimizer;
 
 use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Optimizer\Schedule\LearningRateSchedule;
 
 class SGD implements Optimizer
 {
@@ -10,7 +11,7 @@ class SGD implements Optimizer
 
     public function __construct(
         object $backend,
-        float $lr=null,
+        float|LearningRateSchedule $lr=null,
         )
     {
         // defaults
@@ -55,14 +56,25 @@ class SGD implements Optimizer
         return $params2;
     }
 
+    protected function learningRate(float $step) : float
+    {
+        $lr = $this->lr;
+        if(is_numeric($lr)) {
+            return $lr;
+        }
+        return $lr($step);
+    }
+
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;
         $params = $this->extractVariable($params);
         $grads = $this->extractVariable($grads);
+
+        $lr = $this->learningRate(0);
         foreach(array_map(null,$params,$grads) as [$param,$grad]) {
             // PARAM -=  lr * GRAD
-            $K->update_sub($param,$K->scale($this->lr,$grad));
+            $K->update_sub($param,$K->scale($lr,$grad));
         }
     }
 }

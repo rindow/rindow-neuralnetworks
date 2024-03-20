@@ -8,7 +8,7 @@ use Rindow\NeuralNetworks\Support\Control\Execute;
 use Rindow\NeuralNetworks\Support\Control\Context;
 use LogicException;
 
-class NeuralNetworks
+class NeuralNetworks implements Builder
 {
     protected $backendClasses = [
         'rindowblas' => RindowBlasBackend::class,
@@ -20,6 +20,7 @@ class NeuralNetworks
     protected $models;
     protected $layers;
     protected $losses;
+    protected $metrics;
     protected $optimizers;
     protected $networks;
     protected $datasets;
@@ -68,10 +69,15 @@ class NeuralNetworks
         return $this->backend;
     }
 
+    public function deviceType()
+    {
+        return $this->backend->deviceType();
+    }
+
     public function models()
     {
         if($this->models==null) {
-            $this->models = new Models($this->backend,$this);
+            $this->models = new Models($this);
         }
         return $this->models;
     }
@@ -90,6 +96,14 @@ class NeuralNetworks
             $this->losses = new Losses($this->backend);
         }
         return $this->losses;
+    }
+
+    public function metrics()
+    {
+        if($this->metrics==null) {
+            $this->metrics = new Metrics($this->backend);
+        }
+        return $this->metrics;
     }
 
     public function optimizers()

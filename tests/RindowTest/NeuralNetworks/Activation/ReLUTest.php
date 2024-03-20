@@ -7,7 +7,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Activation\ReLU;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class ReLUTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -51,7 +51,7 @@ class Test extends TestCase
         $states = new \stdClass();
         $copyInputs = $mo->copy($inputs);
         $inputs = $K->array($inputs);
-        $outputs = $activation->forward($states,$inputs, $training=true);
+        $outputs = $activation->forward($states,$inputs);
         $outputs = $K->ndarray($outputs);
         $inputs = $K->ndarray($inputs);
         $this->assertEquals([4,5],$outputs->shape());
@@ -84,6 +84,6 @@ class Test extends TestCase
             [-1.0,-0.5,0.01,0.5,1.0],
         ]);
         $this->assertTrue(
-            $this->verifyGradient($mo,$K,$activation,$inputs,$training=true));
+            $this->verifyGradient($mo,$K,$activation,$inputs));
     }
 }

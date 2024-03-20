@@ -11,7 +11,7 @@ use Rindow\NeuralNetworks\Model\ModelLoader;
 use PDO;
 use Interop\Polite\Math\Matrix\NDArray;
 
-class Test extends TestCase
+class ModelLoaderTest extends TestCase
 {
     private $plot=true;
     private $filename;
@@ -26,7 +26,7 @@ class Test extends TestCase
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 
@@ -53,7 +53,7 @@ class Test extends TestCase
         $mo = new MatrixOperator();
         $backend = $this->newBackend($mo);
         $nn = new NeuralNetworks($mo,$backend);
-        $loader = new ModelLoader($backend,$nn);
+        $loader = new ModelLoader($nn);
 
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,input_shape:[2]),
@@ -71,11 +71,11 @@ class Test extends TestCase
         $this->assertEquals($json,$model->toJson());
 
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t, epochs:100, verbose:0);
 
         $y = $model->predict($x);
-        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        $this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
     }
 
     public function testSaveAndLoadModelDefaultDenseBatchNrm()
@@ -92,9 +92,9 @@ class Test extends TestCase
         ]);
         $model->compile();
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100, verbose:0);
-        [$loss,$accuracy] = $model->evaluate($x,$t);
+        $evals = $model->evaluate($x,$t);
         $y = $model->predict($x);
 
         $model->save($this->filename);
@@ -102,12 +102,12 @@ class Test extends TestCase
         // load model
         $model = $nn->models()->loadModel($this->filename);
 
-        [$loss2,$accuracy2] = $model->evaluate($x,$t);
-        $this->assertLessThan(0.5,abs($loss-$loss2));
-        $this->assertLessThan(0.5,abs($accuracy-$accuracy2));
+        $evals2 = $model->evaluate($x,$t);
+        $this->assertLessThan(0.5,abs($evals['loss']-$evals2['loss']));
+        $this->assertLessThan(0.5,abs($evals['accuracy']-$evals2['accuracy']));
         $y2 = $model->predict($x);
         $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($y,'-',$y2))));
-        //$this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        //$this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
     }
 
     public function testSaveAndLoadModelDefaultRnnEmbed()
@@ -119,7 +119,7 @@ class Test extends TestCase
 
         $REVERSE = True;
         $WORD_VECTOR = 16;
-        if(extension_loaded('rindow_openblas')) {
+        if($mo->isAdvanced()) {
             $UNITS = 128;
         } else {
             $UNITS = 16;
@@ -169,7 +169,7 @@ class Test extends TestCase
             optimizer:'adam',
         );
         $history = $model->fit($question,$answer,epochs:10, verbose:0);
-        [$loss,$accuracy] = $model->evaluate($question,$answer);
+        $evals = $model->evaluate($question,$answer);
         $y = $model->predict($question);
         $layers = $model->layers();
         $embvals = $layers[0]->getParams();
@@ -182,9 +182,9 @@ class Test extends TestCase
         // load model
         $model = $nn->models()->loadModel($this->filename);
 
-        [$loss2,$accuracy2] = $model->evaluate($question,$answer);
-        $this->assertLessThan(0.5,abs($loss-$loss2));
-        $this->assertLessThan(0.5,abs($accuracy-$accuracy2));
+        $evals2 = $model->evaluate($question,$answer);
+        $this->assertLessThan(0.5,abs($evals['loss']-$evals2['loss']));
+        $this->assertLessThan(0.5,abs($evals['accuracy']-$evals2['accuracy']));
 
         $layers1 = $model->layers();
         $embvals1 = $layers1[0]->getParams();
@@ -229,7 +229,7 @@ class Test extends TestCase
         $this->assertEquals(spl_object_id($densevals1[1]),spl_object_id($densevals2[1]));
 
         $this->assertLessThan(1e-7,$mo->la()->sum($mo->la()->square($mo->op($y,'-',$y2))));
-        //$this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        //$this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
     }
 
     public function testSaveAndLoadModelPortable()
@@ -247,10 +247,10 @@ class Test extends TestCase
         ]);
         $model->compile();
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t, epochs:100, verbose:0);
         $y = $model->predict($x);
-        [$loss,$accuracy] = $model->evaluate($x,$t);
+        $evals = $model->evaluate($x,$t);
 
         $model->save($this->filename,$portable=true);
 
@@ -260,8 +260,12 @@ class Test extends TestCase
         $z = $model->predict($x);
         if($this->plot) {
             [$fig,$ax] = $plt->subplots(2);
-            $diff = $mo->f('abs',$mo->select($mo->op($y,'-',$z),$mo->arange($t->size()),$mo->zeros([$t->size()])));
-            $ax[0]->bar($mo->arange($diff->size()),$diff,null,null,'difference');
+            $diff = $mo->f('abs',$mo->select(
+                $mo->op($y,'-',$z),
+                $mo->arange($t->size(),dtype:NDArray::int32),
+                $mo->zeros([$t->size()],dtype:NDArray::int32)
+            ));
+            $ax[0]->bar($mo->arange($diff->size(),dtype:NDArray::int32),$diff,null,null,'difference');
             $ax[0]->legend();
             $ax[1]->plot($mo->array($history['loss']),null,null,'loss');
             $ax[1]->plot($mo->array($history['accuracy']),null,null,'accuracy');
@@ -270,9 +274,9 @@ class Test extends TestCase
             $plt->show();
         }
 
-        [$loss2,$accuracy2] = $model->evaluate($x,$t);
-        $this->assertLessThan(0.5,abs($loss-$loss2));
-        $this->assertLessThan(0.5,abs($accuracy-$accuracy2));
-        //$this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        $evals2 = $model->evaluate($x,$t);
+        $this->assertLessThan(0.5,abs($evals['loss']-$evals2['loss']));
+        $this->assertLessThan(0.5,abs($evals['accuracy']-$evals2['accuracy']));
+        //$this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
     }
 }

@@ -106,9 +106,11 @@ class AbstractTestFunction extends AbstractFunction
         foreach($inputs as $key => $i) {
             $v = $K->onesLike($i->value());
             if($v instanceof NDArrayCL) {
-                $v = new TestNDArrayCL($K->context(),$K->queue(),$v->buffer(),$v->dtype(),$v->shape(),$v->offset());
+                $v = new TestNDArrayCL($K->queue(),$v->buffer(),$v->dtype(),$v->shape(),$v->offset(),
+                            service:$K->localMatrixOperator()->service());
             } else {
-                $v = new TestNDArrayPhp($v->buffer(),$v->dtype(),$v->shape(),$v->offset());
+                $v = new TestNDArrayPhp($v->buffer(),$v->dtype(),$v->shape(),$v->offset(),
+                            service:$K->localMatrixOperator()->service());
             }
             $v->_debug_name = 'dIn'.$key.'@'.$this->name;
             $dInputs[] = $v;
@@ -183,7 +185,7 @@ class Logger
     }
 }
 
-class Test extends TestCase
+class StopGradientTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -193,6 +195,22 @@ class Test extends TestCase
     public function newNeuralNetworks($mo)
     {
         return new NeuralNetworks($mo);
+    }
+
+    public function testReturnValue()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $x = $g->Variable(1);
+        $this->assertTrue($x->isbackpropagatable());
+        $this->assertFalse($g->StopGradient($x)->isbackpropagatable());
+        $this->assertTrue($g->add($x,$x)->isbackpropagatable());
+        $this->assertFalse($g->StopGradient($g->add($x,$x))->isbackpropagatable());
+        $r = $g->StopGradient($x);
+        $this->assertFalse($r->isbackpropagatable());
     }
 
     public function testSinglePath()

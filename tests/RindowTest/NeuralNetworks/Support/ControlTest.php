@@ -40,7 +40,7 @@ class TestContext implements Context
     }
 }
 
-class Test extends TestCase
+class ControlTest extends TestCase
 {
     public function newMatrixOperator()
     {

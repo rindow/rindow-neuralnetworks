@@ -27,10 +27,10 @@ class Div extends AbstractFunction
 
         // for broadcasted inputs
         if($x0->ndim() != $dx0->ndim()) {
-            $dx0 = $K->sum($dx0, $axis=0);
+            $dx0 = $K->sum($dx0, axis:0);
         }
         if($x1->ndim() != $dx1->ndim()) {
-            $dx1 = $K->sum($dx1, $axis=0);
+            $dx1 = $K->sum($dx1, axis:0);
         }
         return [$dx0, $dx1];
     }

@@ -128,7 +128,7 @@ class LSTMCell extends AbstractRNNCell
         ];
     }
 
-    protected function call(NDArray $inputs, array $states, bool $training, object $calcState, array $options=null) : array
+    protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array
     {
         $K = $this->backend;
         $prev_h = $states[0];
@@ -226,7 +226,7 @@ class LSTMCell extends AbstractRNNCell
         $K->gemm($calcState->inputs, $dOutputs,1.0,1.0,
             $this->dKernel,true,false);
         if($this->useBias) {
-            $K->update_add($this->dBias,$K->sum($dOutputs, $axis=0));
+            $K->update_add($this->dBias,$K->sum($dOutputs, axis:0));
         }
 
         $dInputs = $K->gemm($dOutputs, $this->kernel,1.0,0.0,

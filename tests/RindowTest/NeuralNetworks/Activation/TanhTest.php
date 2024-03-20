@@ -7,7 +7,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Activation\Tanh;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class TanhTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -52,7 +52,7 @@ class Test extends TestCase
         $inputs = $K->scale(1/1,$inputs);
         $copyInputs = $K->copy($inputs);
         $inputs = $K->array($inputs);
-        $outputs = $activation->forward($states,$inputs, $training=true);
+        $outputs = $activation->forward($states,$inputs);
         $this->assertEquals([2,5],$outputs->shape());
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
 
@@ -67,6 +67,6 @@ class Test extends TestCase
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
 
         $this->assertTrue(
-            $this->verifyGradient($mo,$K,$activation,$inputs,$training=true));
+            $this->verifyGradient($mo,$K,$activation,$inputs));
     }
 }

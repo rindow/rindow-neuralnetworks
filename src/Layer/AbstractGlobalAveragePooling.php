@@ -79,7 +79,7 @@ class AbstractGlobalAveragePooling extends AbstractImage
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();
@@ -93,7 +93,7 @@ class AbstractGlobalAveragePooling extends AbstractImage
                 array_merge([$batches,$this->reduceShape],$this->outputShape));
             $axis = 1;
         }
-        $outputs = $K->mean($inputsTmp, $axis);
+        $outputs = $K->mean($inputsTmp, axis:$axis);
         $container->origInputsShape = $inputs->shape();
         return $outputs;
     }
@@ -108,7 +108,7 @@ class AbstractGlobalAveragePooling extends AbstractImage
         } else {
             $axis = 1;  // [b,c] => [b,w,c]
         }
-        $dInputs = $K->repeat($dOutputs,$this->reduceShape,$axis);
+        $dInputs = $K->repeat($dOutputs,$this->reduceShape,axis:$axis);
 
         return $dInputs->reshape($container->origInputsShape);
     }

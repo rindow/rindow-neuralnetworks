@@ -52,7 +52,7 @@ class Input extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         return $inputs;

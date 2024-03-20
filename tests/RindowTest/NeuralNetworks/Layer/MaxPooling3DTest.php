@@ -8,7 +8,7 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\MaxPooling3D;
 use InvalidArgumentException;
 
-class Test extends TestCase
+class MaxPooling3DTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -96,7 +96,7 @@ class Test extends TestCase
         $copyInputs = $K->copy($inputs);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
+                $outputsVariable = $layer->forward($inputs);
                 return $outputsVariable;
             }
         );

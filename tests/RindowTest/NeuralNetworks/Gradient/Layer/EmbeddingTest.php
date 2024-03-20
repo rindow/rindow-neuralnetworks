@@ -7,7 +7,7 @@ use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use InvalidArgumentException;
 
-class Test extends TestCase
+class EmbeddingTest extends TestCase
 {
     public function newMatrixOperator()
     {

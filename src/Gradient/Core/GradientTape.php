@@ -8,6 +8,7 @@ use Throwable;
 use WeakMap;
 use Rindow\NeuralNetworks\Support\Control\Context;
 use Rindow\NeuralNetworks\Layer\LayerBase;
+use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 
 class GradientTape implements Context
 {
@@ -41,7 +42,7 @@ class GradientTape implements Context
         return false;
     }
 
-    public function gradient($target,$sources)
+    public function gradient(VariableInterface $target,$sources)
     {
         if(self::$autoBackProp) {
             throw new LogicException("The gradient function is not supported for use within the automatic differentiation context.");
@@ -62,7 +63,13 @@ class GradientTape implements Context
         } else {
             $grads = new WeakMap();
             foreach($target->creator()->outputs() as $o) {
-                $grads[$o->get()] = $K->ones($o->shape(),$o->dtype());
+                if($o->get()===$target) {
+                    //echo "set grads(".spl_object_id($o->get()).") <= Ones from target func's outputs\n";
+                    $grads[$o->get()] = $K->ones($o->shape(),$o->dtype());
+                } else {
+                    //echo "set grads(".spl_object_id($o->get()).") <= Zeros from target func's outputs\n";
+                    $grads[$o->get()] = $K->zeros($o->shape(),$o->dtype());
+                }
             }
             //$grads[$targetId] = $K->onesLike($target->value());
         }
@@ -71,11 +78,14 @@ class GradientTape implements Context
         if(!$this->persistent || !array_key_exists($targetId,$this->persistentGrads)) {
             $this->calcGradient($grads,$target,$sourceIds);
         }
+        $idx = 1;
         foreach ($sourceIds as $sourceId) {
             if(!isset($grads[$sourceId])) {
-                throw new InvalidArgumentException("No applicable gradient found for source");
+                $name = $sourceId->name();
+                throw new InvalidArgumentException("No applicable gradient found for source #{$idx}({$name}).");
             }
             $gradients[] = $grads[$sourceId];
+            $idx++;
         }
         if($this->persistent) {
             $this->persistentGrads[$targetId] = $grads;

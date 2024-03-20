@@ -79,7 +79,7 @@ class AbstractGlobalMaxPooling extends AbstractImage
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();
@@ -93,7 +93,7 @@ class AbstractGlobalMaxPooling extends AbstractImage
             $reshapedInputs = $inputs->reshape([$batches,$this->reduceShape,$this->outputShape[0]]);
             $axis = 1;
         }
-        $outputs = $K->max($reshapedInputs, $axis);
+        $outputs = $K->max($reshapedInputs, axis:$axis);
         $container->reshapedInputs = $reshapedInputs;
         $container->origInputsShape = $inputs->shape();
         return $outputs;
@@ -113,7 +113,7 @@ class AbstractGlobalMaxPooling extends AbstractImage
         } else {
             $axis=1;
         }
-        $argMax = $K->argMax($container->reshapedInputs,$axis);
+        $argMax = $K->argMax($container->reshapedInputs,axis:$axis);
         $dInputs = $K->scatter(
             $argMax,
             $dOutputs,

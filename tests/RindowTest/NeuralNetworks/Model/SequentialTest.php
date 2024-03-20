@@ -5,11 +5,12 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
-use Rindow\NeuralNetworks\Model\ModelLoader;
 use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\NeuralNetworks\Layer\Dense;
 use Rindow\NeuralNetworks\Callback\AbstractCallback;
 use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
+use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Layer\Layer;
 use Rindow\Math\Plot\Plot;
 use Rindow\Math\Plot\Renderer\GDDriver;
 use Interop\Polite\Math\Matrix\NDArray;
@@ -26,7 +27,7 @@ class WeightLog extends AbstractCallback
         $this->prev_w = null;
     }
 
-    public function onEpochEnd(int $epoch, array $logs=null) : void
+    public function onEpochEnd(int $epoch, array $metrics=null) : void
     {
         $model = $this->getModel();
         $K = $model->backend();
@@ -83,7 +84,7 @@ class TestFilter implements DatasetFilter
         $batchSize= count($inputs);
         $cols = count($inputs[0])-1;
         $inputsNDArray = $this->mo->la()->alloc([$batchSize,$cols]);
-        $testsNDArray = $this->mo->la()->alloc([$batchSize,1]);
+        $testsNDArray = $this->mo->la()->alloc([$batchSize,1],dtype:NDArray::int32);
         foreach ($inputs as $i => $row) {
             $testsNDArray[$i][0] = (float)array_pop($row);
             for($j=0;$j<$cols;$j++) {
@@ -94,25 +95,48 @@ class TestFilter implements DatasetFilter
     }
 }
 
-
 class TestCustomModel extends AbstractModel
 {
     protected $seq;
-    public function __construct($backend,$builder,$seq)
+    public function __construct($builder,$seq)
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->seq = $seq;
     }
 
-    public function call($inputs, $training=null, $trues=null)
+    public function call($inputs)
     {
-        $outputs = $this->seq->forward($inputs, $training, $trues);
+        $outputs = $this->seq->forward($inputs);
         return $outputs;
     }
 }
 
+class TestCustomSubModel extends AbstractModel
+{
+    protected Variable $param1;
+    protected Layer $sublayer;
 
-class Test extends TestCase
+    public function __construct($builder)
+    {
+        parent::__construct($builder);
+        $g = $builder->gradient();
+        $this->param1 = $g->Variable([0,0]);
+        $this->sublayer = $builder->layers->Dense(10);
+    }
+
+    public function call($inputs,$training=null)
+    {
+        $g = $this->builder->gradient();
+        $outputs = $g->square($inputs);
+
+        // dummy
+        $this->sublayer->forward($inputs);
+
+        return $outputs;
+    }
+}
+
+class SequentialTest extends TestCase
 {
     protected $plot = false;
 
@@ -130,7 +154,7 @@ class Test extends TestCase
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 
@@ -285,11 +309,11 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,verbose:0);
 
         $y = $model->predict($x);
-        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        $this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
 
         //$plt->plot($mo->array($history['loss']));
         //$plt->plot($mo->array($history['accuracy']));
@@ -321,7 +345,7 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $dataset = $nn->data->NDArrayDataset($x,
             tests:$t,
             batch_size:64,
@@ -330,7 +354,7 @@ class Test extends TestCase
         $history = $model->fit($dataset,null,epochs:100,verbose:0);
 
         $y = $model->predict($x);
-        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        $this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
 
         //$plt->plot($mo->array($history['loss']));
         //$plt->plot($mo->array($history['accuracy']));
@@ -373,9 +397,9 @@ class Test extends TestCase
         $history = $model->fit($dataset,null, epochs: 100, verbose: 0);
 
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $y = $model->predict($x);
-        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        $this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
 
         //$plt->plot($mo->array($history['loss']));
         //$plt->plot($mo->array($history['accuracy']));
@@ -401,12 +425,12 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,verbose:0);
 
-        [$loss,$accuracy] = $model->evaluate($x,$t);
-        $this->assertLessThan(1.0,$loss);
-        $this->assertEquals(1.0,$accuracy);
+        $logs = $model->evaluate($x,$t);
+        $this->assertLessThan(1.0,$logs['loss']);
+        $this->assertEquals(1.0,$logs['accuracy']);
     }
 
     public function testEvaluateNDArrayDataset()
@@ -427,7 +451,7 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,verbose:0);
 
         $dataset = $nn->data->NDArrayDataset($x,
@@ -435,9 +459,9 @@ class Test extends TestCase
             batch_size:64,
             shuffle:true,
         );
-        [$loss,$accuracy] = $model->evaluate($dataset);
-        $this->assertLessThan(1.0,$loss);
-        $this->assertEquals(1.0,$accuracy);
+        $logs = $model->evaluate($dataset);
+        $this->assertLessThan(1.0,$logs['loss']);
+        $this->assertEquals(1.0,$logs['accuracy']);
     }
 
     public function testEvaluateCSVDataset()
@@ -458,7 +482,7 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,verbose:0);
 
         $dataset = $nn->data->CSVDataset(
@@ -468,9 +492,9 @@ class Test extends TestCase
             shuffle:true,
             filter:new TestFilter($mo),
         );
-        [$loss,$accuracy] = $model->evaluate($dataset);
-        $this->assertLessThan(1.0,$loss);
-        $this->assertEquals(1.0,$accuracy);
+        $logs = $model->evaluate($dataset);
+        $this->assertLessThan(1.0,$logs['loss']);
+        $this->assertEquals(1.0,$logs['accuracy']);
     }
 
     public function testFitWithEvaluate()
@@ -492,9 +516,9 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
-        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
 
         $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
@@ -539,13 +563,13 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
-        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
 
         $y = $model->predict($x);
-        $this->assertEquals($t->toArray(),$mo->argMax($y,$axis=1)->toArray());
+        $this->assertEquals($t->toArray(),$mo->argMax($y,axis:1)->toArray());
 
         if($this->plot) {
             $plt->plot($mo->array($history['loss']),null,null,'loss');
@@ -587,8 +611,8 @@ class Test extends TestCase
         $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
 
         $y = $model->predict($x);
-        $this->assertEquals($mo->argMax($t,$axis=1)->toArray(),
-                            $mo->argMax($y,$axis=1)->toArray());
+        $this->assertEquals($mo->argMax($t,axis:1)->toArray(),
+                            $mo->argMax($y,axis:1)->toArray());
 
         $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
 
@@ -622,9 +646,9 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
-        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
 
         $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
@@ -659,9 +683,9 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
-        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
 
         $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
@@ -696,9 +720,9 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
-        $v_t = $mo->array([1, 0, 0, 1, 0, 1]);
+        $v_t = $mo->array([1, 0, 0, 1, 0, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
 
         $this->assertEquals(['loss','accuracy','val_loss','val_accuracy'],array_keys($history));
@@ -808,14 +832,14 @@ class Test extends TestCase
 
     public function testFitConv1DandMaxPooling1D()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $num_of_filters=128;
             $epoch = 300;
         } else {
             $num_of_filters=16;
             $epoch = 50;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -847,7 +871,7 @@ class Test extends TestCase
             [[0.5],[0.5],[0.4],[0.4],[0.3],[0.3],[0.2],[0.2],[0.1],[0.1]],
         ]);
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [[0.1],[0.1],[0.25],[0.25],[0.35],[0.35],[0.45],[0.45],[0.6], [0.6] ],
@@ -856,7 +880,7 @@ class Test extends TestCase
             [[0.5],[0.5],[0.45],[0.45],[0.4], [0.4], [0.35],[0.35],[0.3], [0.3] ],
         ]);
         $v_t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $history = $model->fit(
             $x,$t,
@@ -877,14 +901,14 @@ class Test extends TestCase
 
     public function testFitConv2DandMaxPooling2D()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $num_of_filters=128;
             $epoch = 300;
         } else {
             $num_of_filters=8;
             $epoch = 30;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -917,7 +941,7 @@ class Test extends TestCase
         for($i=1;$i<9;$i++)  { $x[2][$i+1][$i+1][0]=1.0;}
         for($i=1;$i<9;$i++)  { $x[3][$i+1][9-$i][0]=1.0;}
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->zeros([4,10,10,1]);
         for($i=0;$i<8;$i++) { $x[0][$i][$i+2][0]=1.0;}
@@ -925,7 +949,7 @@ class Test extends TestCase
         for($i=1;$i<8;$i++) { $x[2][$i+1][$i][0]=1.0;}
         for($i=1;$i<8;$i++) { $x[3][$i+2][9-$i][0]=1.0;}
         $v_t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $history = $model->fit(
             $x,$t,
@@ -946,14 +970,14 @@ class Test extends TestCase
 
     public function testFitConv3DandMaxPooling3D()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $num_of_filters=128;
             $epoch = 300;
         } else {
             $num_of_filters=8;
             $epoch = 20;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -983,7 +1007,7 @@ class Test extends TestCase
         for($i=1;$i<9;$i++)  { $x[2][$i][$i+1][$i+1][0]=1.0;}
         for($i=1;$i<9;$i++)  { $x[3][$i][$i+1][9-$i][0]=1.0;}
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->zeros([4,10,10,10,1]);
         for($i=0;$i<8;$i++) { $x[0][$i][$i][$i+2][0]=1.0;}
@@ -991,7 +1015,7 @@ class Test extends TestCase
         for($i=1;$i<8;$i++) { $x[2][$i][$i+1][$i][0]=1.0;}
         for($i=1;$i<8;$i++) { $x[3][$i][$i+2][9-$i][0]=1.0;}
         $v_t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $history = $model->fit($x,$t,epochs:$epoch/*100*/,validation_data:[$v_x,$v_t],verbose:0);
 
@@ -1010,14 +1034,14 @@ class Test extends TestCase
 
     public function testFitConv1DandAveragePooling1D()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $num_of_filters=128;
             $epoch = 300;
         } else {
             $num_of_filters=16;
             $epoch = 50;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1049,7 +1073,7 @@ class Test extends TestCase
             [[0.5],[0.5],[0.4],[0.4],[0.3],[0.3],[0.2],[0.2],[0.1],[0.1]],
         ]);
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [[0.1],[0.1],[0.25],[0.25],[0.35],[0.35],[0.45],[0.45],[0.6], [0.6] ],
@@ -1058,7 +1082,7 @@ class Test extends TestCase
             [[0.5],[0.5],[0.45],[0.45],[0.4], [0.4], [0.35],[0.35],[0.3], [0.3] ],
         ]);
         $v_t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $history = $model->fit(
             $x,$t,
@@ -1079,14 +1103,14 @@ class Test extends TestCase
 
     public function testFitConv2DandAveragePooling2D()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $num_of_filters=128;
             $epoch = 300;
         } else {
             $num_of_filters=8;
             $epoch = 30;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1119,7 +1143,7 @@ class Test extends TestCase
         for($i=1;$i<9;$i++)  { $x[2][$i+1][$i+1][0]=1.0;}
         for($i=1;$i<9;$i++)  { $x[3][$i+1][9-$i][0]=1.0;}
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->zeros([4,10,10,1]);
         for($i=0;$i<8;$i++) { $x[0][$i][$i+2][0]=1.0;}
@@ -1127,7 +1151,7 @@ class Test extends TestCase
         for($i=1;$i<8;$i++) { $x[2][$i+1][$i][0]=1.0;}
         for($i=1;$i<8;$i++) { $x[3][$i+2][9-$i][0]=1.0;}
         $v_t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $history = $model->fit(
             $x,$t,
@@ -1148,14 +1172,14 @@ class Test extends TestCase
 
     public function testFitConv3DandAveragePooling3D()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $num_of_filters=128;
             $epoch = 300;
         } else {
             $num_of_filters=8;
             $epoch = 20;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1185,7 +1209,7 @@ class Test extends TestCase
         for($i=1;$i<9;$i++)  { $x[2][$i][$i+1][$i+1][0]=1.0;}
         for($i=1;$i<9;$i++)  { $x[3][$i][$i+1][9-$i][0]=1.0;}
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->zeros([4,10,10,10,1]);
         for($i=0;$i<8;$i++) { $x[0][$i][$i][$i+2][0]=1.0;}
@@ -1193,7 +1217,7 @@ class Test extends TestCase
         for($i=1;$i<8;$i++) { $x[2][$i][$i+1][$i][0]=1.0;}
         for($i=1;$i<8;$i++) { $x[3][$i][$i+2][9-$i][0]=1.0;}
         $v_t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $history = $model->fit($x,$t,epochs:$epoch/*100*/,validation_data:[$v_x,$v_t],verbose:0);
 
@@ -1210,14 +1234,14 @@ class Test extends TestCase
         }
     }
 
-    public function testFitEmbeding()
+    public function testFitEmbedding()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 50;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1249,7 +1273,7 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
@@ -1261,7 +1285,7 @@ class Test extends TestCase
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
 
         $history = $model->fit($x,$t,epochs:$epoch/*300*/,batch_size:1,validation_data:[$v_x,$v_t],verbose:0);
 
@@ -1280,12 +1304,12 @@ class Test extends TestCase
 
     public function testFitSimpleRNN()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1315,18 +1339,18 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array(
-            [1,1,0,0]
+            [1,1,0,0],dtype:NDArray::int32
         );
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
@@ -1348,12 +1372,12 @@ class Test extends TestCase
 
     public function testFitSimpleRNNRetSeq()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1384,25 +1408,25 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array([
             [0,1,2,9],
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
 
@@ -1429,12 +1453,12 @@ class Test extends TestCase
 
     public function testFitSimSimpleRNN()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1466,18 +1490,18 @@ class Test extends TestCase
             [9],
             [1],
             [5],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array(
-            [0,9,1,5]
+            [0,9,1,5],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [2],
             [1],
             [4],
             [9],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array(
-            [2,1,4,9]
+            [2,1,4,9],dtype:NDArray::int32
         );
         $x = $mo->la()->onehot($x->reshape([4]),$numClass=10)->reshape([4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([4]),$numClass=10)->reshape([4,10]);
@@ -1498,12 +1522,12 @@ class Test extends TestCase
     }
     public function testFitLSTM()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1529,18 +1553,18 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array(
-            [1,1,0,0]
+            [1,1,0,0],dtype:NDArray::int32
         );
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
@@ -1561,12 +1585,12 @@ class Test extends TestCase
 
     public function testFitLSTMRetSeq()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1593,25 +1617,25 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array([
             [0,1,2,9],
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $history = $model->fit($x,$t,epochs:$epoch/*300*/,batch_size:1,validation_data:[$v_x,$v_t],verbose:0);
@@ -1631,12 +1655,12 @@ class Test extends TestCase
 
     public function testFitGRUDefault()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1662,18 +1686,18 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array(
-            [1,1,0,0]
+            [1,1,0,0],dtype:NDArray::int32
         );
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
@@ -1694,12 +1718,12 @@ class Test extends TestCase
 
     public function testFitGRUWithoutResetAfter()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1726,18 +1750,18 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array(
-            [1,0,1,0]
+            [1,0,1,0],dtype:NDArray::int32
         );
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array(
-            [1,1,0,0]
+            [1,1,0,0],dtype:NDArray::int32
         );
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
@@ -1758,12 +1782,12 @@ class Test extends TestCase
 
     public function testFitGRURetSeq()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 100;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1794,25 +1818,25 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array([
             [0,1,2,9],
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
 
@@ -1839,12 +1863,12 @@ class Test extends TestCase
 
     public function testFitRepeatVector()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 50;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
@@ -1873,25 +1897,25 @@ class Test extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array([
             [0,1,0],
             [1,0,1],
             [0,1,0],
             [1,0,1],
-        ]);
+        ],dtype:NDArray::int32);
         $v_x = $mo->array([
             [2,3,3,4],
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array([
             [0,1,0],
             [0,1,0],
             [1,0,1],
             [1,0,1],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $mo->la()->onehot($x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $v_x = $mo->la()->onehot($v_x->reshape([16]),$numClass=10)->reshape([4,4,10]);
         $history = $model->fit($x,$t,epochs:$epoch/*300*/,batch_size:1,validation_data:[$v_x,$v_t],verbose:0);
@@ -1928,16 +1952,15 @@ class Test extends TestCase
 
     public function testSaveAndLoadWeightsNormal()
     {
-        if(extension_loaded('rindow_openblas')) {
+        $mo = $this->newMatrixOperator();
+        if($mo->isAdvanced()) {
             $epoch = 300;
         } else {
             $epoch = 50;
         }
-        $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
-        $loader = new ModelLoader($K,$nn);
 
         $model = $nn->models()->Sequential([
             $nn->layers()->Dense($units=128,input_shape:[2]),
@@ -1947,9 +1970,9 @@ class Test extends TestCase
         ]);
         $model->compile();
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:$epoch,verbose:0);
-        [$loss,$accuracy] = $model->evaluate($x,$t);
+        $logs = $model->evaluate($x,$t);
 
         $origY = $model->predict($x);
         $this->assertCount(8,$model->variables());
@@ -1965,24 +1988,23 @@ class Test extends TestCase
 
         // ****************************************************
         // new model from config and load weights
-        $model = $loader->modelFromConfig($config);
+        $model = $nn->Models->modelFromConfig($config);
         $model->loadWeights($weights);
 
-        [$loss2,$accuracy2] = $model->evaluate($x,$t);
-        $this->assertLessThan(0.5,abs($loss-$loss2));
-        $this->assertLessThan(0.5,abs($accuracy-$accuracy2));
+        $logs2 = $model->evaluate($x,$t);
+        $this->assertLessThan(0.5,abs($logs['loss']-$logs2['loss']));
+        $this->assertLessThan(0.5,abs($logs['accuracy']-$logs2['accuracy']));
 
         $y = $model->predict($x);
         $this->assertCount(8,$model->variables());
         $this->assertCount(6,$model->trainableVariables());
         $variables = $model->variables();
 
-        $la = $mo->la();
+        $la = $K->localLA();
         foreach(array_map(null,$variables,$origVariables) as [$v,$origV]) {
             $v = $K->ndarray($v);
             $origV = $K->ndarray($origV);
-            $diff = $la->max($la->square($la->axpy($v,$la->copy($origV),-1)));
-            $this->assertEquals(0,$diff);
+            $this->assertTrue($la->isclose($v,$origV));
         }
 
         //// orig object check
@@ -2016,8 +2038,7 @@ class Test extends TestCase
             foreach(array_map(null,$ly->getParams(),$origLy->getParams()) as [$v,$origV]) {
                 $v = $K->ndarray($v);
                 $origV = $K->ndarray($origV);
-                $diff = $la->max($la->square($la->axpy($v,$la->copy($origV),-1)));
-                $this->assertEquals(0,$diff);
+                $this->assertTrue($la->isclose($v,$origV));
             }
         }
         $diff = $la->max($la->square($la->axpy($origY,$la->copy($y),-1)));
@@ -2068,18 +2089,139 @@ class Test extends TestCase
         $seq = $nn->models->Sequential();
         $seq->add($nn->layers->Dense(2,
             input_shape:[3],activation:'softmax'));
-        $model = new TestCustomModel($K,$nn,$seq);
+        $model = new TestCustomModel($nn,$seq);
         $model->compile();
         //$model->summary();
         $parms = $model->trainableVariables();
         $this->assertCount(2,$parms);
-        $model->fit($mo->zeros([5,3]),$mo->zeros([5],NDArray::int32),
+        $model->fit($mo->zeros([5,3]),$mo->zeros([5],dtype:NDArray::int32),
             epochs:1, verbose:0);
         $this->assertEquals([3,2],$parms[0]->shape());
         $this->assertEquals([2],$parms[1]->shape());
         $predicts = $model->predict($mo->zeros([5,3]));
         $this->assertEquals([5,2],$predicts->shape());
-        $res = $model->evaluate($mo->zeros([5,3]),$mo->zeros([5]));
+        $res = $model->evaluate($mo->zeros([5,3]),$mo->zeros([5],dtype:NDArray::int32));
         $this->assertTrue(true);
     }
+
+    public function testAddCustomModel()
+    {
+        Dense::$nameNumbering = 0;
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $seq = $nn->models->Sequential();
+        $seq->add(new TestCustomSubModel($nn));
+        $seq->add(new TestCustomSubModel($nn));
+        // Raw data
+        $x = $K->array([[2],[3]]);
+        $y = $seq($x);
+        $this->assertEquals("[[16],[81]]",$mo->toString($y));
+        // Pure model
+        $x = $g->Variable($x);
+        $y = $seq($x);
+        $this->assertEquals("[[16],[81]]",$mo->toString($y));
+        // Gradient on pure model
+        $y = $nn->with($tape=$g->GradientTape(),fn() =>
+            $seq($x)
+        );
+        $this->assertEquals("[[16],[81]]",$mo->toString($y));
+        $this->assertEquals("[[32],[108]]",$mo->toString($tape->gradient($y,$x)));
+        // In function graph
+        $func = $g->Function(fn($x) =>
+            $seq($x)
+        );
+        // ...  building graph
+        $y = $func($x);
+        $this->assertEquals("[[16],[81]]",$mo->toString($y));
+        // ...  execute graph
+        $y = $func($x);
+        $this->assertEquals("[[16],[81]]",$mo->toString($y));
+        // Gradient on graph
+        $y = $nn->with($tape=$g->GradientTape(),fn() =>
+            $func($x)
+        );
+        $this->assertEquals("[[16],[81]]",$mo->toString($y));
+        $this->assertEquals("[[32],[108]]",$mo->toString($tape->gradient($y,$x)));
+
+        // get params
+        $params =  $seq->trainableVariables();
+        $this->assertCount(6,$params);
+
+        $layerParams = $nn->layers->Dense(10)->trainableVariables();
+        $this->assertEquals(get_class($layerParams[0]),get_class($params[0]));
+
+        ob_start();
+        $seq->summary();
+        $dump = ob_get_clean();
+        $summary =
+        'Layer(type)                  Output Shape               Param #   '."\n".
+        '=================================================================='."\n".
+        'dense(Dense)                 (10)                       20        '."\n".
+        'dense_1(Dense)               (10)                       20        '."\n".
+        '=================================================================='."\n".
+        'Weights                      Shape                      Param #   '."\n".
+        '=================================================================='."\n".
+        'No name                      (2)                        2         '."\n".
+        'No name                      (2)                        2         '."\n".
+        '=================================================================='."\n".
+        'Total params: 44'."\n";
+        $this->assertEquals($summary,$dump);
+
+    }
+
+    public function testCustomMetric()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $plt = new Plot($this->getPlotConfig(),$mo);
+
+        $model = $nn->models()->Sequential([
+            $nn->layers()->Dense($units=128,input_shape:[2],
+                activation:'sigmoid'),
+            $nn->layers()->Dense($units=2,
+                activation:'softmax'),
+        ]);
+
+        $cateAcc = $nn->metrics->CategoricalAccuracy();
+        $metricFn = function ($trues, $preds) use ($cateAcc) {
+            $value = $cateAcc($trues, $preds);
+            return $value;
+        };
+
+        $model->compile(
+            loss:$nn->losses()->MeanSquaredError(),
+            metrics:['loss'=>'loss','custom'=>$metricFn]
+        );
+
+        // training greater or less
+
+        // training greater or less
+        $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
+        $t = $mo->array([[1, 0], [1, 0], [1, 0], [0, 1], [0, 1], [0, 1]]);
+        $v_x = $mo->array([[5, 1], [1, 5], [2, 6], [6, 1], [1, 7], [7, 2]]);
+        $v_t = $mo->array([[0, 1], [1, 0], [1, 0], [0, 1], [1, 0], [0, 1]]);
+        $history = $model->fit($x,$t,epochs:100,validation_data:[$v_x,$v_t],verbose:0);
+
+        $y = $model->predict($x);
+        $this->assertEquals($mo->argMax($t,axis:1)->toArray(),
+                            $mo->argMax($y,axis:1)->toArray());
+
+        $this->assertEquals(['loss','custom','val_loss','val_custom'],array_keys($history));
+
+        if($this->plot) {
+            $plt->plot($mo->array($history['loss']),null,null,'loss');
+            $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
+            $plt->plot($mo->array($history['custom']),null,null,'custom');
+            $plt->plot($mo->array($history['val_custom']),null,null,'val_custom');
+            $plt->legend();
+            $plt->title('Custom Metric');
+            $plt->show();
+        }
+    }
+
 }

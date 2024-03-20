@@ -7,7 +7,7 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 
 abstract class AbstractPooling extends AbstractImage
 {
-    abstract protected function call(NDArray $inputs, bool $training) : NDArray;
+    abstract protected function call(NDArray $inputs, bool $training=null) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     use GenericUtils;

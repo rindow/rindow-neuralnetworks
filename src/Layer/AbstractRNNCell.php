@@ -9,7 +9,7 @@ use InvalidArgumentException;
  */
 abstract class AbstractRNNCell extends AbstractLayerBase implements RNNCell
 {
-    abstract protected function call(NDArray $inputs, array $states, bool $training, object $calcState, array $options=null) : array;
+    abstract protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array;
     abstract protected function differentiate(NDArray $dOutputs, array $dStates, object $calcState) : array;
 
     public function getParams() : array
@@ -42,11 +42,11 @@ abstract class AbstractRNNCell extends AbstractLayerBase implements RNNCell
         }
     }
 
-    final public function forward(NDArray $inputs, array $states, bool $training, object $calcState, array $options=null) : array
+    final public function forward(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array
     {
         $this->assertInputShape($inputs,'forward');
 
-        [$outputs,$states] = $this->call($inputs,$states,$training,$calcState,$options);
+        [$outputs,$states] = $this->call($inputs,$states,$training,$calcState);
 
         $this->assertOutputShape($outputs,'forward');
         return [$outputs,$states];

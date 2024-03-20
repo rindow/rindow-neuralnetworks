@@ -6,6 +6,7 @@ use UnexpectedValueException;
 use LogicException;
 use ReflectionClass;
 use ArrayAccess;
+use Rindow\NeuralNetworks\Builder\Builder;
 use Rindow\NeuralNetworks\Optimizer\Optimizer;
 use Rindow\NeuralNetworks\Layer\Layer;
 use Rindow\NeuralNetworks\Activation\Softmax;
@@ -14,6 +15,8 @@ use Rindow\NeuralNetworks\Loss\Loss;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
+use Rindow\NeuralNetworks\Metric\Metric;
+use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Callback\CallbackList;
 use Rindow\NeuralNetworks\Data\Dataset\Dataset;
 use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
@@ -29,8 +32,9 @@ abstract class AbstractModel implements Model
     protected $hda;
     protected $name;
     protected $optimizer;
-    protected $metrics;
+    protected $metrics = [];
     protected $lossFunction;
+    protected $accuracyFunction;
     protected $built = false;
     protected $shapeInspection=true;
     protected $backupShapeInspection;
@@ -41,15 +45,22 @@ abstract class AbstractModel implements Model
     protected $generation;
     protected $graph = [];
     protected $weights;
+    protected $callOptions;
 
-    public function __construct(object $backend,object $builder,$hda=null)
+    public function __construct(Builder $builder,$hda=null)
     {
-        $this->backend = $backend;
         $this->builder = $builder;
+        $this->backend = $builder->backend();
         if($hda===null) {
             $this->hda = $builder->utils()->HDA();
         } else {
             $this->hda = $hda;
+        }
+        $refClass = new ReflectionClass($this);
+        $refParams = $refClass->getMethod('call')->getParameters();
+        $this->callOptions = [];
+        foreach($refParams as $param) {
+            $this->callOptions[$param->name] = true;
         }
     }
 
@@ -85,6 +96,11 @@ abstract class AbstractModel implements Model
         return $this->lossFunction;
     }
 
+    // public function accuracyFunction()
+    // {
+    //     return $this->accuracyFunction;
+    // }
+
     public function optimizer()
     {
         return $this->optimizer;
@@ -96,18 +112,18 @@ abstract class AbstractModel implements Model
         return substr($classname,strrpos($classname,'\\')+1);
     }
 
-    public function compile(
-        string|object $optimizer=null,
-        string|object $loss=null,
-        array $metrics=null,
-        int $numInputs=null,
-    ) : void
+    public function isAwareOf(string $name) : bool
     {
-        $optimizer = $optimizer ?? 'SGD';
-        $loss = $loss ?? 'SparseCategoricalCrossEntropy';
-        $metrics = $metrics ?? ['loss','accuracy'];
-        $numInputs = $numInputs ?? 1;
+        return isset($this->callOptions[$name]);
+    }
 
+    protected function setAwareOf(string $name) : bool
+    {
+        $this->callOptions[$name] = true;
+    }
+
+    protected function resolveOptimizer(mixed $optimizer) : mixed
+    {
         // resolve optimizer
         if(is_string($optimizer)) {
             $optimizer = strtolower($optimizer);
@@ -127,14 +143,20 @@ abstract class AbstractModel implements Model
             }
             throw new InvalidArgumentException('invalid optimizer: '.$msg);
         }
-        $this->optimizer = $optimizer;
+        return $optimizer;
+    }
 
+    protected function resolveLossFunction(mixed $loss) : mixed
+    {
         if(is_string($loss)) {
             $loss = strtolower($loss);
         }
         if($loss=='sparsecategoricalcrossentropy'||
             $loss=='sparse_categorical_crossentropy') {
             $loss = $this->builder->losses()->SparseCategoricalCrossEntropy();
+        }
+        if(is_callable($loss)) {
+            return $loss;
         }
 
         if(!($loss instanceof Loss)) {
@@ -147,14 +169,69 @@ abstract class AbstractModel implements Model
             }
             throw new InvalidArgumentException('invalid loss function: '.$msg);
         }
-        $this->lossFunction = $loss;
+        return $loss;
+    }
 
-        // resolve metrics
-        if(empty($metrics)) {
-            $metrics = [];
+    protected function resolveMetricFunctions(?array $metrics) : array
+    {
+        if(empty($metric)) {
+            $metric = [];
         }
-        $this->metrics = $metrics;
+        $newMetrics = [];
+        foreach($metrics as $idx => $metric) {
+            if(is_string($metric)) {
+                $name = $metric;
+                if($metric == 'loss') {
+                    $metricObject = $this->builder->metrics()->ScalarMetric(name:'loss');
+                } else {
+                    if($metric=='accuracy') {
+                        $metric = $this->lossFunction->accuracyMetric($metric); // string name
+                    }
+                    $metricObject = MetricCatalog::factory($this->backend,$metric);
+                }
+            } elseif($metric instanceof Metric) {
+                $metricObject = $metric;
+                $name = $metric->name();
+            } elseif(is_callable($metric)) {
+                $metricObject = $this->builder->metrics()->GenericMetric($metric);
+                $name = $metricObject->name();
+            } else {
+                if(is_object($metric)) {
+                    $name = get_class($metric);
+                } else {
+                    $name = gettype($metric);
+                }
+                throw new InvalidArgumentException('Invarid metric type:'.$name);
+            }
+            if(!is_int($idx)) {
+                $name = $idx;
+            }
+            $newMetrics[$name] = $metricObject;
+        }
+        return $newMetrics;
+    }
 
+    public function compile(
+        string|object $optimizer=null,
+        string|object $loss=null,
+        array $metrics=null,
+        int $numInputs=null,
+    ) : void
+    {
+        $optimizer = $optimizer ?? 'SGD';
+        $loss = $loss ?? 'SparseCategoricalCrossEntropy';
+        $metrics = $metrics ?? ['loss','accuracy'];
+        $numInputs = $numInputs ?? 1;
+
+        $this->optimizer = $this->resolveOptimizer($optimizer);
+
+        $this->lossFunction = $this->resolveLossFunction($loss);
+        if($this->lossFunction instanceof Loss) {
+            $this->accuracyFunction = [$this->lossFunction,'accuracy'];
+        }
+        // resolve metrics
+        $metrics = $this->resolveMetricFunctions($metrics);
+        $this->metrics = $metrics;
     }
 
     public function fit(
@@ -172,6 +249,10 @@ abstract class AbstractModel implements Model
         if($this->optimizer==null || $this->lossFunction==null) {
             throw new LogicException('Not yet compile');
         }
+        if($this->callOptions===null) {
+            throw new LogicException('Not yet initialized by constructor.');
+        }
+        
         $K = $this->backend;
         $mo = $K->localMatrixOperator();
         $localLA = $K->localLA();
@@ -208,6 +289,17 @@ abstract class AbstractModel implements Model
             [$val_inputs, $val_test] = [null,null];
         } elseif(is_array($validation_data)) {
             [$val_inputs, $val_test] = $validation_data;
+            if(is_array($val_inputs)) {
+                $val_inputs = new NDArrayDataset(
+                    $K->localMatrixOperator(),
+                    $val_inputs,
+                    batch_size: $batch_size,
+                    shuffle: $shuffle,
+                    filter: $filter,
+                    tests: $val_test,
+                );
+                $val_test = null;
+            }
         } elseif($validation_data instanceof Dataset) {
             $val_inputs = $validation_data;
             $val_test = null;
@@ -215,10 +307,13 @@ abstract class AbstractModel implements Model
             throw new InvalidArgumentException('unsupported dataset type.'.
                 ' validation_data must be set of NDArray or instance of Dataset.');
         }
-        $history = ['loss'=>[], 'accuracy'=>[]];
+        foreach($this->metrics as $idx => $m) {
+            $history[$idx] = [];
+        }
         if($val_inputs) {
-            $history['val_loss'] = [];
-            $history['val_accuracy'] = [];
+            foreach($this->metrics as $idx => $m) {
+                $history['val_'.$idx] = [];
+            }
         }
         $callbacks = new CallbackList($this,$callbacks);
         if($verbose>=1) {
@@ -242,8 +337,11 @@ abstract class AbstractModel implements Model
         for($epoch=0;$epoch<$epochs;$epoch++) {
             $callbacks->onEpochBegin($epoch);
             $startTime = time();
-            [$totalLoss,$totalAccuracy] =
-                $this->trainProcess($dataset,$epoch,$epochs,$startTime,$totalSteps,
+            foreach($this->metrics as $metric) {
+                $metric->reset();
+            }
+            $logs = [];
+            $this->trainProcess($dataset,$epoch,$epochs,$startTime,$totalSteps,
                                                     $verbose,$callbacks);
             if($totalSteps==0) {
                 $totalSteps = count($dataset);
@@ -251,19 +349,19 @@ abstract class AbstractModel implements Model
             if($totalSteps==0) {
                 $totalSteps=1;
             }
-            if(in_array('loss',$this->metrics)) {
-                $history['loss'][] = $totalLoss / $totalSteps;
+            foreach($this->metrics as $name => $metric) {
+                $value = $metric->result();
+                $history[$name][] = $value;
+                $logs[$name] = $value;
             }
-            if(in_array('accuracy',$this->metrics)) {
-                $history['accuracy'][] = $totalAccuracy / $totalSteps;
-            }
-            $logs = ['loss'=>$totalLoss,'accuracy'=>$totalAccuracy];
             if($val_inputs) {
-                [$loss, $accuracy] = $this->evaluate($val_inputs, $val_test,
+                $evals = $this->evaluate($val_inputs, $val_test,
                     batch_size:$batch_size, verbose:0, callbacks:$callbacks);
-                $history['val_loss'][] = $loss;
-                $history['val_accuracy'][] = $accuracy;
-                $logs = ['val_loss'=>$loss,'val_accuracy'=>$accuracy];
+ 
+                foreach($this->metrics as $name => $metric) {
+                    $history['val_'.$name][] = $evals[$name];
+                    $logs['val_'.$name] = $evals[$name];
+                }
             }
             if($verbose>=1) {
                 $sec = time() - $startTime;
@@ -282,19 +380,17 @@ abstract class AbstractModel implements Model
     }
 
     protected function trainProcess(
-        $dataset,$epoch,$epochs,$startTime,$totalSteps,$verbose,$callbacks)
+        $dataset,$epoch,$epochs,$startTime,$totalSteps,$verbose,$callbacks) : void
     {
         $K = $this->backend;
         if($verbose>=1) {
             $this->console('Epoch '.($epoch+1).'/'.$epochs." ");
         }
-        $totalLoss = 0;
         if($totalSteps==0) {
             $indicateCount = 1000;
         } else {
             $indicateCount = (int)($totalSteps/25);
         }
-        $totalAccuracy = 0;
         $indicate = 0;
         foreach($dataset as $batchIndex => $data) {
             if($verbose>=1) {
@@ -310,7 +406,6 @@ abstract class AbstractModel implements Model
                 if($indicate>$indicateCount)
                     $indicate = 0;
             }
-            $callbacks->onTrainBatchBegin($batchIndex);
             ////
             [$inputs,$trues] = $data;
             if(!is_array($inputs)) {
@@ -325,13 +420,10 @@ abstract class AbstractModel implements Model
             }
             $trues = $K->array($trues);
 
-            [$loss, $accuracy] = $this->trainStep($inputs, $trues);
-            $totalLoss += $loss;
-            $totalAccuracy += $accuracy;
+            $this->trainStep($batchIndex,$inputs, $trues,$callbacks);
             if($this->shapeInspection) {
                 $this->setShapeInspection(false);
             }
-            $callbacks->onTrainBatchEnd($batchIndex,['loss'=>$loss,'accuracy'=>$accuracy]);
         }
         if($verbose==1) {
             $this->progressBar($epoch,$epochs,$startTime,
@@ -339,7 +431,6 @@ abstract class AbstractModel implements Model
         } elseif($verbose>1) {
             $this->console(".");
         }
-        return [$totalLoss,$totalAccuracy];
     }
 
     protected function progressBar($epoch,$epochs,$startTime,$batchIndex,$batchIndexCount,$maxDot)
@@ -373,15 +464,15 @@ abstract class AbstractModel implements Model
         return $trues;
     }
 
-    protected function loss(NDArray $trues,NDArray $preds) : float
-    {
-        return $this->lossFunction->forward($trues,$preds);
-    }
-
-    protected function accuracy(NDArray $trues,NDArray $preds) : float
-    {
-        return $this->lossFunction->accuracy($trues,$preds);
-    }
+    //protected function loss(NDArray $trues,NDArray $preds) : float
+    //{
+    //    return $this->lossFunction->forward($trues,$preds);
+    //}
+    //
+    //protected function accuracy(NDArray $trues,NDArray $preds) : float
+    //{
+    //    return $this->lossFunction->accuracy($trues,$preds);
+    //}
 
     public function evaluate(
         $inputs,
@@ -400,8 +491,9 @@ abstract class AbstractModel implements Model
         $t = $trues; unset($trues);
 
         $K = $this->backend;
-        $totalLoss = 0.0;
-        $totalAccuracy = 0.0;
+        foreach($this->metrics as $metric) {
+            $metric->reset();
+        }
         if(!($callbacks instanceof CallbackList)) {
             $callbacks = new CallbackList($this,$callbacks);
         }
@@ -424,7 +516,6 @@ abstract class AbstractModel implements Model
             if($verbose>=1) {
                     $this->console('.');
             }
-            $callbacks->onTestBatchBegin($batchIndex);
             [$inputs,$trues] = $data;
             if(!is_array($inputs)) {
                 $inputs = $K->array($inputs);
@@ -438,27 +529,26 @@ abstract class AbstractModel implements Model
             }
             $trues = $K->array($trues);
 
-            [$loss,$accuracy] = $this->evaluateStep($inputs,$trues);
+            $this->evaluateStep($batchIndex,$inputs,$trues,$callbacks);
 
-            $callbacks->onTestBatchEnd($batchIndex,['val_loss'=>$loss,'val_accuracy'=>$accuracy]);
-            $totalLoss += $loss;
-            $totalAccuracy += $accuracy;
         }
-        $totalSteps = count($dataset);
-        if($totalSteps==0) {
-            $totalSteps=1;
+        $logs = [];
+        foreach($this->metrics as $name => $metric) {
+            $logs[$name] = $metric->result();
         }
-        $totalLoss = $totalLoss / $totalSteps;
-        $totalAccuracy = $totalAccuracy / $totalSteps;
         if($verbose>=1) {
             $sec = time() - $startTime;
             $this->console(' - '.$sec." sec.\n");
-            $this->console(' loss:'.sprintf('%2.4f',$totalLoss));
-            $this->console(' accuracy:'.sprintf('%2.4f',$totalAccuracy));
+            if(array_key_exists('loss',$logs)) {
+                $this->console(' loss:'.sprintf('%2.4f',$logs['loss']));
+            }
+            if(array_key_exists('accuracy',$logs)) {
+                $this->console(' accuracy:'.sprintf('%2.4f',$logs['accuracy']));
+            }
             $this->console("\n");
         }
-        $callbacks->onTestEnd(['val_loss'=>$totalLoss,'val_accuracy'=>$totalAccuracy]);
-        return [$totalLoss,$totalAccuracy];
+        $callbacks->onTestEnd($logs);
+        return $logs;
     }
 
     public function predict(
@@ -521,8 +611,8 @@ abstract class AbstractModel implements Model
             return $this->graph['model'];
         }
         $model = $this;
-        $func = function($x,$training,$t) use ($model) {
-            return $model->forward($x,$training,$t);
+        $func = function($x,...$options) use ($model) {
+            return $model->forward($x,...$options);
         };
         //$options = ['alternateCreator'=>$this];
         //[$weights,$grads] = $this->initWeights();
@@ -530,7 +620,7 @@ abstract class AbstractModel implements Model
         //    $options['weights'] = $weights;
         //    $options['grads'] = $grads;
         //}
-        $this->graph['model'] = $this->builder->gradient->function(
+        $this->graph['model'] = $this->builder->gradient->Function(
             $func,alternateCreator:$this);
         return $this->graph['model'];
     }
@@ -591,6 +681,25 @@ abstract class AbstractModel implements Model
         return $variables;
     }
 
+    public function parameterVariables() : array
+    {
+        $variables = [];
+        foreach ($this->submodules() as $module) {
+            if($module instanceof Model) {
+                $variables = array_merge($variables,$module->parameterVariables());
+            }
+        }
+        foreach(get_object_vars($this) as $var) {
+            if($var instanceof Variable) {
+                if($var->isbackpropagatable()) {
+                    $variables[] = $var;
+                }
+            }
+        }
+
+        return $variables;
+    }
+
     public function trainableVariables() : array
     {
         return array_filter($this->variables(),fn($v)=>$v->isTrainable());
@@ -623,18 +732,25 @@ abstract class AbstractModel implements Model
         return $this->graph['model']->backward($dOutputs, $grads, $oidsToCollect);
     }
 
-    protected function trainStep($inputs, $trues)
+    protected function trainStep($batchIndex, $inputs, $trues ,$callbacks) : void
     {
         $K = $this->backend;
         $nn = $this->builder;
+        $callbacks->onTrainBatchBegin($batchIndex);
+
         $g = $nn->gradient();
         if(!is_array($inputs)) {
             $inputs = [$inputs];
         }
         $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
-        $inputs[] = $g->Variable(true);
-        $inputs[] = $g->Variable($trues);
+        if($this->isAwareOf('training')) {
+            $inputs['training'] = $g->Variable(true);
+        }
+        if($this->isAwareOf('trues')) {
+            $inputs['trues'] = $g->Variable($trues);
+        }
         $trues = $this->trueValuesFilter($trues);
+        $trues = $g->Variable($trues);
         $model = $this->getModelGraph();
         $lossfunc = $this->lossFunction;
         [$loss,$preds] = $nn->with($tape=$g->GradientTape(),
@@ -651,26 +767,33 @@ abstract class AbstractModel implements Model
         $gradients = $tape->gradient($loss, $params);
         $this->optimizer->update($params, $gradients);
 
-        if(in_array('accuracy',$this->metrics)) {
-            //$preds = $this->forwardLastlayer($preds);
-            $accuracy = $this->lossFunction->accuracy($trues,$preds->value());
-        } else {
-            $accuracy = 0;
+        foreach($this->metrics as $name => $metric) {
+            if($name=='loss') {
+                $metric->immediateUpdate($lossValue);
+            } else {
+                $metric->update($trues,$preds->value());
+            }
         }
-        return [$lossValue,$accuracy];
+        $callbacks->onTrainBatchEnd($batchIndex,$this->metrics);
     }
 
-    protected function evaluateStep($inputs,$trues)
+    protected function evaluateStep($batchIndex,$inputs,$trues,$callbacks) : void
     {
         $nn = $this->builder;
+        $callbacks->onTestBatchBegin($batchIndex);
+
         $K = $nn->backend();
         $g = $nn->gradient();
         if(!is_array($inputs)) {
             $inputs = [$inputs];
         }
         $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
-        $inputs[] = $g->Variable(false); // training
-        $inputs[] = $g->Variable($trues);
+        if($this->isAwareOf('training')) {
+            $inputs['training'] = $g->Variable(false); // training
+        }
+        if($this->isAwareOf('trues')) {
+            $inputs['trues'] = $g->Variable($trues);
+        }
 
         $trues = $this->trueValuesFilter($trues);
         $model = $this->getModelGraph();
@@ -678,8 +801,14 @@ abstract class AbstractModel implements Model
         $predicts = $model(...$inputs);
         $loss = $lossfunc($trues,$predicts);
         $loss = $K->scalar($loss->value());
-        $accuracy = $this->lossFunction->accuracy($trues,$predicts->value());
-        return [$loss,$accuracy];
+        foreach($this->metrics as $name => $metric) {
+            if($name=='loss') {
+                $metric->immediateUpdate($loss);
+            } else {
+                $metric->update($trues,$predicts->value());
+            }
+        }
+        $callbacks->onTestBatchEnd($batchIndex,$this->metrics);
     }
 
     protected function predictStep($inputs,$options)
@@ -690,16 +819,15 @@ abstract class AbstractModel implements Model
             $inputs = [$inputs];
         }
         $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
-        $inputs[] = $g->Variable(false); // training
-        $inputs[] = $g->Variable(false); // trues
+        if($this->isAwareOf('training')) {
+            $inputs['training'] = $g->Variable(false); // training
+        }
+        if($this->isAwareOf('trues')) {
+            $inputs['trues'] = $g->Variable(false); // trues
+        }
         $model = $this->getModelGraph();
         $predicts = $model(...$inputs);
         return $predicts->value();
-    }
-
-    public function parameterVariables() : array
-    {
-        return [];
     }
 
     public function build(...$inputShapes) : void
@@ -708,13 +836,17 @@ abstract class AbstractModel implements Model
             return;
         }
         $K = $this->backend;
+        $nn = $this->builder;
         $inputs = [];
-        foreach($inputShapes as $inputShape) {
+        foreach($inputShapes as $idx => $inputShape) {
             if(is_array($inputShape)) {
-                $inputs[] = $K->zeros($inputShape);
+                $inputs[$idx] = $nn->gradient()->Variable($K->zeros($inputShape));
             } else {
-                $inputs[] = $inputShape;
+                $inputs[$idx] = $inputShape;
             }
+        }
+        if($this->isAwareOf('training')) {
+            $inputs['training'] = false;
         }
         $this->forward(...$inputs);
     }
@@ -733,7 +865,11 @@ abstract class AbstractModel implements Model
         $totalParams = 0;
         foreach ($this->layers() as $layer) {
             $type = $this->basename($layer);
-            $this->display(substr(str_pad($layer->getName().'('.$type.')',29),0,29));
+            $layerName = $layer->getName().'('.$type.')';
+            $this->display(substr(str_pad($layerName,29),0,29));
+            if(!$layer->isBuilt()) {
+                throw new LogicException('the layer is not built: '.$layerName);
+            }
             $outputShape = $layer->outputShape();
             if(count($outputShape)>0 && is_array($outputShape[0])) {
                 $outputShape = $outputShape[0];
@@ -776,13 +912,14 @@ abstract class AbstractModel implements Model
     public function saveWeights(&$modelWeights,$portable=null) : void
     {
         $K = $this->backend;
+        $mo = $K->localMatrixOperator();
         $modelWeights['weights'] = $modelWeights['weights'] ?? [];
         foreach($this->variables() as $idx => $weights) {
             $param = $weights->value();
             $param=$K->ndarray($param);
             if($portable)
                 $param = $this->converPortableSaveMode($param);
-            $modelWeights['weights'][$idx] = serialize($param);
+            $modelWeights['weights'][$idx] = $mo->serializeArray($param);
         }
         $optimizerWeights = $this->optimizer()->getWeights();
         $modelWeights['optimizerNumWeight'] = count($optimizerWeights);
@@ -791,16 +928,16 @@ abstract class AbstractModel implements Model
             $weights=$K->ndarray($weights);
             if($portable)
                 $weights = $this->converPortableSaveMode($weights);
-            $modelWeights['optimizer'][$idx] = serialize($weights);
+            $modelWeights['optimizer'][$idx] = $mo->serializeArray($weights);
         }
     }
     
     public function loadWeights($modelWeights) : void
     {
         $K = $this->backend;
-        $lossfunc = $this->lossFunction;
+        $mo = $K->localMatrixOperator();
         foreach($this->variables() as $idx => $weights) {
-            $data = unserialize($modelWeights['weights'][$idx]);
+            $data = $mo->unserializeArray($modelWeights['weights'][$idx]);
             $data = $K->array($data);
             $weights->assign($K->copy($data));
         }
@@ -816,7 +953,7 @@ abstract class AbstractModel implements Model
         $optimizerNumWeight = $modelWeights['optimizerNumWeight'];
         $params = [];
         for($idx=0;$idx<$optimizerNumWeight;$idx++) {
-            $data = unserialize($modelWeights['optimizer'][$idx]);
+            $data = $mo->unserializeArray($modelWeights['optimizer'][$idx]);
             $data = $K->array($data);
             //$K->copy($data,$weights);
             $params[] = $data;
@@ -860,6 +997,7 @@ abstract class AbstractModel implements Model
         $this->outputsVariables = null;
         $this->optimizer = null;
         $this->lossFunction = null;
+        $this->accuracyFunction = null;
         $this->metrics = null;
     }
 }

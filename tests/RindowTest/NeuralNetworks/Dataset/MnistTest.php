@@ -1,7 +1,7 @@
 <?php
 namespace RindowTest\NeuralNetworks\Dataset\MnistTest;
 
-if(class_exists('RindowTest\NeuralNetworks\Dataset\MnistTest\Test')) {
+if(class_exists('RindowTest\NeuralNetworks\Dataset\MnistTest\MnistTest')) {
     return;
 }
 
@@ -12,10 +12,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-/**
- * @requires extension rindow_openblas
- */
-class Test extends TestCase
+class MnistTest extends TestCase
 {
     protected $plot = false;
     protected $pickleFilename = '/rindow/nn/datasets/mnist/mnist.pkl';
@@ -23,15 +20,21 @@ class Test extends TestCase
 
     public function setUp() : void
     {
+        parent::setUp();
         $this->plot = true;
         $this->pickleFile = sys_get_temp_dir().$this->pickleFilename;
+        $mo = new MatrixOperator();
+        if(!$mo->isAdvanced()) {
+            $this->markTestSkipped("The service is not Advanced.");
+            return;
+        }
     }
 
     public function getPlotConfig()
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 

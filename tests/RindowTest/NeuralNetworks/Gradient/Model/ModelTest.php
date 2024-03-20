@@ -15,18 +15,17 @@ class TestModel1 extends AbstractModel
 {
     protected $dense;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->dense = $builder->layers->Dense($units=5,input_shape:[1]);
     }
 
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
         $dense = $this->dense;
-        $outputs = $dense($inputs,$training);
+        $outputs = $dense($inputs);
         return $outputs;
     }
 }
@@ -36,23 +35,22 @@ class TestModel2 extends AbstractModel
     protected $dense1;
     protected $dense2;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->dense1 = $builder->layers->Dense($units=128,
                 input_shape:[2], activation:'sigmoid'
             );
         $this->dense2 = $builder->layers->Dense($units=2);
     }
 
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
         $dense1 = $this->dense1;
         $dense2 = $this->dense2;
-        $x = $dense1($inputs,$training);
-        $outputs = $dense2($x,$training);
+        $x = $dense1($inputs);
+        $outputs = $dense2($x);
         return $outputs;
     }
 }
@@ -61,19 +59,18 @@ class Test3Mini1 extends AbstractModel
 {
     protected $dense1;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->dense1 = $builder->layers->Dense($units=128,
                 input_shape:[2], activation:'sigmoid'
             );
     }
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
         $dense1 = $this->dense1;
-        $outputs = $dense1($inputs,$training);
+        $outputs = $dense1($inputs);
         return $outputs;
     }
 }
@@ -82,17 +79,16 @@ class Test3Mini2 extends AbstractModel
 {
     protected $dense2;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->dense2 = $builder->layers->Dense($units=2);
     }
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
         $dense2 = $this->dense2;
-        $outputs = $dense2($inputs,$training);
+        $outputs = $dense2($inputs);
         return $outputs;
     }
 }
@@ -102,21 +98,20 @@ class Test3Main extends AbstractModel
     protected $model1;
     protected $model2;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
-        $this->model1 = new Test3Mini1($backend,$builder);
-        $this->model2 = new Test3Mini2($backend,$builder);
+        parent::__construct($builder);
+        $this->model1 = new Test3Mini1($builder);
+        $this->model2 = new Test3Mini2($builder);
     }
 
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
         $model1 = $this->model1;
         $model2 = $this->model2;
-        $x = $model1($inputs,$training);
-        $outputs = $model2($x,$training);
+        $x = $model1($inputs);
+        $outputs = $model2($x);
         return $outputs;
     }
 }
@@ -126,11 +121,10 @@ class TestRNNEncoder extends AbstractModel
     protected $embed;
     protected $rnn;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->embed = $builder->layers->Embedding($inputDim=5, $outputDim=4,
                 input_length:3
             );
@@ -140,13 +134,13 @@ class TestRNNEncoder extends AbstractModel
             );
     }
 
-    protected function call($inputs,$training,$initial_states)
+    protected function call($inputs,$initial_states=null)
     {
         $embed = $this->embed;
         $rnn = $this->rnn;
 
-        $x = $embed($inputs,$training);
-        [$outputs,$states] = $rnn($x,$training,$initial_states);
+        $x = $embed($inputs);
+        [$outputs,$states] = $rnn($x,initialStates:$initial_states);
         return [$outputs, $states];
     }
 }
@@ -160,11 +154,10 @@ class TestRNNDecoder extends AbstractModel
     protected $dense;
     protected $attentionScores;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->embed = $builder->layers->Embedding($inputDim=5, $outputDim=4,
                 input_length:3
             );
@@ -177,7 +170,7 @@ class TestRNNDecoder extends AbstractModel
         $this->dense = $builder->layers->Dense($units=8);
     }
 
-    protected function call($inputs,$encOutputs,$training,$encStates,$options)
+    protected function call($inputs,$encOutputs,$encStates,$returnAttentionScores=null)
     {
         $embed = $this->embed;
         $rnn = $this->rnn;
@@ -185,15 +178,16 @@ class TestRNNDecoder extends AbstractModel
         $concat = $this->concat;
         $dense = $this->dense;
 
-        $x = $embed($inputs,$training);
-        [$rnnSequence,$states] = $rnn($x,$training,$encStates);
-        $contextVector = $attention([$rnnSequence,$encOutputs],$training,$options);
+        $x = $embed($inputs);
+        [$rnnSequence,$states] = $rnn($x,initialStates:$encStates);
+        $contextVector = $attention([$rnnSequence,$encOutputs],
+                                        returnAttentionScores:$returnAttentionScores);
         if(is_array($contextVector)) {
             [$contextVector,$attentionScores] = $contextVector;
             $this->attentionScores = $attentionScores;
         }
-        $outputs = $concat([$contextVector, $rnnSequence],$training);
-        $outputs = $dense($outputs,$training);
+        $outputs = $concat([$contextVector, $rnnSequence]);
+        $outputs = $dense($outputs);
         return [$outputs,$states];
     }
 
@@ -211,27 +205,26 @@ class TestRNNMain extends AbstractModel
     protected $out;
     public function __construct(
         $mo,
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->mo = $mo;
-        $this->encoder = new TestRNNEncoder($backend,$builder);
-        $this->decoder = new TestRNNDecoder($backend,$builder);
+        $this->encoder = new TestRNNEncoder($builder);
+        $this->decoder = new TestRNNDecoder($builder);
         $this->out = $builder->layers->Activation('softmax');
     }
 
-    protected function call($inputs,$training,$trues)
+    protected function call($inputs,$trues=null)
     {
         $encoder = $this->encoder;
         $decoder = $this->decoder;
         $out = $this->out;
         //$trues =$this->builder->gradient->Variable($trues);
 
-        [$encOutputs,$states] = $encoder($inputs,$training,null);
-        [$outputs,$dmyStatus] = $decoder($trues,$encOutputs,$training,$states,$options=null);
-        $outputs = $out($outputs,$training);
+        [$encOutputs,$states] = $encoder($inputs);
+        [$outputs,$dmyStatus] = $decoder($trues,$encOutputs,$states);
+        $outputs = $out($outputs);
         return $outputs;
     }
 
@@ -239,7 +232,7 @@ class TestRNNMain extends AbstractModel
         NDArray $sentence
         ) : NDArray
     {
-        $K = $this->backend;
+        $K = $this->backend();
         $shape = $sentence->shape();
         $batchs = $shape[0];
         $zeroPad = $K->zeros([$batchs,1],$sentence->dtype());
@@ -266,7 +259,7 @@ class TestRNNMain extends AbstractModel
         ...$options
     ) : NDArray
     {
-        $K = $this->backend;
+        $K = $this->backend();
         $g = $this->builder->gradient();
         $encoder = $this->encoder;
         $decoder = $this->decoder;
@@ -284,7 +277,7 @@ class TestRNNMain extends AbstractModel
             $g->Variable($K->zeros([$batchs, 32])),
             $g->Variable($K->zeros([$batchs, 32]))
         ];
-        [$encOutputs, $status] = $encoder($inputs, $training=false, $status);
+        [$encOutputs, $status] = $encoder($inputs, $status);
 
         $decInputs = $g->Variable($K->array([[0]],$inputs->dtype()));
 
@@ -292,8 +285,8 @@ class TestRNNMain extends AbstractModel
         $this->setShapeInspection(false);
         for($t=0;$t<3;$t++) {
             [$predictions, $status] = $decoder(
-                $decInputs, $encOutputs, $training=false, $status,
-                ['return_attention_scores'=>true]);
+                $decInputs, $encOutputs, $status,
+                returnAttentionScores:true);
 
             # storing the attention weights to plot later on
             $scores = $decoder->getAttentionScores();
@@ -323,11 +316,11 @@ class TestVariableMini1 extends AbstractModel
     protected $linearBias;
     protected $activation;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
+        $backend = $this->backend();
         $g = $builder->gradient();
         $inputDim = 2;
         $units = 128;
@@ -340,7 +333,7 @@ class TestVariableMini1 extends AbstractModel
 
     protected function call($inputs)
     {
-        $K = $this->backend;
+        $K = $this->backend();
         $g = $this->builder->gradient();
         $activation = $this->activation;
         $outputs = $g->matmul($inputs,$this->linearWeight);
@@ -355,11 +348,11 @@ class TestVariableMini2 extends AbstractModel
     protected $linearWeight;
     protected $linearBias;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
+        $backend = $this->backend();
         $g = $builder->gradient();
         $inputDim = 128;
         $units = 2;
@@ -384,13 +377,12 @@ class TestVariableMain extends AbstractModel
     protected $model1;
     protected $model2;
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
-        $this->model1 = new TestVariableMini1($backend,$builder);
-        $this->model2 = new TestVariableMini2($backend,$builder);
+        parent::__construct($builder);
+        $this->model1 = new TestVariableMini1($builder);
+        $this->model2 = new TestVariableMini2($builder);
     }
 
     protected function call($inputs)
@@ -410,23 +402,22 @@ class TestGraphMode extends AbstractModel
     protected $fc;
 
     public function __construct(
-        $backend,
         $builder
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $nn = $builder;
         $this->in = $nn->layers->Input(shape:[2]);
         $this->fc = $nn->layers->Dense(3);
     }
 
-    protected function call($inputs,$training)
+    protected function call($inputs)
     {
         $this->log('call');
         $in = $this->in;
         $fc = $this->fc;
-        $x = $in($inputs,$training);
-        $outputs = $fc($x,$training);
+        $x = $in($inputs);
+        $outputs = $fc($x);
         return $outputs;
     }
 
@@ -441,7 +432,7 @@ class TestGraphMode extends AbstractModel
     }
 }
 
-class Test extends TestCase
+class ModelTest extends TestCase
 {
     protected $plot = true;
 
@@ -464,7 +455,7 @@ class Test extends TestCase
     {
         return [
             'renderer.skipCleaning' => true,
-            'renderer.skipRunViewer' => getenv('TRAVIS_PHP_VERSION') ? true : false,
+            'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
     }
 
@@ -476,7 +467,7 @@ class Test extends TestCase
         $g = $nn->gradient();
 
         $x = $g->Variable($K->array([[3.0], [4.0]]));
-        $model = new TestModel1($K,$nn);
+        $model = new TestModel1($nn);
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($model,$x) {
@@ -501,11 +492,11 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestModel2($K,$nn);
+        $model = new TestModel2($nn);
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         $optimizer = $nn->optimizers->Adam();
         $train_inputs = $K->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $K->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $K->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $dataset = $nn->data->NDArrayDataset($train_inputs,
             tests:$train_tests,
             batch_size:64,
@@ -552,10 +543,10 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestModel2($K,$nn);
+        $model = new TestModel2($nn);
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $model->compile(
             loss: $lossfunc,
             optimizer: 'adam',
@@ -584,7 +575,7 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestModel2($K,$nn);
+        $model = new TestModel2($nn);
 
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         $model->compile(
@@ -594,12 +585,12 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:100, verbose:0);
 
-        [$loss,$accuracy] = $model->evaluate($x,$t);
-        $this->assertLessThan(1.0,$loss);
-        $this->assertEquals(1.0,$accuracy);
+        $evals = $model->evaluate($x,$t);
+        $this->assertLessThan(1.0,$evals['loss']);
+        $this->assertEquals(1.0,$evals['accuracy']);
     }
 
     public function testFitWithEvaluate()
@@ -610,11 +601,11 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestModel2($K,$nn);
+        $model = new TestModel2($nn);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $val_inputs = $mo->array([[1, 2], [3, 2],]);
-        $val_tests = $mo->array([0, 1,]);
+        $val_tests = $mo->array([0, 1,],dtype:NDArray::int32);
 
         $model->compile(
             loss:$nn->losses->SparseCategoricalCrossentropy(from_logits:true),
@@ -646,11 +637,11 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new Test3Main($K,$nn);
+        $model = new Test3Main($nn);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $val_inputs = $mo->array([[1, 2], [3, 2],]);
-        $val_tests = $mo->array([0, 1,]);
+        $val_tests = $mo->array([0, 1,],dtype:NDArray::int32);
 
         $model->compile(
             loss: $nn->losses->SparseCategoricalCrossentropy(from_logits:true),
@@ -681,11 +672,11 @@ class Test extends TestCase
         $K = $this->newBackend($nn);
         $g = $nn->gradient();
 
-        $model = new TestModel2($K,$nn);
+        $model = new TestModel2($nn);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $val_inputs = $mo->array([[1, 2], [3, 2],]);
-        $val_tests = $mo->array([0, 1,]);
+        $val_tests = $mo->array([0, 1,],dtype:NDArray::int32);
 
         $model->compile(
             loss: $nn->losses->SparseCategoricalCrossentropy(from_logits:true),
@@ -707,11 +698,11 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestModel2($K,$nn);
+        $model = new TestModel2($nn);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $val_inputs = $mo->array([[1, 2], [3, 2],]);
-        $val_tests = $mo->array([0, 1,]);
+        $val_tests = $mo->array([0, 1,],dtype:NDArray::int32);
 
         $model->compile(
             loss: $nn->losses->SparseCategoricalCrossentropy(from_logits:true),
@@ -719,10 +710,10 @@ class Test extends TestCase
         );
         $model->loadWeights($savedWeights);
 
-        [$totalLoss,$totalAccuracy] = $model->evaluate($val_inputs,$val_tests);
+        $evals = $model->evaluate($val_inputs,$val_tests);
 
-        $this->assertGreaterThanOrEqual(0.9,$totalAccuracy);
-        $this->assertLessThanOrEqual(0.5,$totalLoss);
+        $this->assertGreaterThanOrEqual(0.9,$evals['accuracy']);
+        $this->assertLessThanOrEqual(0.5,$evals['loss']);
         //$model->summary();
     }
 
@@ -733,7 +724,7 @@ class Test extends TestCase
         $K = $this->newBackend($nn);
         $g = $nn->gradient();
 
-        $model = new TestRNNMain($mo,$K,$nn);
+        $model = new TestRNNMain($mo,$nn);
         $inputs = $mo->array(
             [[1, 3, 3], [1, 4, 3], [2, 4, 4], [3, 1, 4], [4, 1, 4], [4, 2, 2]],
             NDArray::int32
@@ -763,7 +754,7 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestRNNMain($mo,$K,$nn);
+        $model = new TestRNNMain($mo,$nn);
         $inputs = $mo->array(
             [[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]],
             NDArray::int32
@@ -800,10 +791,10 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestVariableMain($K,$nn);
+        $model = new TestVariableMain($nn);
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $model->compile(
             loss: $lossfunc,
             optimizer: 'adam',
@@ -832,10 +823,10 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestVariableMain($K,$nn);
+        $model = new TestVariableMain($nn);
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         $x = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $t = $mo->array([0, 0, 0, 1, 1, 1]);
+        $t = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
 
         $model->compile(
             loss: $lossfunc,
@@ -843,9 +834,9 @@ class Test extends TestCase
         );
         $model->loadWeights($savedWeights);
 
-        [$loss,$accuracy] = $model->evaluate($x,$t);
-        $this->assertLessThan(1.0,$loss);
-        $this->assertEquals(1.0,$accuracy);
+        $evals = $model->evaluate($x,$t);
+        $this->assertLessThan(1.0,$evals['loss']);
+        $this->assertEquals(1.0,$evals['accuracy']);
         //$model->summary();
 
         //$loadedWeights = $model->trainableVariables();
@@ -864,12 +855,12 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestGraphMode($K,$nn);
+        $model = new TestGraphMode($nn);
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         //$train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
         //$train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
         $train_inputs = $mo->array([[1, 3]]);
-        $train_tests = $mo->array([0]);
+        $train_tests = $mo->array([0],dtype:NDArray::int32);
         $model->compile(
             loss: $lossfunc,
             optimizer: 'adam',
@@ -905,10 +896,10 @@ class Test extends TestCase
         $g = $nn->gradient();
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        $model = new TestGraphMode($K,$nn);
+        $model = new TestGraphMode($nn);
         $lossfunc = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
         $train_inputs = $mo->array([[1, 3], [1, 4], [2, 4], [3, 1], [4, 1], [4, 2]]);
-        $train_tests = $mo->array([0, 0, 0, 1, 1, 1]);
+        $train_tests = $mo->array([0, 0, 0, 1, 1, 1],dtype:NDArray::int32);
         $model->compile(
             loss: $lossfunc,
             optimizer: 'adam',

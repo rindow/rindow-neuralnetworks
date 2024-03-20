@@ -7,7 +7,7 @@ use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use InvalidArgumentException;
 
-class Test extends TestCase
+class AttentionTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -46,9 +46,9 @@ class Test extends TestCase
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($embed1,$embed2,$layer,$query,$value) {
-                $q = $embed1($query,true);
-                $v = $embed2($value,true);
-                $outputs = $layer([$q,$v],true);
+                $q = $embed1($query);
+                $v = $embed2($value);
+                $outputs = $layer([$q,$v]);
                 return $outputs;
             }
         );
@@ -83,9 +83,9 @@ class Test extends TestCase
 
         $outputs = $nn->with($tape=$g->GradientTape(),
             function() use ($embed1,$embed2,$layer,$query,$value) {
-                $q = $embed1($query,true);
-                $v = $embed2($value,true);
-                $outputs = $layer([$q,$v],true,['return_attention_scores'=>true]);
+                $q = $embed1($query);
+                $v = $embed2($value);
+                $outputs = $layer([$q,$v],returnAttentionScores:true);
                 return $outputs;
             }
         );

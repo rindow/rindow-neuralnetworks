@@ -11,13 +11,14 @@ trait GradientUtils
     protected $container;
 
     protected function postGradientProcess(
-        $backend, array $inputsVariables, array $outputs) : array
+        $backend, array $inputsVariables, array $outputs, array $unbackpropagatables=null) : array
     {
         $outputsVariables = [];
-        foreach ($outputs as $v) {
+        foreach ($outputs as $key => $v) {
             $undetermined = ($v === null) ? true : false;
+            $unbackpropagatable = isset($unbackpropagatables[$key]) && $unbackpropagatables[$key];
             $outputsVariables[] = new Variable(
-                $backend, $v, undetermined:$undetermined);
+                $backend, $v, undetermined:$undetermined, unbackpropagatable:$unbackpropagatable);
         }
         if(GradientTape::$autoBackProp) {
             $this->inputsVariables = $inputsVariables;
@@ -30,7 +31,20 @@ trait GradientUtils
         return $outputsVariables;
     }
 
-    protected function preGradientProcessOnSession($inputsVariables,$optionsVariables=null) : object
+    protected function cleanNullValue(?array $optionsVariables)
+    {
+        if($optionsVariables!==null) {
+            $keys = array_keys($optionsVariables);
+            foreach ($keys as $key) {
+                if($optionsVariables[$key]===null) {
+                    unset($optionsVariables[$key]);
+                }
+            }
+        }
+        return $optionsVariables;
+    }
+
+    protected function preGradientProcessOnSession(array $inputsVariables, ?array $optionsVariables=null) : object
     {
         $session = new GraphSession($this,$inputsVariables,$optionsVariables);
         $session->_setGeneration($this->maxGeneration($inputsVariables));
@@ -38,13 +52,15 @@ trait GradientUtils
     }
 
     protected function postGradientProcessOnSession(
-        object $backend, object $session, array $inputsVariables, array $outputs) : array
+        object $backend, object $session, array $inputsVariables,
+        array $outputs, array $unbackpropagatables=null) : array
     {
         $outputsVariables = [];
-        foreach ($outputs as $v) {
+        foreach ($outputs as $key => $v) {
             $undetermined = ($v === null) ? true : false;
+            $unbackpropagatable = isset($unbackpropagatables[$key]) && $unbackpropagatables[$key];
             $outputsVariables[] = new Variable(
-                $backend, $v, undetermined:$undetermined);
+                $backend, $v, undetermined:$undetermined, unbackpropagatable:$unbackpropagatable);
         }
         if(GradientTape::$autoBackProp) {
             $this->setCreatorToVariables($session,$outputsVariables);
@@ -108,27 +124,35 @@ trait GradientUtils
         return $value;
     }
 
-    public function packAndUnpackVariable(object $backend, $value) : array
+    public function packAndUnpackVariable(
+        object $backend, $value, bool $unbackpropagatable=null) : array
     {
+        if($value===null) {
+            return [null,null];
+        }
         if($value instanceof Variable) {
             $rawValue = $value->value();
         } else {
             $rawValue = $value;
-            $value = new Variable($backend,$rawValue);
+            $value = new Variable($backend,$rawValue,unbackpropagatable:$unbackpropagatable);
         }
         return [$value,$rawValue];
     }
 
-    public function packAndUnpackVariables(object $backend, array $values) : array
+    public function packAndUnpackVariables(
+        object $backend, array $values, bool $unbackpropagatable=null) : array
     {
         $variables = [];
         $rawValues = [];
         foreach($values as $value) {
-            if($value instanceof Variable) {
+            if($value===null) {
+                $variables[] = null;
+                $rawValues[] = null;
+            } elseif($value instanceof Variable) {
                 $variables[] = $value;
                 $rawValues[] = $value->value();
             } else {
-                $variables[] = new Variable($backend,$value);
+                $variables[] = new Variable($backend,$value,unbackpropagatable:$unbackpropagatable);
                 $rawValues[] = $value;
             }
         }

@@ -18,6 +18,8 @@ class Mul extends AbstractFunction
 
     protected function differentiate(array $dOutputs) : array
     {
+        //echo "===mul===\n";
+        //echo 'dOutputs='.implode(',',$dOutputs[0]->toArray())."\n";
         $K = $this->backend;
         //$inputs = $this->inputsVariables;
         $container = $this->container();
@@ -28,11 +30,13 @@ class Mul extends AbstractFunction
 
         // for broadcasted inputs
         if($x0->ndim() != $dx0->ndim()) {
-            $dx0 = $K->sum($dx0, $axis=0);
+            $dx0 = $K->sum($dx0, axis:0);
         }
         if($x1->ndim() != $dx1->ndim()) {
-            $dx1 = $K->sum($dx1, $axis=0);
+            $dx1 = $K->sum($dx1, axis:0);
         }
+        //echo 'dx0=['.implode(',',$dx0->toArray())."]\n";
+        //echo 'dx1=['.implode(',',$dx1->toArray())."]\n";
         return [$dx0, $dx1];
     }
 }

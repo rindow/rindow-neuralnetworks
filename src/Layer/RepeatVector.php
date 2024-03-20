@@ -58,17 +58,17 @@ class RepeatVector extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
-        $outputs = $K->repeat($inputs,$this->repeats,$axis=1);
+        $outputs = $K->repeat($inputs,$this->repeats,axis:1);
         return $outputs;
     }
 
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        $dInput = $K->sum($dOutputs,$axis=1);
+        $dInput = $K->sum($dOutputs,axis:1);
         return $dInput;
     }
 }

@@ -11,7 +11,7 @@ use Rindow\NeuralNetworks\Activation\Tanh;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class ActivationTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -77,7 +77,7 @@ class Test extends TestCase
         $inputs = $K->array($inputs);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
+                $outputsVariable = $layer->forward($inputs);
                 return $outputsVariable;
             }
         );

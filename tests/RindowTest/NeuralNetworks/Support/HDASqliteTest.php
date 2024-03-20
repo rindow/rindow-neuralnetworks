@@ -6,7 +6,7 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Support\HDA\HDASqlite;
 use PDO;
 
-class Test extends TestCase
+class HDASqliteTest extends TestCase
 {
     protected $filename;
 

@@ -6,7 +6,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
-class Test extends TestCase
+class MeanSquaredErrorTest extends TestCase
 {
     public function newMatrixOperator()
     {

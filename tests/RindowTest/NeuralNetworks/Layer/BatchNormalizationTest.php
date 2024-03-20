@@ -8,7 +8,7 @@ use Rindow\NeuralNetworks\Layer\BatchNormalization;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 
 
-class Test extends TestCase
+class BatchNormalizationTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -31,10 +31,10 @@ class Test extends TestCase
 
         // 3 input x 4 batch
         $x = $K->array([
-            [0.0, 0.0 , 6.0],
-            [0.0, 0.0 , 6.0],
-            [0.0, 0.0 , 6.0],
-            [0.0, 0.0 , 6.0],
+            [1.0, 2.0, 1.0],
+            [1.0, 2.0, 1.0],
+            [2.0, 1.0, 2.0],
+            [2.0, 1.0, 2.0],
         ]);
 
         $inputs = $g->Variable($x);
@@ -52,21 +52,34 @@ class Test extends TestCase
 
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {
-                $outputsVariable = $layer->forward($x, $training=true);
+                $outputsVariable = $layer->forward($x, training:true);
                 return $outputsVariable;
             }
         );
         $out = $K->ndarray($outputsVariable);
         // 3 output x 4 batch
         $this->assertEquals([4,3],$out->shape());
+        $this->assertTrue($mo->la()->isclose($mo->la()->array(
+            [[-0.998,0.998,-0.998],
+             [-0.998,0.998,-0.998],
+             [0.998,-0.998,0.998],
+             [0.998,-0.998,0.998]]
+        ), $out));
         // 2 output x 4 batch
         $dout = $K->array([
-            [0.0, 0.0, -0.5],
-            [0.0, 0.0, -0.5],
-            [0.0, 0.0, -0.5],
-            [0.0, 0.0, -0.5],
+            [0.0, 0.5, 1.0],
+            [0.0, 0.5, 1.0],
+            [1.0, 0.5, 0.0],
+            [1.0, 0.5, 0.0],
         ]);
         [$dx] = $outputsVariable->creator()->backward([$dout]);
+        $dx = $K->ndarray($dx);
+        $this->assertTrue($mo->la()->isclose($mo->la()->array(
+            [[-0.004,0.000,0.004],
+             [-0.004,0.000,0.004],
+             [0.004,0.000,-0.004],
+             [0.004,0.000,-0.004]]
+        ), $dx, $r=1e-1));
         // 3 input x 4 batch
         $this->assertEquals([4,3],$dx->shape());
 
@@ -117,7 +130,7 @@ class Test extends TestCase
 
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {
-                $outputsVariable = $layer->forward($x, $training=true);
+                $outputsVariable = $layer->forward($x, training:true);
                 return $outputsVariable;
             }
         );
@@ -168,7 +181,7 @@ class Test extends TestCase
 
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {
-                $outputsVariable = $layer->forward($x, $training=true);
+                $outputsVariable = $layer->forward($x, training:true);
                 return $outputsVariable;
             }
         );

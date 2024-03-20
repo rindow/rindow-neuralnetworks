@@ -2,7 +2,6 @@
 require __DIR__.'/../vendor/autoload.php';
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Layer\AbstractRNNLayer;
 use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\Math\Matrix\MatrixOperator;
@@ -11,6 +10,7 @@ use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Data\Sequence\Tokenizer;
 use Rindow\NeuralNetworks\Data\Sequence\Preprocessor;
+use function Rindow\Math\Matrix\R;
 
 # Download the file
 class EngFraDataset
@@ -55,6 +55,9 @@ class EngFraDataset
         }
         $this->console("Extract to:".$this->datasetDir.'/..'."\n");
         $files = [$memberfile];
+        if(!class_exists("ZipArchive")) {
+            throw new RuntimeException("Please configure the zip php-extension.");
+        }
         $zip = new ZipArchive();
         $zip->open($filePath);
         $zip->extractTo($this->datasetDir);
@@ -167,7 +170,6 @@ class Encoder extends AbstractModel
     protected $rnn;
 
     public function __construct(
-        $backend,
         $builder,
         int $vocabSize,
         int $wordVectSize,
@@ -175,7 +177,7 @@ class Encoder extends AbstractModel
         int $inputLength
         )
     {
-        $this->backend = $backend;
+        parent::__construct($builder);
         $this->vocabSize = $vocabSize;
         $this->wordVectSize = $wordVectSize;
         $this->units = $units;
@@ -192,16 +194,23 @@ class Encoder extends AbstractModel
 
     protected function call(
         object $inputs,
-        Variable|bool $training,
-        array $initial_state=null,
+        array $initialStates=null,
         array $options=null
         ) : array
     {
         $K = $this->backend;
-        $wordVect = $this->embedding->forward($inputs,$training);
+        $wordVect = $this->embedding->forward($inputs);
         [$outputs,$states] = $this->rnn->forward(
-            $wordVect,$training,$initial_state);
+            $wordVect,initialStates:$initialStates);
+        
         return [$outputs, $states];
+    }
+
+    public function computeMask($inputs)
+    {
+        $g = $this->builder->gradient();
+        $mask = $g->notEqual($inputs,$g->zerosLike($inputs));
+        return $mask;
     }
 }
 
@@ -221,7 +230,6 @@ class Decoder extends AbstractModel
     protected $attentionScores;
 
     public function __construct(
-        $backend,
         $builder,
         int $vocabSize,
         int $wordVectSize,
@@ -230,7 +238,6 @@ class Decoder extends AbstractModel
         int $targetLength
         )
     {
-        $this->backend = $backend;
         $this->vocabSize = $vocabSize;
         $this->wordVectSize = $wordVectSize;
         $this->units = $units;
@@ -251,27 +258,30 @@ class Decoder extends AbstractModel
 
     protected function call(
         object $inputs,
-        Variable|bool $training,
-        array $initial_state=null,
-        array $options=null
+        array $initialStates=null,
+        Variable $encOutputs=null,
+        Variable $inputMask=null,
+        bool $returnAttentionScores=null,
         ) : array
     {
         $K = $this->backend;
-        $encOutputs=$options['enc_outputs'];
 
-        $x = $this->embedding->forward($inputs,$training);
+        $x = $this->embedding->forward($inputs);
         [$rnnSequence,$states] = $this->rnn->forward(
-            $x,$training,$initial_state);
+            $x,initialStates:$initialStates);
 
         $contextVector = $this->attention->forward(
-            [$rnnSequence,$encOutputs],$training,$options);
+            [$rnnSequence,$encOutputs],
+            mask:[null,$inputMask],
+            returnAttentionScores:$returnAttentionScores,
+        );
         if(is_array($contextVector)) {
             [$contextVector,$attentionScores] = $contextVector;
             $this->attentionScores = $attentionScores;
         }
-        $outputs = $this->concat->forward([$contextVector, $rnnSequence],$training);
+        $outputs = $this->concat->forward([$contextVector, $rnnSequence]);
 
-        $outputs = $this->dense->forward($outputs,$training);
+        $outputs = $this->dense->forward($outputs);
         return [$outputs,$states];
     }
 
@@ -311,9 +321,8 @@ class Seq2seq extends AbstractModel
         $plt=null
         )
     {
-        parent::__construct($backend,$builder);
+        parent::__construct($builder);
         $this->encoder = new Encoder(
-            $backend,
             $builder,
             $inputVocabSize,
             $wordVectSize,
@@ -321,7 +330,6 @@ class Seq2seq extends AbstractModel
             $inputLength
         );
         $this->decoder = new Decoder(
-            $backend,
             $builder,
             $targetVocabSize,
             $wordVectSize,
@@ -331,7 +339,6 @@ class Seq2seq extends AbstractModel
         );
         $this->out = $builder->layers()->Activation('softmax');
         $this->mo = $mo;
-        $this->backend = $backend;
         $this->startVocId = $startVocId;
         $this->endVocId = $endVocId;
         $this->inputLength = $inputLength;
@@ -340,13 +347,14 @@ class Seq2seq extends AbstractModel
         $this->plt = $plt;
     }
 
-    protected function call($inputs, $training, $trues)
+    protected function call($inputs, $trues=null)
     {
         $K = $this->backend;
-        [$encOutputs,$states] = $this->encoder->forward($inputs,$training);
-        $options = ['enc_outputs'=>$encOutputs];
-        [$outputs,$dmyStatus] = $this->decoder->forward($trues,$training,$states,$options);
-        $outputs = $this->out->forward($outputs,$training);
+        [$encOutputs,$states] = $this->encoder->forward($inputs);
+        $inputMask = $this->encoder->computeMask($inputs);
+        [$outputs,$dmyStatus] = $this->decoder->forward(
+            $trues,initialStates:$states, encOutputs:$encOutputs, inputMask:$inputMask);
+        $outputs = $this->out->forward($outputs);
         return $outputs;
     }
 
@@ -382,7 +390,7 @@ class Seq2seq extends AbstractModel
             throw new InvalidArgumentException('num of batch must be one.');
         }
         $status = [$K->zeros([$batchs, $this->units])];
-        [$encOutputs, $status] = $this->encoder->forward($inputs, $training=false, $status);
+        [$encOutputs, $status] = $this->encoder->forward($inputs, initialStates:$status);
 
         $decInputs = $K->array([[$this->startVocId]],$inputs->dtype());
 
@@ -390,8 +398,8 @@ class Seq2seq extends AbstractModel
         $this->setShapeInspection(false);
         for($t=0;$t<$this->outputLength;$t++) {
             [$predictions, $status] = $this->decoder->forward(
-                $decInputs, $training=false, $status,
-                ['enc_outputs'=>$encOutputs,'return_attention_scores'=>true]);
+                $decInputs, initialStates:$status,
+                encOutputs:$encOutputs,returnAttentionScores:true);
 
             # storing the attention weights to plot later on
             $scores = $this->decoder->getAttentionScores();
@@ -444,7 +452,7 @@ class Seq2seq extends AbstractModel
 }
 
 $numExamples=20000;#30000
-$numWords=null;
+$numWords=1024;#null;
 $epochs = 10;
 $batchSize = 64;
 $wordVectSize=256;
@@ -463,10 +471,10 @@ echo "Generating data...\n";
     = $dataset->loadData(null,$numExamples,$numWords);
 $valSize = intval(floor(count($inputTensor)/10));
 $trainSize = count($inputTensor)-$valSize;
-$inputTensorTrain  = $inputTensor[[0,$trainSize-1]];
-$targetTensorTrain = $targetTensor[[0,$trainSize-1]];
-$inputTensorVal  = $inputTensor[[$trainSize,$valSize+$trainSize-1]];
-$targetTensorVal = $targetTensor[[$trainSize,$valSize+$trainSize-1]];
+$inputTensorTrain  = $inputTensor[R(0,$trainSize)];
+$targetTensorTrain = $targetTensor[R(0,$trainSize)];
+$inputTensorVal  = $inputTensor[R($trainSize,$valSize+$trainSize)];
+$targetTensorVal = $targetTensor[R($trainSize,$valSize+$trainSize)];
 
 $inputLength  = $inputTensor->shape()[1];
 $outputLength = $targetTensor->shape()[1];
@@ -486,6 +494,7 @@ echo "Target word dictionary: $targetVocabSize(".$targLang->numWords(true).")\n"
 echo "Input length: $inputLength\n";
 echo "Output length: $outputLength\n";
 
+echo "device type: ".$nn->deviceType()."\n";
 $seq2seq = new Seq2seq(
     $mo,
     $nn->backend(),
@@ -505,9 +514,9 @@ echo "Compile model...\n";
 $seq2seq->compile(
     loss:'sparse_categorical_crossentropy',
     optimizer:'adam',
-    metrics:['accuracy','loss'],
+    metrics:['loss','accuracy'],
 );
-$seq2seq->build([1,$inputLength], true, [1,$outputLength]); // just for summary
+$seq2seq->build([1,$inputLength], trues:[1,$outputLength]); // just for summary
 $seq2seq->summary();
 
 $modelFilePath = __DIR__."/neural-machine-translation-with-attention.model";

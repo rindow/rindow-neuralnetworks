@@ -6,7 +6,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Data\Sequence\Preprocessor;
 
-class Test extends TestCase
+class PreprocessorTest extends TestCase
 {
     public function testNormal()
     {

@@ -3,6 +3,7 @@ namespace Rindow\NeuralNetworks\Optimizer;
 
 use Rindow\NeuralNetworks\Gradient\Variable;
 use UnexpectedValueException;
+use Rindow\NeuralNetworks\Optimizer\Schedule\LearningRateSchedule;
 
 class Adam implements Optimizer
 {
@@ -17,7 +18,7 @@ class Adam implements Optimizer
 
     public function __construct(
         object $backend,
-        float $lr=null,
+        float|LearningRateSchedule $lr=null,
         float $beta1=null,
         float $beta2=null,
         float $epsilon=null,
@@ -93,6 +94,19 @@ class Adam implements Optimizer
         return $params2;
     }
 
+    public function learningRate(mixed $step) : float
+    {
+        $lr = $this->lr;
+        if(is_numeric($lr)) {
+            // lr_t = lr * sqrt( 1 - beta_2**t ) /
+            //                 ( 1 - beta_1**t )
+            $lr_t = $lr * sqrt(1.0 - ($this->beta2**$step)) /
+                                    (1.0 - ($this->beta1**$step)) ;
+            return $lr_t;
+        }
+        return $lr($step);
+    }
+
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;
@@ -103,11 +117,8 @@ class Adam implements Optimizer
 
         $K->update_increment($this->iter,1.0);
         $iter = $this->iter->toArray();
-        // t = K.cast(self.iterations, K.floatx()) + 1
-        // lr_t = lr * sqrt( 1 - beta_2**t ) /
-        //                 ( 1 - beta_1**t )
-        $lr_t = $this->lr * sqrt(1.0 - ($this->beta2**$iter)) /
-                                (1.0 - ($this->beta1**$iter)) ;
+
+        $lr_t = $this->learningRate($iter);
 
         foreach(array_map(null,$params,$grads,$this->m,$this->v) as [$p,$g,$m,$v]) {
             // m += ( 1 - beta_1 ) * ( g - m )

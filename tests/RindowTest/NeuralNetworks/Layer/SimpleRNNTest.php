@@ -10,7 +10,7 @@ use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Activation\Tanh;
 
-class Test extends TestCase
+class SimpleRNNTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -26,13 +26,13 @@ class Test extends TestCase
     {
         $f = function($x) use ($mo,$K,$function){
             $x = $K->array($x);
-            $y = $function->forward($x,$training=true);
+            $y = $function->forward($x);
             return $K->ndarray($y);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($function,$x) {
-                $outputsVariable = $function->forward($x, $training=true);
+                $outputsVariable = $function->forward($x);
                 return $outputsVariable;
             }
         );
@@ -174,7 +174,7 @@ class Test extends TestCase
         $copyStates = [$K->copy($initialStates[0])];
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs,$initialStates) {
-                $outputsVariable = $layer->forward($inputs,$training=true, $initialStates);
+                $outputsVariable = $layer->forward($inputs,initialStates:$initialStates);
                 return $outputsVariable;
             }
         );
@@ -247,7 +247,7 @@ class Test extends TestCase
         $copyStates = [$K->copy($initialStates[0])];
         [$outputsVariable,$nextStatesVariable] = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs,$initialStates) {
-                [$outputsVariable,$nextStatesVariable] = $layer->forward($inputs,$training=true, $initialStates);
+                [$outputsVariable,$nextStatesVariable] = $layer->forward($inputs,initialStates:$initialStates);
                 return [$outputsVariable,$nextStatesVariable];
             }
         );
@@ -326,7 +326,7 @@ class Test extends TestCase
         //$copyStates = [$mo->copy($initialStates[0])];
         [$outputsVariable,$nextStatesVariable] = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs,$initialStates) {
-                [$outputsVariable,$nextStatesVariable] = $layer->forward($inputs,$training=true, $initialStates);
+                [$outputsVariable,$nextStatesVariable] = $layer->forward($inputs,initialStates:$initialStates);
                 return [$outputsVariable,$nextStatesVariable];
             }
         );
@@ -411,7 +411,7 @@ class Test extends TestCase
         //
         [$outputsVariable,$nextStateVariables] = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs,$initialStates) {
-                [$outputsVariable,$nextStateVariables] = $layer->forward($inputs,$training=true, $initialStates);
+                [$outputsVariable,$nextStateVariables] = $layer->forward($inputs,initialStates:$initialStates);
                 return [$outputsVariable,$nextStateVariables];
             }
         );
@@ -489,11 +489,11 @@ class Test extends TestCase
 
         $x = $K->array([
             [0,1,2,9],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $K->onehot($x->reshape([4]),$numClass=10)->reshape([1,4,10]);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {
-                $outputsVariable = $layer->forward($x,$training=true);
+                $outputsVariable = $layer->forward($x);
                 return $outputsVariable;
             }
         );
@@ -524,11 +524,11 @@ class Test extends TestCase
 
         $x = $K->array([
             [0,1,2,9],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $K->onehot($x->reshape([4]),$numClass=10)->reshape([1,4,10]);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$x) {
-                $outputsVariable = $layer->forward($x,$training=true);
+                $outputsVariable = $layer->forward($x);
                 return $outputsVariable;
             }
         );

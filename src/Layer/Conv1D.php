@@ -8,7 +8,7 @@ class Conv1D extends AbstractConv
     protected $rank = 1;
     protected $defaultLayerName = 'conv1d';
 
-    protected function call(NDArray $inputs, bool $training) : NDArray
+    protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();
@@ -25,7 +25,7 @@ class Conv1D extends AbstractConv
         );
         if($this->activation) {
             $container->activation = new \stdClass();
-            $outputs = $this->activation->forward($container->activation,$outputs,$training);
+            $outputs = $this->activation->forward($container->activation,$outputs,training:$training);
         }
         return $outputs;
     }

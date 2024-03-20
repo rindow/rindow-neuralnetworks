@@ -1,16 +1,18 @@
 <?php
 namespace Rindow\NeuralNetworks\Model;
 
+use Rindow\NeuralNetworks\Builder\Builder;
+
 class ModelLoader
 {
     protected $backend;
     protected $builder;
     protected $hda;
 
-    public function __construct(object $backend,object $builder,$hdaFactory=null)
+    public function __construct(Builder $builder,$hdaFactory=null)
     {
-        $this->backend = $backend;
         $this->builder = $builder;
+        $this->backend = $builder->backend();
         $this->hda = $hdaFactory;
     }
 
@@ -25,7 +27,7 @@ class ModelLoader
     public function modelFromConfig($config)
     {
         $modelClass = $config['model']['class'];
-        $model = new $modelClass($this->backend,$this->builder,$this->hda);
+        $model = new $modelClass($this->builder,$this->hda);
         foreach($config['layer']['layers'] as $layerName => $layerConfig) {
             $class = $layerConfig['class'];
             if(isset($args['builder'])) {

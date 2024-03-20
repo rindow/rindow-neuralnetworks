@@ -9,7 +9,7 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Concatenate;
 use InvalidArgumentException;
 
-class Test extends TestCase
+class ConcatenateTest extends TestCase
 {
     public function newMatrixOperator()
     {
@@ -104,7 +104,7 @@ class Test extends TestCase
         $copyInputs = [$K->copy($i1),$K->copy($i2)];
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
             function() use ($layer,$inputs) {
-                $outputsVariable = $layer->forward($inputs, $training=true);
+                $outputsVariable = $layer->forward($inputs);
                 return $outputsVariable;
             }
         );

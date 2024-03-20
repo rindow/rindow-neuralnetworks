@@ -4,16 +4,16 @@ on: [push]
 
 jobs:
   no_ext_tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: true
       matrix:
-        php: ['8.0','8.1','8.2']
+        php: ['8.1','8.2','8.3']
   
     steps:
       - name: Checkout codes
-        uses: "actions/checkout@v2"
+        uses: "actions/checkout@v4"
 
       - name: Composer
         uses: php-actions/composer@v6
@@ -24,8 +24,8 @@ jobs:
         uses: php-actions/phpunit@v3
         with:
           configuration: tests/phpunit.xml
-          version: 8.5
+          version: 10.5
           php_version: ${{ matrix.php }}
           php_extensions: pdo_sqlite gd
         env:
-          TRAVIS_PHP_VERSION: true
+          PLOT_RENDERER_SKIP: true

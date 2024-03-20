@@ -10,7 +10,7 @@ use Rindow\NeuralNetworks\Gradient\Variable;
 abstract class AbstractMultiInputLayer extends AbstractLayerBase
 {
     use GradientUtils;
-    abstract protected function call(array $inputs, bool $training) : NDArray;
+    abstract protected function call(array $inputs, bool $training=null) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : array;
 
     protected function assertInputShapes(array $inputs,$direction)
@@ -58,7 +58,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
         return $dInputs;
     }
 
-    public function __invoke($inputs, $training)
+    public function __invoke($inputs, $training=null)
     {
         $outputs = $this->forward($inputs, $training);
         return $outputs;
@@ -68,7 +68,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
     *  @param array<Variable>  $inputs
     *  @return array<Variable>
     */
-    public function forward(array $inputs, Variable|bool $training)
+    public function forward(array $inputs, Variable|bool $training=null)
     {
         if(!is_array($inputs)) {
             throw new InvalidArgumentException('inputs must be list of Variable');
@@ -77,7 +77,13 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
             throw new InvalidArgumentException('Must have arguments greater than 2 or equal');
         }
         [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
-        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+        if($training===null) {
+            $rawTraining = null;
+            $options = null;
+        } else {
+            [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+            $options = ['training'=>$training];
+        }
         if(!$this->built) {
             $this->build($inputs);
             $this->built = true;
@@ -101,8 +107,8 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
      */
     public function _rawCall(array $inputs,array $options)
     {
-        $training = $options['training'] ?? false;
-        $outputs = $this->call($inputs, $training);
+        $training = $options['training'] ?? null;
+        $outputs = $this->call($inputs, training:$training);
         if(!is_array($outputs)) {
             $outputs = [$outputs];
         }

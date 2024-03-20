@@ -96,7 +96,7 @@ class Gather extends AbstractMultiInputLayer
         ];
     }
 
-    protected function call(array $inputs, bool $training) : NDArray
+    protected function call(array $inputs, bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();

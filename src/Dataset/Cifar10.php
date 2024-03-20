@@ -6,6 +6,7 @@ use RuntimeException;
 use Rindow\Math\Matrix\MatrixOperator;
 use Interop\Polite\Math\Matrix\NDArray;
 use PharData;
+use function Rindow\Math\Matrix\R;
 
 class Cifar10
 {
@@ -75,7 +76,7 @@ class Cifar10
         $data = file_get_contents($filePath);
         if(!$data)
             throw new LogicException('read error: '.$this->saveFile);
-        $dataset = unserialize($data);
+        $dataset = $this->matrixOperator->unserializeArray($data);
         unset($data);
         $this->console("Done!\n");
         return $dataset;
@@ -88,7 +89,7 @@ class Cifar10
         $this->console("Creating pickle file ...");
         //with open(save_file, 'wb') as f:
         //    pickle.dump(dataset, f, -1)
-        file_put_contents($filePath,serialize($dataset));
+        file_put_contents($filePath,$this->matrixOperator->serializeArray($dataset));
         $this->console("Done!\n");
         return $dataset;
     }
@@ -150,8 +151,8 @@ class Cifar10
         $labels_dataset = $labels_dataset->reshape([$labels_dataset->size(),1]);
         $offset = 0;
         foreach($filenames as $filename) {
-            $images = $image_dataset[[$offset,$offset+9999]];
-            $labels = $labels_dataset[[$offset,$offset+9999]];
+            $images = $image_dataset[R($offset,$offset+10000)];
+            $labels = $labels_dataset[R($offset,$offset+10000)];
             $this->convertImage(
                 $filename, $images, $labels
             );

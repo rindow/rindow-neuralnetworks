@@ -119,7 +119,7 @@ class SimpleRNNCell extends AbstractRNNCell
         ];
     }
 
-    protected function call(NDArray $inputs, array $states, bool $training, object $calcState, array $options=null) : array
+    protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array
     {
         $K = $this->backend;
         $prev_h = $states[0];
@@ -149,7 +149,7 @@ class SimpleRNNCell extends AbstractRNNCell
         }
         $dInputs = $K->zerosLike($calcState->inputs);
         if($this->bias) {
-            $K->update_add($this->dBias,$K->sum($dOutputs,$axis=0));
+            $K->update_add($this->dBias,$K->sum($dOutputs,axis:0));
         }
         // Add RecurrentKernel grad
         $K->gemm($calcState->prev_h, $dOutputs,1.0,1.0,$this->dRecurrentKernel,true);

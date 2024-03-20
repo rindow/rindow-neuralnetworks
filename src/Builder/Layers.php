@@ -29,6 +29,7 @@ use Rindow\NeuralNetworks\Layer\GlobalAveragePooling2D;
 use Rindow\NeuralNetworks\Layer\GlobalAveragePooling3D;
 use Rindow\NeuralNetworks\Layer\Dropout;
 use Rindow\NeuralNetworks\Layer\BatchNormalization;
+use Rindow\NeuralNetworks\Layer\LayerNormalization;
 use Rindow\NeuralNetworks\Layer\SimpleRNN;
 use Rindow\NeuralNetworks\Layer\LSTM;
 use Rindow\NeuralNetworks\Layer\GRU;
@@ -233,6 +234,11 @@ class Layers
     public function BatchNormalization(...$options)
     {
         return new BatchNormalization($this->backend,...$options);
+    }
+
+    public function LayerNormalization(...$options)
+    {
+        return new LayerNormalization($this->backend,...$options);
     }
 
     public function Embedding(int $inputDim,int $outputDim, ...$options)

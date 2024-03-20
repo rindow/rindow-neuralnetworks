@@ -2,6 +2,8 @@
 namespace Rindow\NeuralNetworks\Optimizer;
 
 use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Optimizer\Schedule\LearningRateSchedule;
+use Rindow\NeuralNetworks\Optimizer\Schedule\InverseTimeDecay;
 
 class RMSprop implements Optimizer
 {
@@ -15,7 +17,7 @@ class RMSprop implements Optimizer
 
     public function __construct(
         object $backend,
-        float $lr=null,
+        float|LearningRateSchedule $lr=null,
         float $rho=null,
         float $decay=null,
         float $epsilon=null,
@@ -31,6 +33,10 @@ class RMSprop implements Optimizer
         $this->lr = $lr;
         $this->rho = $rho;
         $this->decay = $decay;
+        if(is_numeric($lr) && $decay!=0.0) {
+            $this->lr = new InverseTimeDecay($lr,$decaySteps=1,$decay);
+        }
+
         if($epsilon===null) {
             $epsilon = $K->epsilon();
         }
@@ -83,6 +89,15 @@ class RMSprop implements Optimizer
         return $params2;
     }
 
+    protected function learningRate(float $step) : float
+    {
+        $lr = $this->lr;
+        if(is_numeric($lr)) {
+            return $lr;
+        }
+        return $lr($step);
+    }
+
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;
@@ -93,10 +108,10 @@ class RMSprop implements Optimizer
 
         $K->update_increment($this->iter,1.0);
         $iter = $this->iter->toArray();
-        $lr = $this->lr;
-        if($this->decay > 0) {
-            $lr = $lr * (1 / (1 + $this->decay * $iter));
-        }
+        $lr = $this->learningRate($iter);
+        //if($this->decay > 0) {
+        //    $lr = $lr * (1 / (1 + $this->decay * $iter));
+        //}
 
         foreach(array_map(null, $params, $grads, $this->a) as [$p, $g, $a]) {
             # update accumulator

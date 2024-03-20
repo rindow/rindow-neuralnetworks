@@ -2,11 +2,14 @@
 require __DIR__.'/../vendor/autoload.php';
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Layer\AbstractRNNLayer;
-use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use function Rindow\Math\Matrix\R;
+
+use Rindow\Math\Matrix\NDArrayPhp;
+
+NDArrayPhp::$unserializeWarning = 1;
 
 $TRAINING_SIZE = 20000;
 $DIGITS = 3;
@@ -138,10 +141,10 @@ class NumAdditionDataset
         }
         if(file_exists($path)){
             $pkl = file_get_contents($path);
-            $dataset = unserialize($pkl);
+            $dataset = $this->mo->unserializeArray($pkl);
         }else{
             $dataset = $this->generate();
-            $pkl = serialize($dataset);
+            $pkl = $this->mo->serializeArray($dataset);
             file_put_contents($path,$pkl);
         }
         return $dataset;
@@ -165,13 +168,14 @@ echo "Total questions: ". $corpus_size."\n";
 
 # Explicitly set apart 10% for validation data that we never train over.
 $split_at = $corpus_size - (int)floor($corpus_size / 10);
-$x_train = $questions[[0,$split_at-1]];
-$x_val   = $questions[[$split_at,$corpus_size-1]];
-$y_train = $answers[[0,$split_at-1]];
-$y_val   = $answers[[$split_at,$corpus_size-1]];
+$x_train = $questions[R(0,$split_at)];
+$x_val   = $questions[R($split_at,$corpus_size)];
+$y_train = $answers[R(0,$split_at)];
+$y_val   = $answers[R($split_at,$corpus_size)];
 
 echo "train,test: ".$x_train->shape()[0].",".$x_val->shape()[0]."\n";
 
+echo "device type: ".$nn->deviceType()."\n";
 $modelFilePath = __DIR__."/learn-add-numbers-with-rnn.model";
 
 if(file_exists($modelFilePath)) {
@@ -238,7 +242,7 @@ for($i=0;$i<10;$i++) {
     $input = $question->reshape([1,$input_length]);
 
     $predict = $model->predict($input);
-    $predict_seq = $mo->argMax($predict[0]->reshape([$output_length,count($target_dic)]),$axis=1);
+    $predict_seq = $mo->argMax($predict[0]->reshape([$output_length,count($target_dic)]),axis:1);
     $predict_str = $dataset->seq2str($predict_seq,$target_voc);
     $question_str = $dataset->seq2str($question,$input_voc);
     $answer_str = $dataset->seq2str($answers[$idx],$target_voc);

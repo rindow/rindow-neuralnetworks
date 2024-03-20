@@ -6,32 +6,27 @@ use InvalidArgumentException;
 use DomainException;
 use ArrayAccess;
 
-class Huber extends AbstractLoss implements Loss
+class Huber extends AbstractLoss
 {
     protected $backend;
     protected $delta;
 
     public function __construct(
         object $backend,
-        float $delta=null
+        float $delta=null,
+        string $reduction=null,
     )
     {
+        parent::__construct($backend,from_logits:null,reduction:$reduction);
         // defaults
         $delta = $delta ?? 1.0;
-
-        $this->backend = $K = $backend;
         $this->delta = $delta;
-    }
-
-    public function getConfig() : array
-    {
-        return [
-        ];
     }
 
     protected function call(NDArray $trues, NDArray $predicts) : NDArray
     {
         $K = $this->backend;
+        [$trues,$predicts] = $this->flattenShapes($trues,$predicts);
         $container = $this->container();
         //$this->assertOutputShape($predicts);
         //if($trues->ndim()!=2) {
@@ -39,7 +34,6 @@ class Huber extends AbstractLoss implements Loss
         //}
         if($trues->shape()!=$predicts->shape())
             throw new InvalidArgumentException('unmatch shape of trues and predicts results');
-        $N = $trues->size();
         #  x = trues - predicts
         #  loss = 0.5 * x^2                  if |x| <= d
         #  loss = 0.5 * d^2 + d * (|x| - d)  if |x| > d
@@ -58,26 +52,50 @@ class Huber extends AbstractLoss implements Loss
         $container->diffx = $x;
         $container->lessThenDelta = $lessThenDelta;
         $container->greaterThenDelta = $greaterThenDelta;
-        $loss = $K->sum($loss);
-
-        if($loss instanceof NDArray) {
-            return $K->scale(1/$N,$loss);
+        if($this->reduction!='none') {
+            $n = $loss->size();
+            $loss = $K->sum($loss);
+            if(is_numeric($loss)) {
+                $loss = $K->array($loss,dtype:$predicts->dtype());
+            }
+            $K->update_scale($loss,1/$n);
+        } else {
+            $shape = $loss->shape();
+            $n = array_pop($shape);
+            $loss = $K->sum($loss,axis:-1);
+            $K->update_scale($loss,1/$n);
         }
-        return $K->array($loss/$N,$predicts->dtype());
+        $loss = $this->reshapeLoss($loss);
+        return $loss;
     }
 
     protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
     {
         $K = $this->backend;
+        $dLoss = $this->flattenLoss($dOutputs[0]);
         $container = $this->container();
-        $x = $container->diffx;
-        $n = $x->size();
-        $dSquaredLoss = $K->scale(-1/$n,$x);
-        $dLinearLoss = $K->scale(-$this->delta/$n,$K->sign($x));
+        $x = $K->copy($container->diffx);
+        $dSquaredLoss = $x;
+        $dLinearLoss = $K->sign($x);
+        $K->update_scale($dLinearLoss,$this->delta);
         $dInputs = $K->add(
             $K->mul($container->lessThenDelta,   $dSquaredLoss),
             $K->mul($container->greaterThenDelta,$dLinearLoss),
         );
+        if($this->reduction!='none') {
+            $n = $x->size();
+            $K->update_scale($dInputs,-1/$n);
+        } else {
+            $shape = $x->shape();
+            $n = array_pop($shape);
+            $K->update_scale($dInputs,-1/$n);
+        }
+        $trans = false;
+        if($this->reduction=='none') {
+            $trans = true;
+        }
+        $K->update_mul($dInputs,$dLoss,trans:$trans);
+        $dInputs = $this->reshapePredicts($dInputs);
         return [$dInputs];
     }
 
@@ -85,8 +103,7 @@ class Huber extends AbstractLoss implements Loss
         NDArray $trues, NDArray $predicts) : float
     {
         $K = $this->backend;
-        if($trues->shape()!=$predicts->shape())
-            throw new InvalidArgumentException('unmatch shape of trues and predicts results');
+        [$trues,$predicts] = $this->flattenShapes($trues,$predicts);
         // calc accuracy
         $shape=$predicts->shape();
         if(count($shape)>=2) {
@@ -95,8 +112,8 @@ class Huber extends AbstractLoss implements Loss
             } else {
                 $dtype = NDArray::int32;
             }
-            $predicts = $K->argmax($predicts, $axis=1,$dtype);
-            $trues = $K->argmax($trues, $axis=1,$dtype);
+            $predicts = $K->argmax($predicts, axis:1,dtype:$dtype);
+            $trues = $K->argmax($trues, axis:1,dtype:$dtype);
             $sum = $K->sum($K->equal($trues, $predicts));
         } else {
             $sum = $K->nrm2($K->sub($predicts,$trues));
@@ -104,5 +121,10 @@ class Huber extends AbstractLoss implements Loss
         $sum = $K->scalar($sum);
         $accuracy = $sum/$trues->shape()[0];
         return $accuracy;
+    }
+
+    public function accuracyMetric() : string
+    {
+        return 'categorical_accuracy';
     }
 }

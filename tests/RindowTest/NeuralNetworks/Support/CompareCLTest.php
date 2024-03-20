@@ -9,11 +9,18 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Activation\FunctionFactory;
 use Interop\Polite\Math\Matrix\NDArray;
 
-/**
-*   @requires extension rindow_clblast
-*/
-class Test extends TestCase
+class CompareCLTest extends TestCase
 {
+    public function setUp() : void
+    {
+        parent::setUp();
+        $mo = new MatrixOperator();
+        if(!$mo->isAccelerated()) {
+            $this->markTestSkipped("The service is not Accelerated.");
+            return;
+        }
+    }
+
     public function newMatrixOperator()
     {
         return new MatrixOperator();
@@ -60,8 +67,8 @@ class Test extends TestCase
 
         $inputs = $g->Variable($backend->array([[1, 3],]));
         $inputscl = $gcl->Variable($backendCL->array([[1, 3],]));
-        $trues = $g->Variable($backend->array([0,]));
-        $truescl = $gcl->Variable($backendCL->array([0,]));
+        $trues = $g->Variable($backend->array([0,],dtype:NDArray::int32));
+        $truescl = $gcl->Variable($backendCL->array([0,],dtype:NDArray::int32));
 
         $outputs = $dense->forward($inputs,true);
         $outputscl = $densecl->forward($inputscl,true);
@@ -128,8 +135,8 @@ class Test extends TestCase
 
         $inputs = $g->Variable($backend->array([[1, 3],]));
         $inputscl = $gcl->Variable($backendCL->array([[1, 3],]));
-        $trues = $g->Variable($backend->array([0,]));
-        $truescl = $gcl->Variable($backendCL->array([0,]));
+        $trues = $g->Variable($backend->array([0,],dtype:NDArray::int32));
+        $truescl = $gcl->Variable($backendCL->array([0,],dtype:NDArray::int32));
 
         $outputs = $func($inputs,$trues);
         $outputscl = $funccl($inputscl,$truescl);
@@ -235,7 +242,7 @@ class Test extends TestCase
 
         // training greater or less
         $x = $mo->array([[1, 3],]);
-        $t = $mo->array([0,]);
+        $t = $mo->array([0,],dtype:NDArray::int32);
         $history = $model->fit($x,$t,epochs:1,verbose:0);
         $history = $modelcl->fit($x,$t,epochs:1,verbose:0);
 

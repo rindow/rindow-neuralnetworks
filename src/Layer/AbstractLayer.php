@@ -15,7 +15,7 @@ use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 abstract class AbstractLayer extends AbstractLayerBase implements SequentialLayer
 {
     use GradientUtils;
-    abstract protected function call(NDArray $inputs, bool $training) : NDArray;
+    abstract protected function call(NDArray $inputs, bool $training=null) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     /**
@@ -51,20 +51,27 @@ abstract class AbstractLayer extends AbstractLayerBase implements SequentialLaye
     *  @return array<Variable>
     *       outputs
     */
-    public function forward(NDArray $inputs, Variable|bool $training) : Variable
+    public function forward(NDArray $inputs, Variable|bool $training=null) : Variable
     {
         [$inputs,$rawInputs]     = $this->packAndUnpackVariable($this->backend,$inputs);
-        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+        //[$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+        if($training===null) {
+            $rawTraining = null;
+            $options = null;
+        } else {
+            [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training);
+            $options = ['training'=>$training];
+        }
         if(!$this->built) {
             $this->build($inputs);
             $this->built = true;
         }
 
-        $session = $this->preGradientProcessOnSession([$inputs],['training'=>$training]);
+        $session = $this->preGradientProcessOnSession([$inputs],$options);
         $session->begin();
         try {
             $this->assertInputShape($rawInputs,'forward');
-            $rawOutputs = $this->call($rawInputs, $rawTraining);
+            $rawOutputs = $this->call($rawInputs, training:$rawTraining);
             $this->assertOutputShape($rawOutputs,'forward');
         } finally {
             $session->end();
@@ -80,8 +87,8 @@ abstract class AbstractLayer extends AbstractLayerBase implements SequentialLaye
      */
     public function _rawCall(array $inputs,array $options)
     {
-        $training = $options['training'] ?? false;
-        $outputs = $this->call($inputs[0],$training);
+        $training = $options['training'] ?? null;
+        $outputs = $this->call($inputs[0],training:$training);
         return [$outputs];
     }
 

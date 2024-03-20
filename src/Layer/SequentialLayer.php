@@ -10,6 +10,6 @@ use Rindow\NeuralNetworks\Gradient\Variable;
  */
 interface SequentialLayer extends Layer
 {
-    public function forward(NDArray $inputs, Variable|bool $training) : Variable;
+    public function forward(NDArray $inputs, Variable|bool $training=null) : Variable;
     public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array;
 }
