@@ -2,13 +2,14 @@
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
 use InvalidArgumentException;
+use LogicException;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 use Rindow\NeuralNetworks\Gradient\Core\Scalar;
 use Interop\Polite\Math\Matrix\NDArray;
 
 class Less extends AbstractFunction
 {
-    protected $numOfInputs = 2;
+    protected int $numOfInputs = 2;
 
     protected function preprocess(array $inputs) : array
     {

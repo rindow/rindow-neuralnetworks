@@ -8,20 +8,22 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Dense extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $units;
-    protected $useBias;
-    protected $kernelInitializer;
-    protected $biasInitializer;
-    protected $kernelInitializerName;
-    protected $biasInitializerName;
+    protected int $units;
+    protected bool $useBias;
+    protected mixed $kernelInitializer;
+    protected mixed $biasInitializer;
+    protected ?string $kernelInitializerName;
+    protected ?string $biasInitializerName;
 
-    protected $kernel;
-    protected $bias;
-    protected $dKernel;
-    protected $dBias;
+    protected ?NDArray $kernel=null;
+    protected NDArray $bias;
+    protected NDArray $dKernel;
+    protected NDArray $dBias;
     //protected $inputs;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $units,
@@ -44,22 +46,21 @@ class Dense extends AbstractLayer
         //'activity_regularizer'=null,
         //'kernel_constraint'=null, 'bias_constraint'=null,
 
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->units = $units;
         $this->inputShape = $input_shape;
         $this->kernelInitializer = $K->getInitializer($kernel_initializer);
         $this->biasInitializer   = $K->getInitializer($bias_initializer);
-        $this->kernelInitializerName = $kernel_initializer;
-        $this->biasInitializerName = $bias_initializer;
-        if($use_bias===null || $use_bias) {
-            $this->useBias = true;
-        }
+        $this->kernelInitializerName = $this->toStringName($kernel_initializer);
+        $this->biasInitializerName = $this->toStringName($bias_initializer);
+        $this->useBias = $use_bias;
         $this->initName($name,'dense');
         $this->allocateWeights($this->useBias?2:1);
         $this->setActivation($activation);
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
@@ -146,7 +147,7 @@ class Dense extends AbstractLayer
         $inputDim=array_pop($shape);
         $inputSize=array_product($shape);
         $container->inputs = $inputs->reshape([$inputSize,$inputDim]);
-        if($this->bias) {
+        if($this->useBias) {
             $outputs = $K->batch_gemm($container->inputs, $this->kernel,1.0,1.0,$this->bias);
         } else {
             $outputs = $K->gemm($container->inputs, $this->kernel);
@@ -174,7 +175,7 @@ class Dense extends AbstractLayer
 
         // update params
         $K->gemm($container->inputs, $dOutputs,1.0,0.0,$this->dKernel,true,false);
-        if($this->dBias)
+        if($this->useBias)
             $K->sum($dOutputs, axis:0,output:$this->dBias);
 
         return $dInputs->reshape($container->origInputsShape);

@@ -14,7 +14,7 @@
     },
     "suggest": {
         "rindow/rindow-math-plot": "when visualize machine learning results",
-        "rindow/rindow-math-matrix-matlibffi": "~1.0.0",
+        "rindow/rindow-math-matrix-matlibffi": "~1.0.1",
         "ext-pdo_sqlite": "for save model"
     },
     "autoload": {

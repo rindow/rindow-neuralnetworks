@@ -2,11 +2,20 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
+use LogicException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
 class BatchNormalization extends AbstractNormalization
 {
+    protected float $momentum;
+    protected NDArray $movingVariance;
+    protected mixed $movingVarianceInitializer;
+    protected string $movingVarianceInitializerName;
+    protected ?NDArray $movingMean=null;
+    protected mixed $movingMeanInitializer;
+    protected string $movingMeanInitializerName;
+
     public function __construct(
         object $backend,
         int $axis=null,
@@ -21,30 +30,25 @@ class BatchNormalization extends AbstractNormalization
         string $name=null,
     )
     {
+        parent::__construct(
+            $backend,
+            $axis,
+            $epsilon,
+            $center,
+            $scale,
+            $beta_initializer,
+            $gamma_initializer,
+        );
         // defaults
-        $axis = $axis ?? -1;
         $momentum = $momentum ?? 0.99;
-        $epsilon = $epsilon ?? 0.001;
-        $center = $center ?? true;
-        $scale = $scale ?? true;
-        $beta_initializer = $beta_initializer ?? 'zeros';
-        $gamma_initializer = $gamma_initializer ?? 'ones';
         $moving_mean_initializer = $moving_mean_initializer ?? 'zeros';
         $moving_variance_initializer = $moving_variance_initializer ?? 'ones';
         $name = $name ?? null;
 
-        $this->backend = $K = $backend;
-        $this->axis = $axis;
+        $K = $backend;
         $this->momentum = $momentum;
-        $this->epsilon = $epsilon;
-        $this->center = $center;
-        $this->scale = $scale;
-        $this->betaInitializerName  = $beta_initializer;
-        $this->gammaInitializerName = $gamma_initializer;
-        $this->movingMeanInitializerName  = $moving_mean_initializer;
-        $this->movingVarianceInitializerName = $moving_variance_initializer;
-        $this->betaInitializer  = $K->getInitializer($beta_initializer);
-        $this->gammaInitializer = $K->getInitializer($gamma_initializer);
+        $this->movingMeanInitializerName  = $this->toStringName($moving_mean_initializer);
+        $this->movingVarianceInitializerName = $this->toStringName($moving_variance_initializer);
         $this->movingMeanInitializer  = $K->getInitializer($moving_mean_initializer);
         $this->movingVarianceInitializer = $K->getInitializer($moving_variance_initializer);
         $this->initName($name,'batchnormalization');
@@ -168,8 +172,9 @@ class BatchNormalization extends AbstractNormalization
         } else {
             $dxn = $dOutputs;
         }
-        if($container->std===null)
+        if($container->std===null) {
             throw new LogicException('not initialized for training');
+        }
         $dxc = $K->div($dxn, $container->std);
         $dstd = $K->scale(-1.0, $K->sum(
             $K->div($K->mul($dxn, $container->xc), $K->mul($container->std, $container->std)),
@@ -207,6 +212,8 @@ class BatchNormalization extends AbstractNormalization
         }
 
         $this->allocateWeights(2,$nonTrainables=2);
-        $this->syncWeightVariables();
+        if($this->assignedWeights) {
+            $this->syncWeightVariables();
+        }
     }
 }

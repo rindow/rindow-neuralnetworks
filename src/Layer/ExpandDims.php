@@ -8,9 +8,11 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class ExpandDims extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $axis;
+    protected int $axis;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $axis,
@@ -21,13 +23,13 @@ class ExpandDims extends AbstractLayer
         $input_shape = $input_shape ?? null;
         $name = $name ?? null;
         
-        $this->backend = $backend;
+        parent::__construct($backend);
         $this->axis = $axis;
         $this->inputShape = $input_shape;
         $this->initName($name,'expanddims');
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -46,9 +48,9 @@ class ExpandDims extends AbstractLayer
         for($i=0;$i<$axis;$i++) {
             $left[] = array_shift($right);
         }
-        if($right===null) {
-            $right=[];
-        }
+        //if($right===null) {
+        //    $right=[];
+        //}
         $outputShape = array_merge($left,[1],$right);
         $this->outputShape = $outputShape;
     }
@@ -66,7 +68,7 @@ class ExpandDims extends AbstractLayer
     public function getConfig() : array
     {
         return [
-            'dims' => $this->dims,
+            'axis' => $this->axis,
             'options' => [
                 'input_shape'=>$this->inputShape,
             ]

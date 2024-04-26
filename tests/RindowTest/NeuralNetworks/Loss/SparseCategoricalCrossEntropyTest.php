@@ -4,6 +4,7 @@ namespace RindowTest\NeuralNetworks\Loss\SparseCategoricalCrossEntropyTest;
 use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
+use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Plot\Plot;
@@ -18,6 +19,15 @@ class SparseCategoricalCrossEntropyTest extends TestCase
     public function newNeuralNetworks($mo)
     {
         return new NeuralNetworks($mo);
+    }
+
+    protected function accuracy($nn,$loss,$trues,$predicts) : float
+    {
+        $metric = $loss->accuracyMetric();
+        $metricObject = MetricCatalog::factory($nn->backend(),$metric);
+        $metricObject->update($trues,$predicts);
+        $accuracy = $metricObject->result();
+        return $accuracy;
     }
 
     public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
@@ -143,7 +153,7 @@ class SparseCategoricalCrossEntropyTest extends TestCase
         $this->assertEquals($copyx->toArray(),$tx->toArray());
         $this->assertEquals($copyt->toArray(),$tt->toArray());
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
 
         //
@@ -228,7 +238,7 @@ class SparseCategoricalCrossEntropyTest extends TestCase
         $this->assertEquals($copyx->toArray(),$tx->toArray());
         $this->assertEquals($copyt->toArray(),$tt->toArray());
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
 
         //
@@ -305,7 +315,7 @@ class SparseCategoricalCrossEntropyTest extends TestCase
         $this->assertEquals($copyx->toArray(),$tx->toArray());
         $this->assertEquals($copyt->toArray(),$tt->toArray());
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
 
         $x = $mo->array([
@@ -383,7 +393,7 @@ class SparseCategoricalCrossEntropyTest extends TestCase
         $this->assertEquals($copyx->toArray(),$tx->toArray());
         $this->assertEquals($copyt->toArray(),$tt->toArray());
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
 
         $x = $mo->array([

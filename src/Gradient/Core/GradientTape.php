@@ -5,7 +5,9 @@ namespace Rindow\NeuralNetworks\Gradient\Core;
 use InvalidArgumentException;
 use LogicException;
 use Throwable;
+use ArrayAccess;
 use WeakMap;
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\Control\Context;
 use Rindow\NeuralNetworks\Layer\LayerBase;
 use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
@@ -14,15 +16,15 @@ class GradientTape implements Context
 {
     use GraphUtils;
 
-    static public $autoBackProp = null;
-    static public $debugBackward = null;
-    static public $debug = false;
+    static public ?object $autoBackProp = null;
+    //static public $debugBackward = null;
+    static public bool $debug = false;
 
-    protected $backend;
-    protected $persistent;
-    protected $backup;
-    protected $persistentGrads = [];
-    protected $lockingObjects = [];
+    protected object $backend;
+    protected ?bool $persistent;
+    protected ?object $backup;
+    /** @var array<int,ArrayAccess<object,object>> $persistentGrads */
+    protected array $persistentGrads = [];
 
     public function __construct(object $backend,bool $persistent=null)
     {
@@ -42,7 +44,12 @@ class GradientTape implements Context
         return false;
     }
 
-    public function gradient(VariableInterface $target,$sources)
+    /**
+     * @param VariableInterface|array<VariableInterface> $sources
+     * @return NDArray|array<NDArray>
+     */
+    public function gradient(
+        VariableInterface $target, VariableInterface|array $sources) : null|NDArray|array
     {
         if(self::$autoBackProp) {
             throw new LogicException("The gradient function is not supported for use within the automatic differentiation context.");
@@ -97,7 +104,12 @@ class GradientTape implements Context
         return $gradients;
     }
 
-    protected function calcGradient($grads,$target,$sourceIds) : void
+    /**
+     * @param ArrayAccess<object,object> $grads
+     * @param array<VariableInterface> $sourceIds
+     */
+    protected function calcGradient(
+        ArrayAccess $grads,VariableInterface $target,array $sourceIds) : void
     {
         $graphOutputs = [$target];
         [$pipeline,$backprop,$constants] = $this->buildPipeline($graphOutputs);

@@ -2,8 +2,10 @@
 namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
-use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Variable as VariableIF;
+use Rindow\NeuralNetworks\Gradient\Module;
+use Rindow\NeuralNetworks\Gradient\ArrayShape;
+use Rindow\NeuralNetworks\Gradient\Core\Variable as VariableImpl;
 use Rindow\NeuralNetworks\Gradient\Core\Modules;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GraphFunction;
@@ -39,51 +41,59 @@ use Rindow\NeuralNetworks\Gradient\Func\Repeat;
 
 class Gradient
 {
-    protected $backend;
+    protected object $backend;
 
     public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
-    public function Variable($variable, ...$options)
+    public function Variable(mixed $variable, mixed ...$options) : VariableIF
     {
         if(GraphFunction::$mode==GraphFunction::EXECUTING) {
             return $variable;
         }
-        return new Variable($this->backend,$variable,...$options);
+        return new VariableImpl($this->backend,$variable,...$options);
     }
 
-    public function toVariables(array $values, ...$options) : array
+    /**
+     * @param array<mixed> $values
+     * @return array<VariableIF>
+     */
+    public function toVariables(array $values, mixed ...$options) : array
     {
         if(GraphFunction::$mode==GraphFunction::EXECUTING) {
             return $values;
         }
         $variables = [];
         foreach($values as $value) {
-            $variables[] = new Variable($this->backend,$value,...$options);
+            $variables[] = new VariableImpl($this->backend,$value,...$options);
         }
         return $variables;
     }
 
-    public function modules($modules=null)
+    /**
+     * @param array<Module> $modules
+     */
+    public function modules(array $modules=null) : object
     {
         return new Modules($modules);
     }
 
-    public function GradientTape($persistent=null)
+    public function GradientTape(bool $persistent=null) : object
     {
         return new GradientTape($this->backend,$persistent);
     }
 
-    public function Function(callable $func, ...$options)
+    public function Function(callable $func, mixed ...$options) : object
     {
         return new GraphFunction($this->backend, $func, ...$options);
     }
 
-    public function isUndetermined($variable) : bool
+    public function isUndetermined(mixed $variable) : bool
     {
-        if($variable instanceof VariableInterface) {
+        if($variable instanceof VariableIF) {
+            /** @var VariableImpl $variable */
             if($variable->isUndetermined()) {
                 return true;
             }
@@ -91,65 +101,65 @@ class Gradient
         return false;
     }
 
-    public function stopGradient($variable)
+    public function stopGradient(NDArray $variable) : NDArray
     {
         $func = new StopGradient($this->backend);
         return $func($variable);
     }
 
-    public function square($x)
+    public function square(NDArray $x) : NDArray
     {
         $func = new Square($this->backend);
         return $func($x);
     }
 
-    public function sqrt($x)
+    public function sqrt(NDArray $x) : NDArray
     {
         $func = new Sqrt($this->backend);
         return $func($x);
     }
 
-    public function exp($x)
+    public function exp(NDArray $x) : NDArray
     {
         $func = new Exp($this->backend);
         return $func($x);
     }
 
-    public function log($x)
+    public function log(NDArray $x) : NDArray
     {
         $func = new Log($this->backend);
         return $func($x);
     }
 
-    public function add($x,$y)
+    public function add(NDArray $x, NDArray $y) : NDArray
     {
         $func = new Add($this->backend);
         return $func($x,$y);
     }
 
-    public function sub($x,$y)
+    public function sub(NDArray $x, NDArray $y) : NDArray
     {
         $func = new Sub($this->backend);
         return $func($x,$y);
     }
 
-    public function mul($x,$y)
+    public function mul(NDArray $x, NDArray $y) : NDArray
     {
         $func = new Mul($this->backend);
         return $func($x,$y);
     }
 
-    public function div($x,$y)
+    public function div(NDArray $x, NDArray $y) : NDArray
     {
         $func = new Div($this->backend);
         return $func($x,$y);
     }
 
     public function matmul(
-        $x,$y,
+        NDArray $x, NDArray $y,
         bool $transpose_a=null,
         bool $transpose_b=null,
-    )
+    ) : NDArray
     {
         $func = new Matmul(
             $this->backend,
@@ -160,10 +170,10 @@ class Gradient
     }
 
     public function reduceMean(
-        $x,
+        NDArray $x,
         int $axis=null,
-        int $keepdims=null,
-    )
+        bool $keepdims=null,
+    ) : NDArray
     {
         $func = new ReduceMean(
             $this->backend,
@@ -174,10 +184,10 @@ class Gradient
     }
 
     public function reduceSum(
-        $x,
+        NDArray $x,
         int $axis=null,
-        int $keepdims=null,
-    )
+        bool $keepdims=null,
+    ) : NDArray
     {
         $func = new ReduceSum(
             $this->backend,
@@ -188,10 +198,10 @@ class Gradient
     }
 
     public function clipByValue(
-        $x,
+        NDArray $x,
         float $min,
         float $max,
-    )
+    ) : NDArray
     {
         $func = new ClipByValue(
             $this->backend,
@@ -201,40 +211,43 @@ class Gradient
         return $func($x);
     }
 
-    public function equal($x,$y)
+    public function equal(NDArray $x, NDArray $y) : NDArray
     {
         $func = new Equal($this->backend);
         return $func($x,$y);
     }
 
-    public function notEqual($x,$y)
+    public function notEqual(NDArray $x, NDArray $y) : NDArray
     {
         $func = new NotEqual($this->backend);
         return $func($x,$y);
     }
 
-    public function cast($x,$dtype)
+    public function cast(NDArray $x, int $dtype) : NDArray
     {
         $func = new Cast($this->backend,$dtype);
         return $func($x);
     }
 
-    public function zerosLike($x)
+    public function zerosLike(NDArray $x) : NDArray 
     {
         $func = new ZerosLike($this->backend);
         return $func($x);
     }
 
-    public function reshape($x, $shape)
+    public function reshape(NDArray $x, mixed $shape) : NDArray
     {
         $func = new Reshape($this->backend);
         return $func($x,$shape);
     }
 
+    /**
+     * @param array<int> $perm
+     */
     public function transpose(
-        $x,
+        NDArray $x,
         array $perm=null,
-    )
+    ) : NDArray
     {
         $func = new Transpose(
             $this->backend,
@@ -244,18 +257,18 @@ class Gradient
     }
 
     public function shape(
-        $x,
-    )
+        mixed $x,
+    ) : NDArray
     {
         $func = new Shape($this->backend);
         return $func($x);
     }
 
     public function get(
-        $x,
-        $offset,
-        $count=null,
-    )
+        mixed $x,
+        mixed $offset,
+        mixed $count=null,
+    ) : mixed
     {
         if($count===null) {
             $count = 0;
@@ -265,47 +278,47 @@ class Gradient
     }
 
     public function scale(
-        $alpha,
-        $x,
-    )
+        mixed $alpha,
+        NDArray $x,
+    ) : NDArray
     {
         $func = new Scale($this->backend);
         return $func($alpha,$x);
     }
 
     public function zeros(
-        $shape,
-        $dtype=null,
-    )
+        mixed $shape,
+        int $dtype=null,
+    ) : NDArray
     {
         $func = new Zeros($this->backend,$dtype);
         return $func($shape);
     }
 
     public function ones(
-        $shape,
-        $dtype=null,
-    )
+        mixed $shape,
+        int $dtype=null,
+    ) : NDArray
     {
         $func = new Ones($this->backend,$dtype);
         return $func($shape);
     }
 
     public function bandpart(
-        $x,
-        $lower,
-        $upper,
-    )
+        NDArray $x,
+        int $lower,
+        int $upper,
+    ) : NDArray
     {
         $func = new Bandpart($this->backend,$lower,$upper);
         return $func($x);
     }
 
     public function increment(
-        $x,
-        $beta,
-        $alpha=null,
-    )
+        NDArray $x,
+        mixed $beta,
+        mixed $alpha=null,
+    ) : NDArray
     {
         $alpha = $alpha ?? 1.0;
         $func = new Increment($this->backend);
@@ -313,29 +326,29 @@ class Gradient
     }
 
     public function greater(
-        $x,
-        $alpha,
-    )
+        NDArray $x,
+        mixed $alpha,
+    ) : NDArray
     {
         $func = new Greater($this->backend);
         return $func($x,$alpha);
     }
 
     public function less(
-        $x,
-        $alpha,
-    )
+        NDArray $x,
+        mixed $alpha,
+    ) : NDArray
     {
         $func = new Less($this->backend);
         return $func($x,$alpha);
     }
 
     public function repeat(
-        $x,
-        $repeats,
-        $axis=null,
-        $keepdims=null,
-    )
+        NDArray $x,
+        mixed $repeats,
+        int $axis=null,
+        bool $keepdims=null,
+    ) : NDArray
     {
         $func = new Repeat($this->backend,axis:$axis,keepdims:$keepdims);
         return $func($x,$repeats);

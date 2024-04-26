@@ -3,21 +3,27 @@ namespace Rindow\NeuralNetworks\Model;
 
 use InvalidArgumentException;
 use UnexpectedValueException;
-use LogicException;
 use Rindow\NeuralNetworks\Builder\Builder;
 use Rindow\NeuralNetworks\Gradient\Module;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Layer\Layer;
+use Rindow\NeuralNetworks\Support\HDA\HDAFactory;
 use Interop\Polite\Math\Matrix\NDArray;
 
 
 class Sequential extends AbstractModel
 {
+    /**
+     * @var array<Model|Layer> $layers;
+     */
     protected $layers = [];
 
-    public function __construct(Builder $builder,$hda,array $layers=null)
+    /**
+     * @param array<Layer> $layers
+     */
+    public function __construct(Builder $builder, HDAFactory $hdaFactory=null, array $layers=null)
     {
-        parent::__construct($builder,$hda);
+        parent::__construct($builder,$hdaFactory);
         if($layers!==null) {
             foreach ($layers as $layer) {
                 $this->add($layer);
@@ -25,7 +31,7 @@ class Sequential extends AbstractModel
         }
     }
 
-    public function add(Module $layer)
+    public function add(Layer $layer) : Layer
     {
         $this->layers[] = $layer;
         //$this->extractWeights($layer);
@@ -43,6 +49,9 @@ class Sequential extends AbstractModel
     //    return $lastLayer;
     //}
 
+    /**
+     * @return array<Layer>
+     */
     public function layers() : array
     {
         $layers = [];
@@ -56,11 +65,17 @@ class Sequential extends AbstractModel
         return $layers;
     }
 
+    /**
+     * @return array<Module>
+     */
     public function submodules() : array
     {
         return $this->layers;
     }
     
+    /**
+     * @return array<mixed>
+     */
     public function variables() : array
     {
         $variables = [];
@@ -71,6 +86,9 @@ class Sequential extends AbstractModel
         return $variables;
     }
     
+    /**
+     *  CAUTION: The "call" method is untyped!!
+     */
     protected function call($x, Variable|bool $training=null, ...$args)
     {
         $trainingOpt = ['training'=> $training];
@@ -84,6 +102,7 @@ class Sequential extends AbstractModel
         }
         return $x;
     }
+
 /*
     protected function backward(array $dOutputs) : array
     {
@@ -95,13 +114,16 @@ class Sequential extends AbstractModel
         return $dout;
     }
 */
+    /**
+     * @return array{array<string>,array<string,array<string,mixed>>}
+     */
     protected function generateLayersConfig() : array
     {
         $layerNames = [];
         $layers = [];
 
         foreach ($this->layers as $layer) {
-            $name = $layer->getName();
+            $name = $layer->name();
             $layerNames[] = $name;
             $layers[$name] = [
                 'class'  => get_class($layer),
@@ -111,7 +133,7 @@ class Sequential extends AbstractModel
         return [$layerNames,$layers];
     }
 
-    public function summary()
+    public function summary() : void
     {
         if(!$this->built) {
             $first = $this->layers[0];
@@ -147,14 +169,14 @@ class Sequential extends AbstractModel
         return $configJson;
     }
 
-    public function save($filepath,$portable=null) : void
+    public function save(string $filepath,bool $portable=null) : void
     {
-        $f = $this->hda->open($filepath);
+        $f = $this->hdaFactory->open($filepath);
         $f['modelConfig'] = $this->toJson();
         $f['modelWeights'] = [];
         $this->saveWeights($f['modelWeights'],$portable);
     }
-
+  
     public function __clone()
     {
         $newLayers = [];

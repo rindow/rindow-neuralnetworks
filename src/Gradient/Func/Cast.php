@@ -1,6 +1,7 @@
 <?php
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 use LogicException;
 
@@ -32,9 +33,7 @@ class Cast extends AbstractFunction
 
     /**
     *  @param array<NDArray>  $dOutputs
-    *       difference outputs
     *  @return array<NDArray>
-    *       difference inputs
     */
     protected function differentiate(array $dOutputs) : array
     {

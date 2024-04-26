@@ -10,7 +10,7 @@ use Rindow\NeuralNetworks\Gradient\Core\ArrayShape;
 
 class Reshape extends AbstractFunction
 {
-    protected $numOfInputs = 2;
+    protected int $numOfInputs = 2;
 
     protected function preprocess(array $inputs) : array
     {

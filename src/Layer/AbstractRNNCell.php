@@ -3,14 +3,63 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
+use Rindow\NeuralNetworks\Activation\Activation as ActivationInterface;
 
 /**
  *
  */
 abstract class AbstractRNNCell extends AbstractLayerBase implements RNNCell
 {
+    /**
+     * @param array<NDArray> $states
+     * @return array{NDArray,array<NDArray>}
+     */
     abstract protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array;
+
+    /**
+     * @param array<NDArray> $dStates
+     * @return array{NDArray,array<NDArray>}
+     */
     abstract protected function differentiate(NDArray $dOutputs, array $dStates, object $calcState) : array;
+
+    protected bool $useBias;
+    protected ?NDArray $kernel=null;
+    protected ?NDArray $recurrentKernel=null;
+    protected NDArray $bias;
+    protected NDArray $dKernel;
+    protected NDArray $dRecurrentKernel;
+    protected ?NDArray $dBias=null;
+
+
+    protected ?ActivationInterface $recurrentActivation;
+    protected ?string $recurrentActivationName;
+    protected mixed $kernelInitializer;
+    protected mixed $recurrentInitializer;
+    protected mixed $biasInitializer;
+    protected string $kernelInitializerName;
+    protected string $recurrentInitializerName;
+    protected string $biasInitializerName;
+
+    protected function setRecurrentActivation(null|string|ActivationInterface $activation) : void
+    {
+        $this->recurrentActivation = $this->createFunction($activation);
+        $this->recurrentActivationName = $this->toStringName($activation);
+    }
+
+    protected function setKernelInitializer(
+        mixed $kernelInitializer=null,
+        mixed $recurrentInitializer=null,
+        mixed $biasInitializer=null,
+    ) : void
+    {
+        $K = $this->backend;
+        $this->kernelInitializer = $K->getInitializer($kernelInitializer);
+        $this->recurrentInitializer = $K->getInitializer($recurrentInitializer);
+        $this->biasInitializer   = $K->getInitializer($biasInitializer);
+        $this->kernelInitializerName = $this->toStringName($kernelInitializer);
+        $this->recurrentInitializerName = $this->toStringName($recurrentInitializer);
+        $this->biasInitializerName = $this->toStringName($biasInitializer);
+    }
 
     public function getParams() : array
     {

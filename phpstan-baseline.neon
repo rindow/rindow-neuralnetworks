@@ -1,0 +1,21 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Cannot call method dtype\\(\\) on iterable\\<Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray\\>\\.$#"
+			count: 1
+			path: src/Data/Image/ImageFilter.php
+
+		-
+			message: "#^Cannot call method shape\\(\\) on iterable\\<Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray\\>\\.$#"
+			count: 2
+			path: src/Data/Image/ImageFilter.php
+
+		-
+			message: "#^Else branch is unreachable because previous condition is always true\\.$#"
+			count: 1
+			path: src/Gradient/Core/GraphFunction.php
+
+		-
+			message: "#^Else branch is unreachable because previous condition is always true\\.$#"
+			count: 1
+			path: src/Gradient/Func/Get.php

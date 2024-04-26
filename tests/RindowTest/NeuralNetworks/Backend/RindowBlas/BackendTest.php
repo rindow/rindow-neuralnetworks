@@ -520,6 +520,438 @@ class BackendTest extends TestCase
         $this->assertLessThan(1e-5, 1.1180339-$z);
     }
 
+    public function testmax()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,3],[1,2]]);
+        $z = $K->max($x,axis:1); $K->finish();
+        $this->assertEquals([3,2],$z->toArray());
+        $z = $K->max($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertLessThan(1e-5,abs(3-$z));
+    }
+
+    public function testmin()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,3],[1,2]]);
+        $z = $K->min($x,axis:1); $K->finish();
+        $this->assertEquals([2,1],$z->toArray());
+        $z = $K->min($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertLessThan(1e-5,abs(1-$z));
+    }
+
+    public function testamax()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,-3],[1,-2]]);
+        //$z = $K->amax($x,axis:1); $K->finish();
+        //$this->assertEquals([2,1],$z->toArray());
+        $z = $K->amax($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertLessThan(1e-5,abs(3-$z));
+    }
+
+    public function testamin()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[-2,3],[-1,2]]);
+        //$z = $K->amax($x,axis:1); $K->finish();
+        //$this->assertEquals([2,1],$z->toArray());
+        $z = $K->amin($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertLessThan(1e-5,abs(1-$z));
+    }
+
+    public function testargmax()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,3],[1,2]]);
+        $z = $K->argMax($x,axis:1); $K->finish();
+        $this->assertEquals([1,1],$z->toArray());
+        $z = $K->argMax($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertEquals(1,$z);
+    }
+
+    public function testargmin()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[2,3],[1,2]]);
+        if(!$K->accelerated()) {
+            $z = $K->argMin($x,axis:1); $K->finish();
+            $this->assertEquals([0,0],$z->toArray());
+        }
+        $z = $K->argMin($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertEquals(2,$z);
+    }
+
+    public function testNrm2()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[1,2],[3,4]],dtype:NDArray::float32);
+        $nrm2 = sqrt(1+2**2+3**2+4**2);
+        $z = $K->nrm2($x); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertLessThan(0.00001,abs($nrm2-$z));
+    }
+
+    public function testRand()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $z = $K->rand([2,2]); $K->finish();
+        $this->assertLessThan(1.0,$K->scalar($K->max($z)));
+        $this->assertGreaterThan(0.0,$K->scalar($K->min($z)));
+    }
+
+    public function testRandomSequence()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $z = $K->randomSequence(8,size:4); $K->finish();
+        $this->assertLessThan(8,$K->scalar($K->max($z)));
+        $this->assertGreaterThanOrEqual(0,$K->scalar($K->min($z)));
+    }
+
+    public function testDot()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->array([[1,2,3],[4,5,6]],dtype:NDArray::float32);
+        $y = $K->array([[10,20,30],[40,50,60]],dtype:NDArray::float32);
+        $z = $K->dot($x,$y); $K->finish();
+        $z = $K->scalar($z);
+        $this->assertEquals(1*10+2*20+3*30+4*40+5*50+6*60,$z);
+    }
+
+    public function testGemm()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $A = $K->array([
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        $B = $K->array([
+            [1,0,0],
+            [0,1,0],
+            [0,0,1],
+        ]);
+        $C = $K->array([
+            [100,200,300],
+            [400,500,600],
+            [700,800,900],
+        ]);
+        $Z = $K->gemm($A,$B,beta:1,c:$C); $K->finish();
+        $this->assertEquals([
+            [101,202,303],
+            [404,505,606],
+            [707,808,909],
+        ],$Z->toArray());
+    }
+
+    public function testBatchGemm()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $A = $K->array([
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        $B = $K->array([
+            [1,0,0],
+            [0,1,0],
+            [0,0,1],
+        ]);
+        $C = $K->array(
+            [100,200,300],
+        );
+        $Z = $K->batch_gemm($A,$B,beta:1,c:$C); $K->finish();
+        $this->assertEquals([
+            [101,202,303],
+            [104,205,306],
+            [107,208,309],
+        ],$Z->toArray());
+    }
+
+    public function testMatmul()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $A = $K->array([
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ]);
+        $B = $K->array([
+            [1,0,0],
+            [0,1,0],
+            [0,0,1],
+        ]);
+        $Z = $K->matmul($A,$B); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [4,5,6],
+            [7,8,9],
+        ],$Z->toArray());
+    }
+
+    public function testexpandDims()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->zeros([2,3]);
+        $this->assertEquals([2,3],$x->shape());
+        $this->assertEquals([1,2,3],$K->expandDims($x,axis:0)->shape());
+        $this->assertEquals([2,1,3],$K->expandDims($x,axis:1)->shape());
+
+        $x = $K->zeros([]);
+        $this->assertEquals([],$x->shape());
+        $this->assertEquals(1,$x->size());
+        $this->assertEquals(1,count($x->buffer()));
+        $this->assertEquals([1],$K->expandDims($x,axis:0)->shape());
+        $this->assertEquals([1],$K->expandDims($x,axis:-1)->shape());
+    }
+
+    public function testSqueeze()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $x = $K->zeros([1,2,1,3,1]);
+        $this->assertEquals([1,2,1,3,1],$x->shape());
+        $this->assertEquals([2,3],$K->squeeze($x)->shape());
+        $this->assertEquals([2,1,3,1],$K->squeeze($x,axis:0)->shape());
+        $this->assertEquals([1,2,3,1],$K->squeeze($x,axis:2)->shape());
+        $this->assertEquals([1,2,1,3],$K->squeeze($x,axis:4)->shape());
+        $this->assertEquals([1,2,1,3],$K->squeeze($x,axis:-1)->shape());
+        $this->assertEquals([1,2,3,1],$K->squeeze($x,axis:-3)->shape());
+        $this->assertEquals([2,1,3,1],$K->squeeze($x,axis:-5)->shape());
+    }
+
+    public function testGather()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // 1D by 1D
+        $x = $K->array([3,2,1,1],dtype:NDArray::int32);
+        $a = $K->array([10,11,12,13,14,15,16,17,18,19]);
+        $b = $K->gather($a,$x); $K->finish();
+        $this->assertEquals([4],$b->shape()); // replace axis0
+        $this->assertEquals([13,12,11,11],$b->toArray());
+
+        // axis = 0
+        // 1D indices
+        $x = $K->array([3,2,1],dtype:NDArray::int32);
+        $a = $K->array([
+            [ 0, 0, 3],
+            [ 0, 0, 4],
+            [ 0, 2, 0],
+            [ 1, 0, 0]]);
+        $b = $K->gather($a,$x,axis:0);  $K->finish();
+        $this->assertEquals([3],$x->shape());
+        $this->assertEquals([4,3],$a->shape());
+        $this->assertEquals([3],$b->shape()); // reduction axis0
+        $this->assertEquals([1,2,4],$b->toArray()); // reduction axis0
+    }
+
+    public function testScatterAdd()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // 1D by 1D
+        $x = $K->array([3,2,1,4],dtype:NDArray::int32); // Must not be duplicated
+        $a = $K->array([13,12,11,14]);
+        $b = $K->ones([10]);  $K->finish();
+        $K->scatterAdd($b,$x,$a);  $K->finish();
+        $this->assertEquals([4],$x->shape());
+        $this->assertEquals([4],$a->shape());
+        $this->assertEquals([10],$b->shape()); // replace axis0
+        $trues = $K->array([1,12,13,14,15,1,1,1,1,1]);
+        //echo $mo->toString($b,null,true)."\n";
+        $this->assertEquals($trues->toArray(),$b->toArray());
+
+        //
+        // axis = 0
+        //
+        //  1D inputs
+        $x = $K->array([3,2,0],dtype:NDArray::int32);
+        $a = $K->array([1,2,3],dtype:NDArray::float32);
+        $b = $K->ones([4,3]); $K->finish();
+        $K->scatterAdd($b,$x,$a,axis:0); $K->finish();
+        $this->assertEquals([3],$x->shape());
+        $this->assertEquals([3],$a->shape());
+        $this->assertEquals([4,3],$b->shape()); // insert axis0
+        $trues = $K->array([
+            [ 1, 1, 4],
+            [ 1, 1, 1],
+            [ 1, 3, 1],
+            [ 2, 1, 1]]);
+        $this->assertEquals($trues->toArray(),$b->toArray());
+    }
+
+    public function testSlice()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // 3D
+        $x = $K->array([
+            [[0,1,2],
+             [3,4,5],
+             [6,7,8],
+             [9,10,11]],
+            [[12,13,14],
+             [15,16,17],
+             [18,19,20],
+             [21,22,23]],
+        ]);
+        $this->assertEquals(3,$x->ndim());
+        $y = $K->slice(
+            $x,
+            begin:[0,1],
+            size:[-1,2]
+            );
+        $K->finish();
+        $this->assertEquals([
+            [[3,4,5],
+             [6,7,8],],
+            [[15,16,17],
+             [18,19,20],],
+        ],$y->toArray());
+    }
+
+    public function testStick()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->array($mo->arange(12,null,null,dtype:NDArray::float32)->reshape([2,2,3]));
+        $y = $K->array($mo->zeros([2,4,3]));
+        $K->stick(
+            $x,
+            $y,
+            begin:[0,1],
+            size:[-1,2]
+            );
+        $K->finish();
+        $this->assertEquals([
+            [[0,0,0],
+             [0,1,2],
+             [3,4,5],
+             [0,0,0]],
+            [[0,0,0],
+             [6,7,8],
+             [9,10,11],
+             [0,0,0]],
+        ],$y->toArray());
+    }
+
+    public function testStack()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $a = $K->array($mo->arange(6,0,null,dtype:NDArray::float32)->reshape([2,3]));
+        $b = $K->array($mo->arange(6,6,null,dtype:NDArray::float32)->reshape([2,3]));
+        $y = $K->stack(
+            [$a,$b],
+            axis:0
+            );
+        $K->finish();
+
+        $this->assertEquals([
+            [[0,1,2],
+             [3,4,5]],
+            [[6,7,8],
+             [9,10,11]],
+        ],$y->toArray());
+    }
+
+    public function testConcat()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $a = $K->array($mo->arange(6,$start=0,null,dtype:NDArray::float32)->reshape([3,2]));
+        $b = $K->array($mo->arange(4,$start=6,null,dtype:NDArray::float32)->reshape([2,2]));
+        $y = $K->concat(
+            [$a,$b],
+            axis:0
+            );
+        $K->finish();
+        $this->assertEquals([
+            [0,1],
+            [2,3],
+            [4,5],
+            [6,7],
+            [8,9],
+        ],$y->toArray());
+    }
+
+    public function testSplit()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->array([
+            [0,1],
+            [2,3],
+            [4,5],
+            [6,7],
+            [8,9],
+        ]);
+        $y = $K->split(
+            $x,
+            [3,2],
+            axis:0
+        );
+        $K->finish();
+        $a = $K->array($mo->arange(6,$start=0,null,dtype:NDArray::float32)->reshape([3,2]));
+        $b = $K->array($mo->arange(4,$start=6,null,dtype:NDArray::float32)->reshape([2,2]));
+        $this->assertCount(2,$y);
+        $this->assertEquals($a->toArray(),$y[0]->toArray());
+        $this->assertEquals($b->toArray(),$y[1]->toArray());
+    }
+
+    public function testRepeat()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // Y := X (duplicate 2 times)
+        $X = $K->array([
+            [1,2,3],
+            [4,5,6]
+        ]);
+        $Y = $K->repeat($X,$repeats=2,axis:1);
+        $K->finish();
+        $this->assertEquals([2,3],$X->shape());
+        $this->assertEquals([2,2,3],$Y->shape());
+        $this->assertEquals([
+            [1,2,3],
+            [4,5,6]
+        ],$X->toArray());
+        $this->assertEquals([
+            [[1,2,3],[1,2,3]],
+            [[4,5,6],[4,5,6]],
+        ],$Y->toArray());
+    }
+
     public function testOneHot()
     {
         $mo = $this->newMatrixOperator();
@@ -536,6 +968,71 @@ class BackendTest extends TestCase
             [0,0,1,0],
             [0,0,0,1],
         ]);
+    }
+
+    public function testRandomUniformVariables()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // float
+        $x = $K->randomUniformVariables(
+            shape:[20,30],
+            low:-1.0,
+            high:1.0);
+        $K->finish();
+        $y = $K->randomUniformVariables(
+            shape:[20,30],
+            low:-1,
+            high:1);
+        $K->finish();
+        $this->assertEquals(
+            NDArray::float32,$x->dtype());
+        $this->assertNotEquals(
+            $x->toArray(),
+            $y->toArray());
+
+        // int
+        $x = $K->randomUniformVariables(
+            shape:[20,30],
+            low:-1,
+            high:1,
+            dtype:NDArray::int32
+            );
+        $K->finish();
+        $y = $K->randomUniformVariables(
+            shape:[20,30],
+            low:-1,
+            high:1,
+            dtype:NDArray::int32);
+        $K->finish();
+        $this->assertEquals(
+            NDArray::int32,$x->dtype());
+        $this->assertNotEquals(
+            $x->toArray(),
+            $y->toArray());
+    }
+
+    public function testRandomNormalVariables()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->randomNormalVariables(
+            shape:[20,30],
+            mean:0.0,
+            scale:1.0);
+        $K->finish();
+        $y = $K->randomNormalVariables(
+            shape:[20,30],
+            mean:0.0,
+            scale:1.0);
+        $K->finish();
+        $this->assertEquals(
+            NDArray::float32,$x->dtype());
+        $this->assertNotEquals(
+            $x->toArray(),
+            $y->toArray());
     }
 
     public function testReLU()
@@ -555,12 +1052,16 @@ class BackendTest extends TestCase
         $y = $K->sigmoid($x); $K->finish();
 
         $this->assertEquals([-1.0,-0.5,0.0,0.5,1.0],$x->toArray());
-        $y = $y->toArray();
-        $this->assertTrue($y[0]<0.5);
-        $this->assertTrue($y[1]<0.5);
-        $this->assertTrue($y[2]==0.5);
-        $this->assertTrue($y[3]>0.5);
-        $this->assertTrue($y[4]>0.5);
+        $ndy = $K->ndarray($y);
+        $truesY = $mo->array([0.26894143223763,0.37754067778587,0.5,0.62245935201645,0.7310585975647]);
+        $this->assertTrue($mo->la()->isclose($truesY,$ndy));
+
+        // backward
+        $dy = $K->onesLike($y);
+        $dx = $K->dSigmoid($dy,$y); $K->finish();
+        $nddx = $K->ndarray($dx);
+        $truesDx = $mo->array([0.19661194086075,0.23500370979309,0.25,0.23500370979309,0.196611925959590]);
+        $this->assertTrue($mo->la()->isclose($truesDx,$nddx));
     }
 
     public function testSoftmax()
@@ -570,15 +1071,18 @@ class BackendTest extends TestCase
         $fn = $K;
         $x = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
         $y = $K->softmax($x); $K->finish();
-        $y = $y->toArray();
-        $this->assertTrue($y[0]>0.0);
-        $this->assertTrue($y[0]<$y[1]);
-        $this->assertTrue($y[1]<$y[2]);
-        $this->assertTrue($y[2]<$y[3]);
-        $this->assertTrue($y[3]<$y[4]);
-        $this->assertTrue($y[4]<1.0);
-        $this->assertTrue($fn->equalTest(1.0,$mo->sum($mo->array($y))));
-        $single = $y;
+        $ndy = $K->ndarray($y);
+        $truesY = $mo->array([0.058012217283249,0.095645979046822,0.15769356489182,0.25999271869659,0.42865553498268]);
+        $this->assertTrue($mo->la()->isclose($truesY,$ndy));
+        $this->assertTrue($fn->equalTest(1.0,$mo->sum($ndy)));
+        $dy = $K->onesLike($y);
+        $dx = $K->dSoftmax($dy,$y); $K->finish();
+        $nddx = $K->ndarray($dx);
+        $truesDx = $mo->array([0,0,0,0,0]);
+        $this->assertTrue($mo->la()->isclose($truesDx,$nddx));
+
+
+        $single = $y->toArray();
 
         // batch mode
         $x = $K->array([
@@ -611,9 +1115,24 @@ class BackendTest extends TestCase
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
-        $y = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $t = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
-        $this->assertEquals(0.0,$K->scalar($K->meanSquaredError($y,$t)));
+        $reduction = 'sum';
+        $y = $K->array([
+            [-1.0,-0.5,0.0,0.5,1.0],
+            [-1.0,-0.5,0.0,0.5,1.0],
+        ]);
+        $t = $K->array([
+            [-1.0,-0.5,0.0,0.5,1.0],
+            [-1.0,-0.5,0.0,0.5,1.0],
+        ]);
+        $loss = $K->meanSquaredError($y,$t,$reduction);
+        $this->assertEquals(0.0,$K->scalar($loss));
+        $dLoss = $K->onesLike($loss);
+        $dy = $K->dMeanSquaredError($dLoss,$t,$y,$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
 
         $y = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
         $t = $K->array([-1.0,-0.5,0.0,0.5,1.0]);
@@ -624,20 +1143,49 @@ class BackendTest extends TestCase
         $t = $K->array([-1.0,-0.5,0.1,0.5,1.0]);
         $this->assertTrue(0.0<$K->scalar($K->meanSquaredError($y,$t)));
         $this->assertTrue(1.0>$K->scalar($K->meanSquaredError($y,$t)));
+
+        // none reduction
+        $reduction = 'none';
+        $y = $K->array([
+            [-1.0,-0.5,0.0,0.5,1.0],
+            [-1.0,-0.5,0.0,0.5,1.0],
+        ]);
+        $t = $K->array([
+            [-1.0,-0.5,0.0,0.5,1.0],
+            [-1.0,-0.5,0.0,0.5,1.0],
+        ]);
+        $loss = $K->meanSquaredError($y,$t,$reduction);
+        $trueLoss = $mo->array([0,0]);
+        $this->assertTrue($mo->la()->isclose($trueLoss,$K->ndarray($loss)));
+        $dLoss = $K->onesLike($loss);
+        $dy = $K->dMeanSquaredError($dLoss,$t,$y,$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
     }
 
     public function testSparseCategoricalCrossEntropy()
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
+        $reduction = 'sum';
         // if test is label
         $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $t = $K->array([2,2]);
-        $this->assertTrue($K->equalTest(
-            0.0,$K->scalar($K->sparseCategoricalCrossEntropy($t,$y))));
+        $t = $K->array([2,2],dtype:NDArray::int32);
+        $loss = $K->sparseCategoricalCrossEntropy($t,$y,reduction:$reduction);
+        $this->assertTrue($K->equalTest(0.0,$K->scalar($loss)));
+        $dLoss = $K->zerosLike($loss);
+        $dy = $K->dSparseCategoricalCrossEntropy($dLoss,$t,$y,reduction:$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
 
         $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
@@ -645,6 +1193,25 @@ class BackendTest extends TestCase
         $t = $K->array([2]);
         $this->assertTrue($K->equalTest(
             0.0,$K->scalar($K->sparseCategoricalCrossEntropy($t,$y))));
+
+        $reduction = 'none';
+        // if test is label
+        $y = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $t = $K->array([2,2],dtype:NDArray::int32);
+        $loss = $K->sparseCategoricalCrossEntropy($t,$y,reduction:$reduction);
+        $trueLoss = $mo->array([0,0]);
+        $this->assertTrue($mo->la()->isclose($trueLoss,$K->ndarray($loss),atol:1e-6));
+        $dLoss = $K->zerosLike($loss);
+        $dy = $K->dSparseCategoricalCrossEntropy($dLoss,$t,$y,reduction:$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
+
     }
 
     public function testCategoricalCrossEntropy()
@@ -652,6 +1219,7 @@ class BackendTest extends TestCase
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
         // if test is label
+        $reduction = 'sum';
         $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0, 0.0],
@@ -660,8 +1228,15 @@ class BackendTest extends TestCase
             [0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $this->assertTrue($K->equalTest(
-            0.0,$K->scalar($K->categoricalCrossEntropy($t,$y))));
+        $loss = $K->categoricalCrossEntropy($t,$y,reduction:$reduction);
+        $this->assertTrue($K->equalTest(0.0,$K->scalar($loss)));
+        $dLoss = $K->zerosLike($loss);
+        $dy = $K->dCategoricalCrossEntropy($dLoss,$t,$y,reduction:$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
 
         $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
@@ -671,6 +1246,73 @@ class BackendTest extends TestCase
         ]);
         $this->assertTrue($K->equalTest(
             0.0,$K->scalar($K->categoricalCrossEntropy($t,$y))));
+
+        
+        $reduction = 'none';
+        $y = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $t = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $loss = $K->categoricalCrossEntropy($t,$y,reduction:$reduction);
+        $trueLoss = $mo->array([0,0]);
+        $this->assertTrue($mo->la()->isclose($trueLoss,$K->ndarray($loss),atol:1e-6));
+        $dLoss = $K->zerosLike($loss);
+        $dy = $K->dCategoricalCrossEntropy($dLoss,$t,$y,reduction:$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
+    }
+
+    public function testBinaryCrossEntropy()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        // if test is label
+        $reduction = 'sum';
+        $y = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $t = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $loss = $K->binaryCrossEntropy($t,$y,reduction:$reduction);
+        $this->assertTrue($K->equalTest(0.0,$K->scalar($loss)));
+        $dLoss = $K->zerosLike($loss);
+        $dy = $K->dBinaryCrossEntropy($dLoss,$t,$y,reduction:$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
+
+        
+        $reduction = 'none';
+        $y = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $t = $K->array([
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+        ]);
+        $loss = $K->binaryCrossEntropy($t,$y,reduction:$reduction);
+        $trueLoss = $mo->array([0,0]);
+        $this->assertTrue($mo->la()->isclose($trueLoss,$K->ndarray($loss),atol:1e-6));
+        $dLoss = $K->zerosLike($loss);
+        $dy = $K->dBinaryCrossEntropy($dLoss,$t,$y,reduction:$reduction);
+        $trueDy = $mo->array([
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+        ]);
+        $this->assertTrue($mo->la()->isclose($trueDy,$K->ndarray($dy)));
     }
 
     public function testEqualArray()

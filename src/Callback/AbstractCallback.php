@@ -8,19 +8,20 @@ use Rindow\NeuralNetworks\Model\Model;
  */
 abstract class AbstractCallback implements Callback
 {
-    protected $model;
-    public function __construct($model=null)
+    protected ?Model $model=null;
+    public function __construct(Model $model=null)
     {
-        if($model)
+        if($model) {
             $this->setModel($model);
+        }
     }
 
-    public function setModel(Model $model)
+    public function setModel(Model $model) : void
     {
         $this->model = $model;
     }
 
-    public function getModel()
+    public function getModel() : ?Model  
     {
         return $this->model;
     }

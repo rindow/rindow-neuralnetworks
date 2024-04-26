@@ -10,10 +10,21 @@ use Rindow\NeuralNetworks\Gradient\Variable;
 abstract class AbstractMultiInputLayer extends AbstractLayerBase
 {
     use GradientUtils;
+
+    /**
+     * @param array<NDArray> $inputs
+     */
     abstract protected function call(array $inputs, bool $training=null) : NDArray;
+
+    /**
+     * @return array<NDArray>
+     */
     abstract protected function differentiate(NDArray $dOutputs) : array;
 
-    protected function assertInputShapes(array $inputs,$direction)
+    /**
+     * @param array<NDArray> $inputs
+     */
+    protected function assertInputShapes(array $inputs, string $direction) : void
     {
         if(!$this->shapeInspection)
             return;
@@ -21,7 +32,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
             throw new InvalidArgumentException('Uninitialized input shape');
         }
         if(count($inputs)!=count($this->inputShape)){
-            throw new InvalidArgumentException('Unmatch num of input. inputs need '.count($this->inputShapes).' NDArray. '.count($inputs).'given in '.$this->name.':'.$direction);
+            throw new InvalidArgumentException('Unmatch num of input. inputs need '.count($this->inputShape).' NDArray. '.count($inputs).'given in '.$this->name.':'.$direction);
         }
         $batchSize = null;
         foreach($inputs as $idx=>$input){;
@@ -41,6 +52,12 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
         }
     }
 
+    /**
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<object,object> $grads
+     * @param array<object> $oidsToCollect
+     * @return array<NDArray>
+     */
     public function backward(array $dOutputs, ArrayAccess $grads=null,array $oidsToCollect=null) : array
     {
         if(count($dOutputs)!=1) {
@@ -58,7 +75,11 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
         return $dInputs;
     }
 
-    public function __invoke($inputs, $training=null)
+    /**
+    *  @param array<Variable>  $inputs
+    *  @return Variable
+    */
+    public function __invoke(array $inputs, Variable|bool $training=null) : Variable
     {
         $outputs = $this->forward($inputs, $training);
         return $outputs;
@@ -66,9 +87,9 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
 
     /**
     *  @param array<Variable>  $inputs
-    *  @return array<Variable>
+    *  @return Variable
     */
-    public function forward(array $inputs, Variable|bool $training=null)
+    public function forward(array $inputs, Variable|bool $training=null) : Variable
     {
         if(!is_array($inputs)) {
             throw new InvalidArgumentException('inputs must be list of Variable');
@@ -104,14 +125,14 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
 
     /**
      * Call from SessionFunc in compiled graph
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
      */
-    public function _rawCall(array $inputs,array $options)
+    public function _rawCall(array $inputs,array $options) : array
     {
         $training = $options['training'] ?? null;
         $outputs = $this->call($inputs, training:$training);
-        if(!is_array($outputs)) {
-            $outputs = [$outputs];
-        }
-        return $outputs;
+        return [$outputs];
     }
 }

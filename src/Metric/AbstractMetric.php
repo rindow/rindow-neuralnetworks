@@ -9,6 +9,7 @@ abstract class AbstractMetric implements Metric
     protected object $backend;
     protected float $state = 0.0;
     protected int $count = 0;
+    protected string $name='unknown';
 
     public function __construct(
         object $backend,
@@ -48,12 +49,15 @@ abstract class AbstractMetric implements Metric
         $this->count++;
     }
 
-    public function __invoke(...$args) : mixed
+    public function __invoke(mixed ...$args) : mixed
     {
         [$trues,$predicts] = $args;
         return $this->forward($trues, $predicts);
     }
 
+    /**
+     * @return array{NDArray,NDArray}
+     */
     protected function flattenShapes(NDArray $trues, NDArray $predicts) : array
     {
         $origTrueShape = $trues->shape();
@@ -82,6 +86,9 @@ abstract class AbstractMetric implements Metric
         return [$trues,$predicts];
     }
 
+    /**
+     * @return array{NDArray,NDArray}
+     */
     protected function flattenShapesForSparse(NDArray $trues, NDArray $predicts) : array
     {
         $origTrueShape = $trues->shape();
@@ -90,9 +97,9 @@ abstract class AbstractMetric implements Metric
         $batchShape = $predicts->shape();
         $feature = array_pop($batchShape);
         $batchSize = array_product($batchShape);
-        if($trues->shape()!=$batchShape){
+        if($trues->shape()!=$batchShape) {
             throw new InvalidArgumentException('trues and predicts must be same batch-shape of dimensions. '.
-                'trues,predicts are ['.implode(',',$origTrueShape).'],['.implode(',',$origPredictsShape->shape()).']');
+                'trues,predicts are ['.implode(',',$origTrueShape).'],['.implode(',',$origPredictsShape).']');
         }
 
         $trues = $trues->reshape([$batchSize]);

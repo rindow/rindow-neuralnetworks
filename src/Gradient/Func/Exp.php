@@ -7,8 +7,6 @@ use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
 class Exp extends AbstractFunction
 {
-    protected $outputs;
-
     protected function call(array $inputs) : array
     {
         $container = $this->container();

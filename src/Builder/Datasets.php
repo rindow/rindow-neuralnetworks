@@ -9,17 +9,17 @@ use LogicException;
 
 class Datasets
 {
-    protected $matrixOperator;
-    protected $mnist;
-    protected $fashionMnist;
-    protected $cifar10;
+    protected object $matrixOperator;
+    protected ?object $mnist=null;
+    protected ?object $fashionMnist=null;
+    protected ?object $cifar10=null;
 
     public function __construct(object $matrixOperator)
     {
         $this->matrixOperator = $matrixOperator;
     }
 
-    public function __get( string $name )
+    public function __get( string $name ) : object
     {
         if(!method_exists($this,$name)) {
             throw new LogicException('Unknown dataset: '.$name);
@@ -27,12 +27,12 @@ class Datasets
         return $this->$name();
     }
 
-    public function __set( string $name, $value ) : void
+    public function __set( string $name, mixed $value ) : void
     {
         throw new LogicException('Invalid operation to set');
     }
 
-    public function mnist()
+    public function mnist() : object
     {
         if($this->mnist==null) {
             $this->mnist = new Mnist(
@@ -42,7 +42,7 @@ class Datasets
         return $this->mnist;
     }
 
-    public function fashionMnist()
+    public function fashionMnist() : object
     {
         if($this->fashionMnist==null) {
             $this->fashionMnist = new FashionMnist(
@@ -52,7 +52,7 @@ class Datasets
         return $this->fashionMnist;
     }
 
-    public function cifar10()
+    public function cifar10() : object
     {
         if($this->cifar10==null) {
             $this->cifar10 = new Cifar10(

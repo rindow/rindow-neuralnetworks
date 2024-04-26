@@ -7,9 +7,12 @@ use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
 class Transpose extends AbstractFunction
 {
+    /** @var array<int> $perm */
     protected ?array $perm=null;
+    /** @var array<int> $dPerm */
     protected ?array $dPerm=null;
 
+    /** @param array<int> $perm */
     public function __construct(
         object $backend,
         array $perm=null,

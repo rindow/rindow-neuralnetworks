@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Loss\MeanSquaredError;
+use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
 
@@ -19,6 +20,16 @@ class MeanSquaredErrorTest extends TestCase
     {
         return new NeuralNetworks($mo);
     }
+
+    protected function accuracy($nn,$loss,$trues,$predicts) : float
+    {
+        $metric = $loss->accuracyMetric();
+        $metricObject = MetricCatalog::factory($nn->backend(),$metric);
+        $metricObject->update($trues,$predicts);
+        $accuracy = $metricObject->result();
+        return $accuracy;
+    }
+
     public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
     {
         $f = function($x) use ($mo,$K,$g,$function,$t,$fromLogits){

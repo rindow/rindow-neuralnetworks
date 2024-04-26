@@ -162,7 +162,6 @@ class EngFraDataset
 
 class Encoder extends AbstractModel
 {
-    protected $backend;
     protected $vocabSize;
     protected $wordVectSize;
     protected $units;
@@ -216,7 +215,6 @@ class Encoder extends AbstractModel
 
 class Decoder extends AbstractModel
 {
-    protected $backend;
     protected $vocabSize;
     protected $wordVectSize;
     protected $units;
@@ -238,6 +236,7 @@ class Decoder extends AbstractModel
         int $targetLength
         )
     {
+        parent::__construct($builder);
         $this->vocabSize = $vocabSize;
         $this->wordVectSize = $wordVectSize;
         $this->units = $units;
@@ -298,7 +297,6 @@ class Seq2seq extends AbstractModel
     protected $decoder;
     protected $out;
     protected $mo;
-    protected $backend;
     protected $startVocId;
     protected $endVocId;
     protected $inputLength;

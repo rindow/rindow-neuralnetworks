@@ -6,13 +6,16 @@ use InvalidArgumentException;
 
 class Preprocessor
 {
-    protected $mo;
+    protected object $mo;
 
     public function __construct(object $mo)
     {
         $this->mo = $mo;
     }
 
+    /**
+     * @param iterable<iterable<int>> $sequences
+     */
     public function padSequences(
         iterable $sequences,
         int $maxlen=null,

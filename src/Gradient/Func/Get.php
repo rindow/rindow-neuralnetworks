@@ -13,8 +13,7 @@ use function Rindow\Math\Matrix\R;
 
 class Get extends AbstractFunction
 {
-    protected $numOfInputs = 3;
-    protected $outputs;
+    protected int $numOfInputs = 3;
 
     protected function preprocess(array $inputs) : array
     {
@@ -45,11 +44,7 @@ class Get extends AbstractFunction
         } elseif($array instanceof NDArray) {
             $value = $this->getNDArray($array,$offset,$count);
         } else {
-            if(is_object($array)) {
-                $type = get_class($array);
-            } else {
-                $type = gettype($array);
-            }
+            $type = get_class($array);
             throw new InvalidArgumentException("arg #1 is invalid data type.: ".$type);
         }
 
@@ -57,7 +52,11 @@ class Get extends AbstractFunction
         return [$value];
     }
 
-    protected function getArrayShape($array,$offset,$count)
+    protected function getArrayShape(
+        ArrayShapeInterface $array,
+        int $offset,
+        int $count
+        ) : ScalarInterface|ArrayShapeInterface
     {
         $K = $this->backend;
         if($count===0) {
@@ -78,7 +77,11 @@ class Get extends AbstractFunction
         return $value;
     }
 
-    protected function getNDArray($array,$offset,$count)
+    protected function getNDArray(
+        NDArray $array,
+        int $offset,
+        int $count
+        ) : ScalarInterface|NDArray
     {
         $K = $this->backend;
         if($count===0) {

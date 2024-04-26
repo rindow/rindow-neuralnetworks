@@ -7,57 +7,41 @@ use stdClass;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
 use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
+use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 use Rindow\NeuralNetworks\Gradient\Core\Scalar;
 
 abstract class AbstractFunction
 {
     use GradientUtils;
+    /** @var array<bool> */
     protected ?array $unbackpropagatables = null;
 
     /**
     *  @param array<NDArray>  $inputs
-    *       inputs
     *  @return array<NDArray>
-    *       outputs
     */
     abstract protected function call(array $inputs) : array;
 
     /**
     *  @param array<NDArray>  $dOutputs
-    *       difference outputs
     *  @return array<NDArray>
-    *       difference inputs
     */
     abstract protected function differentiate(array $dOutputs) : array;
 
-    protected $backend;
+    protected object $backend;
 
-    /**
-    *  @var array<Variable>   inputs
-    */
-    protected $inputsVariables;
+    /** @var array<VariableInterface> $inputsVariables */
+    protected array $inputsVariables;
+    /** @var array<null|VariableReference> $outputsVariables */
+    protected array $outputsVariables;
 
-    /**
-    *  @var array<Variable>   outputs
-    */
-    protected $outputsVariables;
+    protected int $generation;
 
-    /**
-    *  @var int   generation
-    */
-    protected $generation;
+    protected int $numOfInputs = 1;
 
-    /**
-    *  @var int   numOfInputs
-    */
-    protected $numOfInputs = 1;
+    protected int $numOfOutputs = 1;
 
-    /**
-    *  @var int   numOfOutputs
-    */
-    protected $numOfOutputs = 1;
-
-    protected $container;
+    protected ?stdClass $container;
 
     public function __construct(object $backend)
     {
@@ -66,8 +50,7 @@ abstract class AbstractFunction
     }
 
     /**
-    *  @return array<Variable>
-    *       outputs
+    *  @return array<VariableInterface>
     */
     public function inputs() : array
     {
@@ -75,8 +58,7 @@ abstract class AbstractFunction
     }
 
     /**
-    *  @return Dict<Variable>
-    *       options
+    *  @return array<VariableInterface>
     */
     public function options() : array
     {
@@ -84,7 +66,7 @@ abstract class AbstractFunction
     }
 
     /**
-    *  @return array<Variable>
+    *  @return array<VariableReference>
     *       outputs
     */
     public function outputs() : array
@@ -102,8 +84,11 @@ abstract class AbstractFunction
 
     /**
      * Call from SessionFunc in compiled graph
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
      */
-    public function _rawCall(array $inputs,array $options)
+    public function _rawCall(array $inputs,array $options) : array
     {
         return $this->call($inputs);
     }
@@ -113,12 +98,16 @@ abstract class AbstractFunction
         return get_class($this);
     }
 
+    /**
+     * @param array<mixed> $inputs
+     * @return array<mixed>
+     */
     protected function preprocess(array $inputs) : array
     {
         return $inputs;
     }
 
-    protected function toScalar($value,$argIdx) : mixed
+    protected function toScalar(mixed $value,int $argIdx) : mixed
     {
         $K = $this->backend;
         if($value instanceof ScalarInterface) {
@@ -139,9 +128,12 @@ abstract class AbstractFunction
         return $value;
     }
 
+    /**
+     * @return array<ArrayShapeInterface|VariableInterface>
+     */
     protected function extractShapeArgment(mixed $shape) : array
     {
-        if($shape instanceof Variable) {
+        if($shape instanceof VariableInterface) {
             if($shape->value() instanceof ArrayShapeInterface) {
                 return [$shape];
             }
@@ -164,6 +156,10 @@ abstract class AbstractFunction
         return $inputs;
     }
 
+    /**
+     * @param array<mixed> $inputs
+     * @return array<int>
+     */
     protected function translateToShape(array $inputs) : array
     {
         if($inputs[0] instanceof ArrayShapeInterface) {
@@ -182,13 +178,7 @@ abstract class AbstractFunction
         return $shape;
     }
 
-    /**
-    *  @param array<Variable>  $inputs
-    *       inputs
-    *  @return array<Variable>
-    *       outputs
-    */
-    public function __invoke(...$inputs)
+    public function __invoke(mixed ...$inputs) : mixed
     {
         if(count($inputs)!=$this->numOfInputs) {
             throw new InvalidArgumentException($this->numOfInputs.' arguments are required.');
@@ -217,10 +207,8 @@ abstract class AbstractFunction
     }
 
     /**
-    *  @param array<NDArray>  $inputs
-    *       inputs
+    *  @param array<NDArray>  $dOutputs
     *  @return array<NDArray>
-    *       outputs
     */
     public function backward(array $dOutputs) : array
     {

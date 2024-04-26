@@ -3,6 +3,6 @@ namespace Rindow\NeuralNetworks\Layer;
 
 class GlobalAveragePooling2D extends AbstractGlobalAveragePooling
 {
-    protected $rank = 2;
-    protected $defaultLayerName = 'globalaveragepooling2d';
+    protected int $rank = 2;
+    protected string $defaultLayerName = 'globalaveragepooling2d';
 }

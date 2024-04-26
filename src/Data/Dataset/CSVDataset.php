@@ -9,24 +9,33 @@ use Countable;
 use IteratorAggregate;
 use Traversable;
 
-class CSVDataset implements Countable,IteratorAggregate,Dataset
+/**
+ * @implements Dataset<array<mixed>>
+ * @implements IteratorAggregate<int,array{NDArray|array<NDArray>,NDArray}>
+ */
+class CSVDataset implements IteratorAggregate,Dataset
 {
-    protected $mo;
-    protected $path;
-    protected $pattern;
-    protected $batchSize;
-    protected $skipHeader;
-    protected $filter;
-    protected $crawler;
-    protected $shuffle;
-    protected $length;
-    protected $delimiter;
-    protected $enclosure;
-    protected $escape;
-    protected $filenames;
-    protected $maxSteps=0;
-    protected $maxDatasetSize=0;
+    protected object $mo;
+    protected string $path;
+    protected ?string $pattern;
+    protected int $batchSize;
+    protected bool $skipHeader;
+    /** @var DatasetFilter<array<mixed>> $filter */
+    protected ?DatasetFilter $filter;
+    protected object $crawler;
+    protected bool $shuffle;
+    protected int $length;
+    protected string $delimiter;
+    protected string $enclosure;
+    protected string $escape;
+    /** @var array<string> $filenames */
+    protected ?array $filenames=null;
+    protected int $maxSteps=0;
+    protected int $maxDatasetSize=0;
 
+    /**
+     * @param DatasetFilter<array<mixed>> $filter
+     */
     public function __construct(
         object $mo,
         string $path,
@@ -47,7 +56,9 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         $batch_size = $batch_size ?? 32;
         $skip_header = $skip_header ?? false;
         $filter = $filter ?? null;
-        $crawler = $crawler ?? null;
+        if($crawler==null) {
+            $crawler = new Dir();
+        }
         $shuffle = $shuffle ?? false;
         $length = $length ?? 0;
         $delimiter = $delimiter ?? ',';
@@ -61,9 +72,6 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         $this->batchSize = $batch_size;
         $this->skipHeader = $skip_header;
         $this->filter = $filter;
-        if($crawler==null) {
-            $crawler = new Dir();
-        }
         $this->crawler = $crawler;
         $this->shuffle = $shuffle;
         $this->length = $length;
@@ -72,7 +80,12 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         $this->escape = $escape;
     }
 
-    public function setFilter(DatasetFilter $filter) : void
+    public function filter() : ?DatasetFilter
+    {
+        return $this->filter;
+    }
+
+    public function setFilter(?DatasetFilter $filter) : void
     {
         $this->filter = $filter;
     }
@@ -92,7 +105,10 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         return $this->maxSteps;
     }
 
-    protected function getFilenames()
+    /**
+     * @return array<string>
+     */
+    protected function getFilenames() : array
     {
         if($this->filenames===null) {
             $this->filenames = $this->crawler->glob($this->path,$this->pattern);
@@ -100,7 +116,10 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         return $this->filenames;
     }
 
-    protected function shuffleData($inputs,$tests)
+    /**
+     * @return array{NDArray,NDArray}
+     */
+    protected function shuffleData(NDArray $inputs, ?NDArray $tests) : array
     {
         $la = $this->mo->la();
         $size = count($inputs);
@@ -127,6 +146,7 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         $rows = 0;
         $steps = 0;
         $batchSize = $this->batchSize;
+        $inputs = [];
         foreach($filenames as $filename) {
             $f = fopen($filename,'r');
             if($this->skipHeader) {
@@ -142,7 +162,8 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
                 $inputs[] = $row;
                 $rows++;
                 if($rows>=$batchSize) {
-                    $inputset = $this->filter->translate($inputs);
+                    /** @var array{NDArray,NDArray} $inputset */
+                    $inputset = $this->filter()->translate($inputs);
                     $this->maxDatasetSize += $rows;
                     $rows = 0;
                     if($this->shuffle) {
@@ -159,7 +180,8 @@ class CSVDataset implements Countable,IteratorAggregate,Dataset
         }
         $this->maxDatasetSize += $rows;
         if($rows) {
-            $inputset = $this->filter->translate($inputs);
+            /** @var array{NDArray,NDArray} $inputset */
+            $inputset = $this->filter()->translate($inputs);
             if($this->shuffle) {
                 $inputset = $this->shuffleData($inputset[0],$inputset[1]);
             }

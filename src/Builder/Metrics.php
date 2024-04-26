@@ -12,44 +12,44 @@ use Rindow\NeuralNetworks\Metric\MeanSquaredError;
 
 class Metrics
 {
-    protected $backend;
+    protected object $backend;
 
     public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
-    public function ScalarMetric(string $name)
+    public function ScalarMetric(string $name) : object
     {
         return new ScalarMetric($this->backend, $name);
     }
 
-    public function GenericMetric(callable $func, string $name=null)
+    public function GenericMetric(callable $func, string $name=null) : object
     {
         return new GenericMetric($this->backend, $func, $name);
     }
 
-    public function SparseCategoricalAccuracy(...$options)
+    public function SparseCategoricalAccuracy(mixed ...$options) : object
     {
         return new SparseCategoricalAccuracy($this->backend, ...$options);
     }
 
-    public function CategoricalAccuracy(...$options)
+    public function CategoricalAccuracy(mixed ...$options) : object
     {
         return new CategoricalAccuracy($this->backend, ...$options);
     }
 
-    public function BinaryAccuracy(...$options)
+    public function BinaryAccuracy(mixed ...$options) : object
     {
         return new BinaryAccuracy($this->backend, ...$options);
     }
 
-    public function MeanSquaredError(...$options)
+    public function MeanSquaredError(mixed ...$options) : object
     {
         return new MeanSquaredError($this->backend, ...$options);
     }
 
-    public function MeanNorm2Error(...$options)
+    public function MeanNorm2Error(mixed ...$options) : object
     {
         return new MeanNorm2Error($this->backend, ...$options);
     }

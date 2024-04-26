@@ -9,6 +9,25 @@ use Interop\Polite\Math\Matrix\NDArray;
  */
 interface RNNLayer extends Layer
 {
-    public function forward(object $inputs, bool $training=null,array $initialStates=null);
-    public function backward(array $dOutputs,ArrayAccess $grads=null,array $oidsToCollect=null) : array; // dOutputs is NDArray or array
+    /**
+     * @param array<NDArray> $initialStates
+     * @return NDArray|array<NDArray>
+     */
+    public function forward(
+        object $inputs,
+        bool $training=null,
+        array $initialStates=null
+    ) : NDArray|array;
+
+    /**
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<object,object> $grads
+     * @param array<NDArray> $oidsToCollect
+     * @return array<NDArray>
+     */
+    public function backward(
+        array $dOutputs,
+        ArrayAccess $grads=null,
+        array $oidsToCollect=null
+    ) : array;
 }

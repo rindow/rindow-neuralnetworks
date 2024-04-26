@@ -8,16 +8,14 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Embedding extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $inputLength;
-    protected $inputDim;
-    protected $outputDim;
-    protected $kernelInitializer;
-    protected $kernelInitializerName;
-    protected $input_length;
+    protected ?int $inputLength;
+    protected int $inputDim;
+    protected int $outputDim;
+    protected mixed $kernelInitializer;
+    protected ?string $kernelInitializerName;
 
-    protected $kernel;
-    protected $dKernel;
+    protected ?NDArray $kernel=null;
+    protected NDArray $dKernel;
     //protected $inputs;
     //protected $originalShape;
     //protected $flattenOutputsShape;
@@ -36,7 +34,8 @@ class Embedding extends AbstractLayer
         $kernel_initializer = $kernel_initializer ?? 'random_uniform';
         $name = $name ?? null;
         
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         if($input_length!=null){
             $this->inputShape = [$input_length];
         }
@@ -44,12 +43,12 @@ class Embedding extends AbstractLayer
         $this->inputDim = $inputDim;
         $this->outputDim = $outputDim;
         $this->kernelInitializer = $K->getInitializer($kernel_initializer);
-        $this->kernelInitializerName = $kernel_initializer;
+        $this->kernelInitializerName = $this->toStringName($kernel_initializer);
         $this->initName($name,'embedding');
         $this->allocateWeights(1);
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;

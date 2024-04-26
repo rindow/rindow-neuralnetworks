@@ -266,9 +266,9 @@ class CustomModelTest extends TestCase
         array_unshift($layers,$f);
         $f = $f->inputs()[0]->creator();
         array_unshift($layers,$f);
-        $this->assertEquals('flatten',$layers[0]->func()->getName());
-        $this->assertEquals('dense',$layers[1]->func()->getName());
-        $this->assertEquals('dense_1',$layers[2]->func()->getName());
+        $this->assertEquals('flatten',$layers[0]->func()->name());
+        $this->assertEquals('dense',$layers[1]->func()->name());
+        $this->assertEquals('dense_1',$layers[2]->func()->name());
         $this->assertEquals(0,$layers[0]->generation());
         $this->assertEquals(1,$layers[1]->generation());
         $this->assertEquals(2,$layers[2]->generation());
@@ -505,12 +505,14 @@ class CustomModelTest extends TestCase
         $backend = $this->newBackend($nn);
 
         $origModel = new TestRNNModel($nn);
-
-        $model = clone $origModel;
         $origModel->compile(
             loss: 'sparse_categorical_crossentropy',
             optimizer: 'adam',
         );
+        //$origModel->build([1,3],trues:[1,3]);
+
+
+        $model = clone $origModel;
         $model->compile(
             loss: 'sparse_categorical_crossentropy',
             optimizer: 'adam',

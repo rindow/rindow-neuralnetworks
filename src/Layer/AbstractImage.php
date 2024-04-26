@@ -9,11 +9,15 @@ use InvalidArgumentException;
  */
 abstract class AbstractImage extends AbstractLayer
 {
+    protected int $rank;
+    protected ?string $data_format;
+
     protected function normalizeInputShape($variable=null) : array
     {
         $inputShape=parent::normalizeInputShape($variable);
-        if($this->rank===null)
+        if($this->rank==0) {
             return $inputShape;
+        }
         if(count($inputShape)!=$this->rank+1) {
             throw new InvalidArgumentException(
                 'Unsuppored input shape: ['.implode(',',$inputShape).']');
@@ -21,7 +25,7 @@ abstract class AbstractImage extends AbstractLayer
         return $inputShape;
     }
 
-    protected function getChannels()
+    protected function getChannels() : int
     {
         $inputShape = $this->inputShape;
         if($this->data_format==null||
@@ -37,11 +41,16 @@ abstract class AbstractImage extends AbstractLayer
         return $channels;
     }
 
+    /**
+     * @param null|int|array<int> $size
+     * @param int|array<int> $default
+     * @return array<int>
+     */
     protected function normalizeFilterSize(
-        $size,
+        null|int|array $size,
         string $sizename,
-        $default=null,
-        $notNull=null)
+        int|array $default=null,
+        bool $notNull=null) : array
     {
         if($size===null && !$notNull) {
             $size = $default;

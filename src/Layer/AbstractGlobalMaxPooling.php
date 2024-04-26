@@ -8,13 +8,14 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class AbstractGlobalMaxPooling extends AbstractImage
 {
     use GenericUtils;
-    protected $backend;
-    protected $data_format;
-    protected $reduceShape;
-    protected $pool_mode = 'max';
-    protected $channels_first = false;
-    protected $defaultLayerName;
+    protected int $reduceShape;
+    protected string $pool_mode = 'max';
+    protected bool $channels_first = false;
+    protected string $defaultLayerName = 'unknow';
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         string $data_format=null,
@@ -26,13 +27,14 @@ class AbstractGlobalMaxPooling extends AbstractImage
         $data_format = $data_format ?? null;
         $input_shape = $input_shape ?? null;
 
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->data_format = $data_format;
         $this->inputShape = $input_shape;
         $this->initName($name,$this->defaultLayerName);
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 

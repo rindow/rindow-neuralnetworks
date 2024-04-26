@@ -11,16 +11,23 @@ abstract class AbstractPooling extends AbstractImage
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     use GenericUtils;
-    protected $backend;
-    protected $poolSize;
-    protected $strides;
-    protected $padding;
-    protected $data_format;
-    protected $dilation_rate;
-    protected $defaultLayerName;
+    /** @var array<int> $poolSize */
+    protected array $poolSize;
+    /** @var array<int> $strides */
+    protected array $strides;
+    protected string $padding;
+    /** @var array<int> $dilation_rate */
+    protected array $dilation_rate;
+    protected string $defaultLayerName = 'unkown';
 
     //protected $status;
 
+    /**
+     * @param int|array<int> $pool_size
+     * @param int|array<int> $strides
+     * @param int|array<int> $dilation_rate
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int|array $pool_size=null,
@@ -40,7 +47,7 @@ abstract class AbstractPooling extends AbstractImage
         $dilation_rate = $dilation_rate ?? 1;
         $input_shape = $input_shape ?? null;
 
-        $this->backend = $backend;
+        parent::__construct($backend);
         $this->initName($name,$this->defaultLayerName);
         $pool_size=$this->normalizeFilterSize($pool_size,'pool_size',2);
         $strides=$this->normalizeFilterSize($strides,'strides',$pool_size);
@@ -53,7 +60,7 @@ abstract class AbstractPooling extends AbstractImage
         $this->inputShape = $input_shape;
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 

@@ -5,9 +5,9 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class AveragePooling2D extends AbstractPooling
 {
-    protected $rank = 2;
-    protected $pool_mode = 'avg';
-    protected $defaultLayerName = 'averagepooling2d';
+    protected int $rank = 2;
+    protected string $pool_mode = 'avg';
+    protected string $defaultLayerName = 'averagepooling2d';
 
     protected function call(NDArray $inputs, bool $training=null) : NDArray
     {

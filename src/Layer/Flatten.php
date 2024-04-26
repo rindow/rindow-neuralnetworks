@@ -8,8 +8,10 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Flatten extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         array $input_shape=null,
@@ -19,12 +21,12 @@ class Flatten extends AbstractLayer
         $input_shape = $input_shape ?? null;
         $name = $name ?? null;
 
-        $this->backend = $backend;
+        parent::__construct($backend);
         $this->inputShape = $input_shape;
         $this->initName($name,'flatten');
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 

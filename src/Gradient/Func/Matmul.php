@@ -5,9 +5,9 @@ use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
 class Matmul extends AbstractFunction
 {
-    protected $numOfInputs = 2;
-    protected $transA;
-    protected $transB;
+    protected int $numOfInputs = 2;
+    protected bool $transA;
+    protected bool $transB;
 
     public function __construct(
         object $backend,

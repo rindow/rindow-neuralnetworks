@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
+use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Plot\Plot;
@@ -19,6 +20,15 @@ class BinaryCrossEntropyTest extends TestCase
     public function newNeuralNetworks($mo)
     {
         return new NeuralNetworks($mo);
+    }
+
+    protected function accuracy($nn,$loss,$trues,$predicts) : float
+    {
+        $metric = $loss->accuracyMetric();
+        $metricObject = MetricCatalog::factory($nn->backend(),$metric);
+        $metricObject->update($trues,$predicts);
+        $accuracy = $metricObject->result();
+        return $accuracy;
     }
 
     public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
@@ -152,7 +162,7 @@ class BinaryCrossEntropyTest extends TestCase
             }
         );
         $loss = $K->scalar($outputsVariable);
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         $this->assertLessThan(0.001,abs($loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -164,7 +174,7 @@ class BinaryCrossEntropyTest extends TestCase
         //$this->assertLessThan(0.001,abs(1-$dx[1][0])/6);
         //$this->assertLessThan(0.001,abs(-1-$dx[2][0])/6);
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         $this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
@@ -193,7 +203,7 @@ class BinaryCrossEntropyTest extends TestCase
         $this->assertGreaterThan(100,$dx[1][0]);
         $this->assertLessThan(100,$dx[2][0]);
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         $this->assertLessThan(0.0001,abs(0-$accuracy));
 
@@ -232,7 +242,7 @@ class BinaryCrossEntropyTest extends TestCase
             }
         );
         $loss = $K->ndarray($outputsVariable);
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         //$this->assertLessThan(0.001,abs($loss));
         $this->assertTrue($mo->la()->isclose(
             $loss,$mo->la()->array([1e-5, 1e-5, 1e-5]))
@@ -247,7 +257,7 @@ class BinaryCrossEntropyTest extends TestCase
         //$this->assertLessThan(0.001,abs(1-$dx[1][0])/6);
         //$this->assertLessThan(0.001,abs(-1-$dx[2][0])/6);
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         $this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
@@ -279,7 +289,7 @@ class BinaryCrossEntropyTest extends TestCase
         $this->assertGreaterThan(100,$dx[1][0]);
         $this->assertLessThan(100,$dx[2][0]);
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         $this->assertLessThan(0.0001,abs(0-$accuracy));
 

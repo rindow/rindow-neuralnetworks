@@ -5,7 +5,7 @@ use InvalidArgumentException;
 use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
-use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 
@@ -13,12 +13,13 @@ class Attention extends AbstractLayerBase
 {
     use GenericUtils;
     use GradientUtils;
-    protected $backend;
-    protected $useScale;
-    protected $doNotExpandMask;
-    protected $scale;
-    protected $dScale;
+    protected bool $useScale;
+    protected bool $doNotExpandMask;
+    protected NDArray $scale;
+    protected NDArray $dScale;
+    /** @var array<int> $scoresShape */
     protected $scoresShape;
+    /** @var array<bool> $unbackpropagatables */
     protected ?array $unbackpropagatables = null;
 
     //protected $returnAttentionScores;
@@ -28,6 +29,9 @@ class Attention extends AbstractLayerBase
     //protected $key;
     //protected $attentionWeight;
 
+    /**
+     * @param array<array<int>> $input_shapes
+     */
     public function __construct(
         object $backend,
         array $input_shapes=null,
@@ -42,7 +46,8 @@ class Attention extends AbstractLayerBase
         $use_scale = $use_scale ?? false;
         $do_not_expand_mask = $do_not_expand_mask ?? false;
 
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->inputShape = $input_shapes;
         $this->useScale = $use_scale;
         $this->doNotExpandMask = $do_not_expand_mask;
@@ -54,20 +59,16 @@ class Attention extends AbstractLayerBase
         $this->initName($name,'attention');
     }
 
-    public function build($variables=null, array $sampleWeights=null)
+    public function build(mixed $variables=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
-        $inputShapes = $this->normalizeInputShape($variables);
+        $inputShapes = $this->normalizeInputShapes($variables);
         if(count($inputShapes)!=2&&count($inputShapes)!=3) {
             throw new InvalidArgumentException('num of inputs must be 2 or 3: inputs is '.count($inputShapes));
         }
         foreach ($inputShapes as $idx => $shape) {
             if(!is_array($shape)||count($shape)<2) {
-                if(is_array($shape)) {
-                    $type = '['.implode(',',$shape).']';
-                } else {
-                    $type = gettype($shape);
-                }
+                $type = '['.implode(',',$shape).']';
                 throw new InvalidArgumentException('input_shapes must be the list of shape: '.$type.' included in #'.$idx.'.');
             }
         }
@@ -118,7 +119,10 @@ class Attention extends AbstractLayerBase
         ];
     }
 
-    protected function assertInputShapes(array $inputs,$direction)
+    /**
+     * @param array<NDArray> $inputs
+     */
+    protected function assertInputShapes(array $inputs,string $direction) : void
     {
         if(!$this->shapeInspection)
             return;
@@ -167,7 +171,7 @@ class Attention extends AbstractLayerBase
         }
     }
 
-    protected function assertScoresShape(NDArray $scores,$direction)
+    protected function assertScoresShape(NDArray $scores,string $direction) : void
     {
         if(!$this->shapeInspection)
             return;
@@ -179,11 +183,21 @@ class Attention extends AbstractLayerBase
         if($shape!=$this->scoresShape) {
             $shape = $this->shapeToString($shape);
             $scoresShape = $this->shapeToString($this->scoresShape);
-            throw new InvalidArgumentException('unmatch scores shape: '.$shape.', must be '.scoresShape.' in '.$this->name.':'.$direction);
+            throw new InvalidArgumentException('unmatch scores shape: '.$shape.', must be '.$scoresShape.' in '.$this->name.':'.$direction);
         }
     }
 
-    public function backward(array $dOutputs,ArrayAccess $grads=null,array $oidsToCollect=null) : array
+    /**
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<object,object> $grads
+     * @param array<NDArray> $oidsToCollect
+     * @return array<NDArray>
+     */
+    public function backward(
+        array $dOutputs,
+        ArrayAccess $grads=null,
+        array $oidsToCollect=null
+        ) : array
     {
         if(count($dOutputs)!=1&&count($dOutputs)!=2) {
             throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
@@ -200,7 +214,7 @@ class Attention extends AbstractLayerBase
         return $dInputs;
     }
 
-    protected function expandMask($sourceMask,$target)
+    protected function expandMask(NDArray $sourceMask,NDArray $target) : NDArray
     {
         $K = $this->backend;
         $mask = $sourceMask;
@@ -217,12 +231,17 @@ class Attention extends AbstractLayerBase
         return $mask;
     }
 
+    /**
+     * @param array<NDArray> $inputs
+     * @param array{NDArray,NDArray} $mask
+     * @return NDArray|array<NDArray>
+     */
     protected function call(
         array $inputs,
         bool $training=null,
         bool $returnAttentionScores=null,
         array $mask=null,
-        )
+        ) : NDArray|array
     {
         $K = $this->backend;
         $container = $this->container();
@@ -242,6 +261,7 @@ class Attention extends AbstractLayerBase
         // scores = [batch_size, Tq, Tv]
         $scores = $K->matmul($query, $key, null, $tranB=true);
         
+        $container->useScale = $this->useScale;
         if($this->useScale) {
             // scores = scores / sqrt(qk) 
             $scale = $K->scalar($this->scale);
@@ -333,6 +353,9 @@ class Attention extends AbstractLayerBase
         }
     }
 
+    /**
+     * @return array<NDArray>
+     */
     protected function differentiate(NDArray $dOutputs) : array
     {
         $K = $this->backend;
@@ -367,7 +390,7 @@ class Attention extends AbstractLayerBase
 
         // valueMask is dAdd so it is passed through.
 
-        if(isset($container->scale)) {
+        if($container->useScale) {
             // dScale  = sum(dScales * scales)
             // dScores = dScores * scale 
             $dScale = $K->sum($K->mul($dScores,$container->scores));
@@ -389,7 +412,10 @@ class Attention extends AbstractLayerBase
         }
     }
 
-    protected function numOfOutputs(?array $options)
+    /**
+     * @param array<string,mixed> $options
+     */
+    protected function numOfOutputs(?array $options) : int
     {
         if($options['returnAttentionScores'] ?? false) {
             return 2;
@@ -397,15 +423,19 @@ class Attention extends AbstractLayerBase
         return 1;
     }
 
-    final public function __invoke(...$args)
+    /**
+     * @return array<Variable>|Variable
+     */
+    final public function __invoke(mixed ...$args) : array|NDArray
     {
         return $this->forward(...$args);
     }
 
     /**
-    *  @param array<Variable>  $inputs
-    *  @return array<Variable>|Variable
-    */
+     * @param array<Variable> $inputs
+     * @param array<Variable> $mask
+     * @return array<Variable>|Variable
+     */
     public function forward(
         array $inputs, 
         Variable|bool $training=null, 
@@ -474,8 +504,11 @@ class Attention extends AbstractLayerBase
 
     /**
      * Call from SessionFunc in compiled graph
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
      */
-    public function _rawCall(array $inputs,array $options)
+    public function _rawCall(array $inputs,array $options) : array
     {
         $training = $options['training'] ?? null;
         $queryMask = $options['queryMask'] ?? null;

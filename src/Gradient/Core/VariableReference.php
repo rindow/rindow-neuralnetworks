@@ -7,9 +7,10 @@ use Interop\Polite\Math\Matrix\NDArray;
 class VariableReference
 {
     //protected $oid;
-    protected $ref;
-    protected $shape;
-    protected $dtype;
+    protected object $ref;
+    /** @var array<int> $shape */
+    protected ?array $shape=null;
+    protected int $dtype;
 
     public function __construct(Variable $variable)
     {
@@ -27,31 +28,41 @@ class VariableReference
     //    return $this->oid;
     //}
 
-    public function ref()
+    public function ref() : object
     {
         return $this->ref;
     }
-    public function get()
+
+    public function get() : ?object
     {
         return $this->ref->get();
     }
 
+    /**
+     * @param array<int> $shape
+     */
     public function _setShape(array $shape) : void
     {
         $this->shape = $shape;
     }
 
-    public function shape()
+    /**
+     * @return array<int>
+     */
+    public function shape() : ?array
     {
         return $this->shape;
     }
 
-    public function dtype()
+    public function dtype() : int
     {
         return $this->dtype;
     }
 
-    public function valueShape()
+    /**
+     * @return array<int>
+     */
+    public function valueShape() : ?array
     {
         if($this->shape===null) {
             return null;

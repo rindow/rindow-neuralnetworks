@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
 use InvalidArgumentException;
+use LogicException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 

@@ -1,17 +1,16 @@
 <?php
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
 class Add extends AbstractFunction
 {
-    protected $numOfInputs = 2;
+    protected int $numOfInputs = 2;
 
     /**
     *  @param array<NDArray>  $inputs
-    *       inputs
     *  @return array<NDArray>
-    *       outputs
     */
     protected function call(array $inputs) : array
     {
@@ -24,9 +23,7 @@ class Add extends AbstractFunction
 
     /**
     *  @param array<NDArray>  $dOutputs
-    *       difference outputs
     *  @return array<NDArray>
-    *       difference inputs
     */
     protected function differentiate(array $dOutputs) : array
     {

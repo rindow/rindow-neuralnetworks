@@ -1,20 +1,23 @@
 <?php
 namespace Rindow\NeuralNetworks\Optimizer;
 
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use UnexpectedValueException;
 use Rindow\NeuralNetworks\Optimizer\Schedule\LearningRateSchedule;
 
 class Adam implements Optimizer
 {
-    protected $backend;
-    protected $lr;
-    protected $beta1;
-    protected $beta2;
-    protected $iter;
-    protected $m;
-    protected $v;
-    protected $epsilon;
+    protected object $backend;
+    protected float|LearningRateSchedule $lr;
+    protected float $beta1;
+    protected float $beta2;
+    protected NDArray $iter;
+    /** @var array<NDArray> $m */
+    protected ?array $m=null;
+    /** @var array<NDArray> $v */
+    protected ?array $v=null;
+    protected float $epsilon;
 
     public function __construct(
         object $backend,
@@ -40,6 +43,9 @@ class Adam implements Optimizer
         $this->epsilon = $epsilon;
     }
 
+    /**
+     * @return array<NDArray>
+     */
     public function getWeights() : array
     {
         if($this->m === null) {
@@ -48,6 +54,9 @@ class Adam implements Optimizer
         return array_merge([$this->iter],$this->m,$this->v);
     }
 
+    /**
+     * @param array<NDArray> $params
+     */
     public function loadWeights(array $params) : void
     {
         $this->iter = array_shift($params);
@@ -60,6 +69,9 @@ class Adam implements Optimizer
         $this->v = $params;
     }
 
+    /**
+     * @return array<string,mixed>
+     */
     public function getConfig() : array
     {
         return [
@@ -72,6 +84,9 @@ class Adam implements Optimizer
         ];
     }
 
+    /**
+     * @param array<NDArray|Variable> $params
+     */
     public function build(array $params) : void
     {
         $K = $this->backend;
@@ -82,7 +97,11 @@ class Adam implements Optimizer
         $this->iter = $K->zeros([]);
     }
 
-    protected function extractVariable($params)
+    /**
+     * @param array<NDArray|Variable> $params
+     * @return array<NDArray>
+     */
+    protected function extractVariable(array $params) : array
     {
         $params2 = [];
         foreach($params as $p) {
@@ -94,7 +113,7 @@ class Adam implements Optimizer
         return $params2;
     }
 
-    public function learningRate(mixed $step) : float
+    public function learningRate(int $step) : float
     {
         $lr = $this->lr;
         if(is_numeric($lr)) {
@@ -118,7 +137,7 @@ class Adam implements Optimizer
         $K->update_increment($this->iter,1.0);
         $iter = $this->iter->toArray();
 
-        $lr_t = $this->learningRate($iter);
+        $lr_t = $this->learningRate((int)floor($iter));
 
         foreach(array_map(null,$params,$grads,$this->m,$this->v) as [$p,$g,$m,$v]) {
             // m += ( 1 - beta_1 ) * ( g - m )

@@ -7,17 +7,23 @@ use LogicException;
 
 class Dir
 {
-    public static function factory()
+    public static function factory() : self
     {
         return new self();
     }
 
-    public function clawl($path,$callback=null)
+    /**
+     * @return array<mixed>
+     */
+    public function clawl(string $path,callable $callback=null) : array
     {
         return $this->glob($path,null,$callback);
     }
 
-    public function glob($path,$pattern,$callback=null)
+    /**
+     * @return array<mixed>
+     */
+    public function glob(string $path, ?string $pattern,callable $callback=null) : array
     {
         if(!file_exists($path)) {
             throw new LogicException('directory not found: '.$path);
@@ -25,7 +31,7 @@ class Dir
         $fileSPLObjects = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($path)
         );
-        $filenames = array();
+        $filenames = [];
         foreach($fileSPLObjects as $fullFileName => $fileSPLObject) {
             $filename = $fileSPLObject->getFilename();
             if (!is_dir($fullFileName)) {
@@ -46,7 +52,7 @@ class Dir
         return $filenames;
     }
 
-    public function clear($path)
+    public function clear(string $path) : void
     {
         $fileSPLObjects = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($path),

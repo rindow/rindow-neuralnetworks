@@ -575,7 +575,7 @@ class GRUTest extends TestCase
             #return_state:true,
             #activation:'linear',
             );
-        //$layer->build();
+        $layer->build();
         $weights = $layer->getParams();
 
         $x = $K->array([

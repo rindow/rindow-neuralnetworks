@@ -11,28 +11,35 @@ abstract class AbstractConv extends AbstractImage
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     use GenericUtils;
-    protected $backend;
-    protected $filters;
-    protected $kernel_size;
-    protected $strides;
-    protected $padding;
-    protected $data_format;
-    protected $dilation_rate;
-    protected $activation;
-    protected $useBias;
-    protected $kernelInitializer;
-    protected $biasInitializer;
-    protected $kernelInitializerName;
-    protected $biasInitializerName;
-    protected $defaultLayerName;
+    protected int $filters;
+    /** @var array<int> $kernel_size */
+    protected array $kernel_size;
+    /** @var array<int> $strides */
+    protected array $strides;
+    protected string $padding;
+    /** @var array<int> $dilation_rate */
+    protected array $dilation_rate;
+    //protected $activation;
+    protected bool $useBias;
+    protected mixed $kernelInitializer;
+    protected mixed $biasInitializer;
+    protected ?string $kernelInitializerName;
+    protected ?string $biasInitializerName;
+    protected string $defaultLayerName;
 
-    protected $kernel;
-    protected $bias;
-    protected $dKernel;
-    protected $dBias;
+    protected ?NDArray $kernel=null;
+    protected NDArray $bias;
+    protected NDArray $dKernel;
+    protected NDArray $dBias;
     //protected $status;
 
 
+    /**
+     * @param int|array<int> $kernel_size
+     * @param int|array<int> $strides
+     * @param int|array<int> $dilation_rate
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $filters,
@@ -72,8 +79,8 @@ abstract class AbstractConv extends AbstractImage
         $bias_constraint = $bias_constraint ?? null;
         $input_shape = $input_shape ?? null;
 
-
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->initName($name,$this->defaultLayerName);
         $kernel_size=$this->normalizeFilterSize($kernel_size,'kernel_size',
             null,true);
@@ -86,19 +93,17 @@ abstract class AbstractConv extends AbstractImage
         $this->data_format = $data_format;
         $this->dilation_rate = $dilation_rate;
         $this->inputShape = $input_shape;
-        $this->activation = $activation;
+        //$this->activation = $activation;
         $this->kernelInitializer = $K->getInitializer($kernel_initializer);
         $this->biasInitializer   = $K->getInitializer($bias_initializer);
         $this->kernelInitializerName = $kernel_initializer;
         $this->biasInitializerName = $bias_initializer;
-        if($use_bias===null || $use_bias) {
-            $this->useBias = true;
-        }
+        $this->useBias = $use_bias;
         $this->allocateWeights($this->useBias?2:1);
         $this->setActivation($activation);
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
@@ -145,7 +150,7 @@ abstract class AbstractConv extends AbstractImage
 
     public function getParams() : array
     {
-        if($this->bias) {
+        if($this->useBias) {
             return [$this->kernel,$this->bias];
         } else {
             return [$this->kernel];
@@ -154,7 +159,7 @@ abstract class AbstractConv extends AbstractImage
 
     public function getGrads() : array
     {
-        if($this->bias) {
+        if($this->useBias) {
             return [$this->dKernel,$this->dBias];
         } else {
             return [$this->dKernel];

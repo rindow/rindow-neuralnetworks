@@ -38,26 +38,6 @@ class BinaryCrossEntropy extends AbstractLoss
         return [$dInputs];
     }
 
-    public function accuracy(
-        NDArray $trues, NDArray $predicts) : float
-    {
-        $K = $this->backend;
-        [$trues,$predicts] = $this->flattenShapes($trues,$predicts);
-        if($this->fromLogits) {
-            //$predicts = $this->activationFunction($predicts);
-            $predicts = $this->backend->sigmoid($predicts);
-        }
-        // calc accuracy
-        $predicts = $K->greater($predicts,0.5);
-        if($trues->dtype()!=$predicts->dtype()) {
-            $predicts = $K->cast($predicts,$trues->dtype());
-        }
-        $sum = $K->sum($K->equal($trues, $predicts));
-        $sum = $K->scalar($sum);
-        $accuracy = $sum/$trues->size();
-        return $accuracy;
-    }
-
     public function accuracyMetric() : string
     {
         return 'binary_accuracy';

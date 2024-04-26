@@ -5,11 +5,15 @@ use InvalidArgumentException;
 use LogicException;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 use Rindow\NeuralNetworks\Gradient\Core\ArrayShape;
+use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
+use Interop\Polite\Math\Matrix\NDArray;
 
 class Shape extends AbstractFunction
 {
-    protected $outputs;
-
+    /**
+     * @param array<NDArray> $inputs
+     * @return array<ArrayShapeInterface>
+     */
     protected function call(array $inputs) : array
     {
         $shape = $inputs[0]->shape();

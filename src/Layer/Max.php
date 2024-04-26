@@ -8,11 +8,13 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Max extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $axis;
-    protected $realAxis;
-    protected $reduceNumClass;
+    protected int $axis;
+    protected int $realAxis;
+    protected int $reduceNumClass;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $axis=null,
@@ -24,13 +26,13 @@ class Max extends AbstractLayer
         $input_shape = $input_shape ?? null;
         $name = $name ?? null;
         
-        $this->backend = $backend;
+        parent::__construct($backend);
         $this->axis = $axis;
         $this->inputShape = $input_shape;
         $this->initName($name,'max');
     }
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -50,9 +52,6 @@ class Max extends AbstractLayer
             $left[] = array_shift($right);
         }
         $this->reduceNumClass = array_shift($right);
-        if($right===null) {
-            $right=[];
-        }
         $outputShape = array_merge($left,$right);
 
         $this->realAxis = $axis+1;

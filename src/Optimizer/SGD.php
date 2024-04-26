@@ -1,13 +1,15 @@
 <?php
 namespace Rindow\NeuralNetworks\Optimizer;
 
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Optimizer\Schedule\LearningRateSchedule;
 
+
 class SGD implements Optimizer
 {
-    protected $backend;
-    protected $lr;
+    protected object $backend;
+    protected float|LearningRateSchedule $lr;
 
     public function __construct(
         object $backend,
@@ -21,16 +23,25 @@ class SGD implements Optimizer
         $this->lr = $lr;
     }
 
+    /**
+     * @return array<NDArray>
+     */
     public function getWeights() : array
     {
         return [
         ];
     }
 
+    /**
+     * @param array<NDArray> $params
+     */
     public function loadWeights(array $params) : void
     {
     }
 
+    /**
+     * @return array<string,mixed>
+     */
     public function getConfig() : array
     {
         return [
@@ -40,11 +51,18 @@ class SGD implements Optimizer
         ];
     }
 
+    /**
+     * @param array<NDArray|Variable> $params
+     */
     public function build(array $params) : void
     {
     }
 
-    protected function extractVariable($params)
+    /**
+     * @param array<NDArray|Variable> $params
+     * @return array<NDArray>
+     */
+    protected function extractVariable($params) : array
     {
         $params2 = [];
         foreach($params as $p) {
@@ -56,7 +74,7 @@ class SGD implements Optimizer
         return $params2;
     }
 
-    protected function learningRate(float $step) : float
+    protected function learningRate(int $step) : float
     {
         $lr = $this->lr;
         if(is_numeric($lr)) {
@@ -65,6 +83,10 @@ class SGD implements Optimizer
         return $lr($step);
     }
 
+    /**
+     * @param array<NDArray|Variable> $params
+     * @param array<NDArray|Variable> $grads
+     */
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;

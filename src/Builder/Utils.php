@@ -5,7 +5,14 @@ use Rindow\NeuralNetworks\Support\HDA\HDASqliteFactory;
 
 class Utils
 {
-    public function HDA($type=null)
+    protected object $backend;
+
+    public function __construct(object $backend)
+    {
+        $this->backend = $backend;
+    }
+
+    public function HDA(mixed $type=null) : object
     {
         return new HDASqliteFactory();
     }

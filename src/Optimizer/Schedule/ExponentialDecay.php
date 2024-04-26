@@ -23,7 +23,7 @@ class ExponentialDecay implements LearningRateSchedule
         $this->staircase = $staircase;
     }
 
-    public function __invoke(mixed $step) : float
+    public function __invoke(int $step) : float
     {
         $progress = ($step / $this->decaySteps);
         if($this->staircase) {

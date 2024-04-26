@@ -5,45 +5,33 @@ namespace Rindow\NeuralNetworks\Gradient\Core;
 use InvalidArgumentException;
 use stdClass;
 use ArrayAccess;
+use Throwable;
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Gradient\Module;
+use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Layer\Layer;
+use Rindow\NeuralNetworks\Model\Model;
+use Rindow\NeuralNetworks\Loss\Loss;
 
 class GraphSession
 {
-    static public $session;
-
-    protected $backupSession = [];
-
-    /**
-    *  @var array<Variable>   inputs
-    */
-    protected $inputsVariables;
-
-    /**
-    *  @var Dict<Variable>   options
-    */
-    protected $optionsVariables = [];
-
-    /**
-    *  @var array<Variable>   outputs
-    */
-    protected $outputsVariables;
+    static public ?object $session=null;
+    /** @var array<object> $backupSession */
+    protected array $backupSession = [];
+    /** @var array<Variable> $inputsVariables */
+    protected array $inputsVariables;
+    /** @var array<string,Variable> $optionsVariables */
+    protected array $optionsVariables = [];
+    /** @var array<Variable> $outputsVariables */
+    protected array $outputsVariables;
+    protected int $generation;
+    protected GraphFunction|Layer|Model|Loss $func;
+    /** @var array<stdClass> $container */
+    protected array $container = [];
 
     /**
-    *  @var int   generation
+    *  @param array<Variable> $inputs
+    *  @param array<string,mixed> $options
     */
-    protected $generation;
-
-    /**
-    *  @var object $func   Shared Function Object. GraphFunction/Layer/Model etc.
-    */
-    protected $func;
-
-    /**
-    *  @var dict<stdClass>   container
-    */
-    protected $container = [];
-
     public function __construct(object $func,array $inputs, ?array $options=null)
     {
         $this->func = $func;
@@ -54,15 +42,19 @@ class GraphSession
         }
     }
 
-    public function name()
+    public function name() : ?string
     {
+        // this func is model
         if(method_exists($this->func,'name')) {
             return $this->func->name();
         }
         return get_class($this->func);
     }
 
-    protected function maxGeneration(array $variables)
+    /**
+    *  @param array<null|Variable> $variables
+    */
+    protected function maxGeneration(array $variables) : int
     {
         return array_reduce($variables,function($max,$variable) {
             return ($variable!==null)?max($max,$variable->generation()):$max;},-1);
@@ -70,7 +62,6 @@ class GraphSession
 
     /**
     *  @return array<Variable>
-    *       inputs
     */
     public function inputs() : array
     {
@@ -78,29 +69,30 @@ class GraphSession
     }
 
     /**
-    *  @return Dict<Variable>
-    *       options
+    *  @return array<string,Variable>
     */
     public function options() : array
     {
         return $this->optionsVariables;
     }
 
-    public function _setOutputsVariables(array $outputs)
+    /**
+    *  @param array<Variable> $outputs
+    */
+    public function _setOutputsVariables(array $outputs) : void
     {
         $this->outputsVariables = $outputs;
     }
 
     /**
     *  @return array<Variable>
-    *       outputs
     */
     public function outputs() : array
     {
         return $this->outputsVariables;
     }
 
-    public function _setGeneration($generation)
+    public function _setGeneration(int $generation) : void
     {
         $this->generation = $generation;
     }
@@ -113,21 +105,27 @@ class GraphSession
         return $this->generation;
     }
 
-    public function begin()
+    public function begin() : void
     {
         array_push($this->backupSession,self::$session);
         self::$session = $this;
     }
 
-    public function end()
+    public function end() : void
     {
         self::$session = array_pop($this->backupSession);
     }
 
-    public function _rawCall(array $inputs,array $options)
+    /**
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
+     */
+    public function _rawCall(array $inputs,array $options) : array
     {
         $this->begin();
         try {
+            // this func is a function or layer or loss or model
             $outputs = $this->func->_rawCall($inputs,$options);
         } catch(Throwable $e) {
             $this->end();
@@ -142,24 +140,39 @@ class GraphSession
         return get_class($this->func);
     }
 
-    public function weights()
+    /**
+    *  @return array<Variable>
+    */
+    public function weights() : array
     {
+        // this func is a layer only
         return $this->func->weights();
     }
 
+    /**
+     * @return array<NDArray>
+     */
     public function getGrads()
     {
+        // this func is a layer only
         return $this->func->getGrads();
     }
 
     /**
-    *  @return array<NDArray> dInputs
-    *       function
-    */
-    public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<object,object> $grads
+     * @param array<object> $oidsToCollect
+     * @return array<NDArray>
+     */
+    public function backward(
+        array $dOutputs,
+        ArrayAccess $grads=null,
+        array $oidsToCollect=null
+        ) : array
     {
         $this->begin();
         try {
+            // this func is a activation or gradientfunc or layer or loss or model
             $dInputs = $this->func->backward($dOutputs, $grads, $oidsToCollect);
         } catch(Throwable $e) {
             $this->end();

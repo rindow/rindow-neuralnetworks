@@ -3,6 +3,6 @@ namespace Rindow\NeuralNetworks\Layer;
 
 class GlobalMaxPooling1D extends AbstractGlobalMaxPooling
 {
-    protected $rank = 1;
-    protected $defaultLayerName = 'globalmaxpooling1d';
+    protected int $rank = 1;
+    protected string $defaultLayerName = 'globalmaxpooling1d';
 }

@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
 use InvalidArgumentException;
+use LogicException;
 use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
@@ -11,7 +12,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Zeros extends AbstractFunction
 {
-    protected $numOfInputs = 1;
+    protected int $numOfInputs = 1;
     protected ?int $dtype;
 
     public function __construct(

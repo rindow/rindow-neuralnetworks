@@ -4,7 +4,7 @@ namespace Rindow\NeuralNetworks\Builder;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
 use Rindow\NeuralNetworks\Data\Dataset\CSVDataset;
-use Rindow\NeuralNetworks\Data\Dataset\ClassifiedTextDataset;
+use Rindow\NeuralNetworks\Data\Dataset\ClassifiedDirectoryDataset;
 use Rindow\NeuralNetworks\Data\Image\ImageFilter;
 use Rindow\NeuralNetworks\Data\Image\ImageClassifiedDataset;
 use Rindow\NeuralNetworks\Data\Sequence\TextClassifiedDataset;
@@ -12,14 +12,14 @@ use LogicException;
 
 class Data
 {
-    protected $matrixOperator;
+    protected object $matrixOperator;
 
     public function __construct(object $matrixOperator)
     {
         $this->matrixOperator = $matrixOperator;
     }
 
-    public function __get( string $name )
+    public function __get( string $name ) : object
     {
         if(!method_exists($this,$name)) {
             throw new LogicException('Unknown dataset: '.$name);
@@ -27,27 +27,30 @@ class Data
         return $this->$name();
     }
 
-    public function __set( string $name, $value ) : void
+    public function __set( string $name, mixed $value ) : void
     {
         throw new LogicException('Invalid operation to set');
     }
 
-    public function NDArrayDataset($inputs, ...$options)
+    /**
+     * @param array<NDArray>|NDArray $inputs
+     */
+    public function NDArrayDataset(array|NDArray $inputs, mixed ...$options) : object
     {
         return new NDArrayDataset($this->matrixOperator, $inputs, ...$options);
     }
 
-    public function CSVDataset(string $path, ...$options)
+    public function CSVDataset(string $path, mixed ...$options) : object
     {
         return new CSVDataset($this->matrixOperator, $path, ...$options);
     }
 
-    public function ImageFilter(...$options)
+    public function ImageFilter(mixed ...$options) : object
     {
         return new ImageFilter($this->matrixOperator, ...$options);
     }
 
-    public function ImageDataGenerator(NDArray $inputs, ...$options)
+    public function ImageDataGenerator(NDArray $inputs, mixed ...$options) : object
     {
         $data_format = $options['data_format'] ?? null;
         $height_shift = $options['height_shift'] ?? null;
@@ -71,17 +74,17 @@ class Data
         return new NDArrayDataset($this->matrixOperator, $inputs, ...$options);
     }
 
-    public function ClassifiedTextDataset(string $path, ...$options)
+    public function ClassifiedDirectoryDataset(string $path, mixed ...$options) : object
     {
-        return new ClassifiedTextDataset($this->matrixOperator, $path, ...$options);
+        return new ClassifiedDirectoryDataset($this->matrixOperator, $path, ...$options);
     }
 
-    public function TextClassifiedDataset(string $path, ...$options)
+    public function TextClassifiedDataset(string $path, mixed ...$options) : object
     {
         return new TextClassifiedDataset($this->matrixOperator, $path, ...$options);
     }
 
-    public function ImageClassifiedDataset(string $path, ...$options)
+    public function ImageClassifiedDataset(string $path, mixed ...$options) : object
     {
         return new ImageClassifiedDataset($this->matrixOperator, $path, ...$options);
     }

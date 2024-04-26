@@ -2,7 +2,6 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
-use LogicException;
 use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable;
@@ -40,17 +39,11 @@ abstract class AbstractLayer extends AbstractLayerBase implements SequentialLaye
     }
 
 
-    final public function __invoke(...$args)
+    final public function __invoke(mixed ...$args) : mixed
     {
         return $this->forward(...$args);
     }
     
-    /**
-    *  @param Variable  $inputs
-    *       inputs
-    *  @return array<Variable>
-    *       outputs
-    */
     public function forward(NDArray $inputs, Variable|bool $training=null) : Variable
     {
         [$inputs,$rawInputs]     = $this->packAndUnpackVariable($this->backend,$inputs);
@@ -84,8 +77,11 @@ abstract class AbstractLayer extends AbstractLayerBase implements SequentialLaye
 
     /**
      * Call from SessionFunc in compiled graph
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
      */
-    public function _rawCall(array $inputs,array $options)
+    public function _rawCall(array $inputs,array $options) : array
     {
         $training = $options['training'] ?? null;
         $outputs = $this->call($inputs[0],training:$training);
@@ -107,6 +103,8 @@ abstract class AbstractLayer extends AbstractLayerBase implements SequentialLaye
             $this->dBias = clone $this->dBias;
         }
         $this->allocateWeights(count($this->weights));
-        $this->syncWeightVariables();
+        if($this->assignedWeights) {
+            $this->syncWeightVariables();
+        }
     }
 }

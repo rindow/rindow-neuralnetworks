@@ -14,5 +14,5 @@ interface Metric
     public function immediateUpdate(float $value) : void;
     public function update(NDArray $trues, NDArray $predicts) : void;
     public function forward(NDArray $trues, NDArray $predicts) : float;
-    public function __invoke(...$args) : mixed;
+    public function __invoke(mixed ...$args) : mixed;
 }

@@ -1,28 +1,27 @@
 <?php
 namespace Rindow\NeuralNetworks\Data\Image;
 
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
 use InvalidArgumentException;
 
+/**
+ * @implements DatasetFilter<NDArray>
+ */
 class ImageFilter implements DatasetFilter
 {
-    protected $mo;
-    protected $channelsFirst;
-    protected $heightShift;
-    protected $widthShift;
-    protected $verticalFlip;
-    protected $horizontalFlip;
-    protected $inputs;
-    protected $tests;
-    protected $batchSize;
-    protected $shuffle;
-    protected $filter;
-    protected $heightShiftInteger;
-    protected $heightShiftLow;
-    protected $heightShiftHigh;
-    protected $widthShiftInteger;
-    protected $widthShiftLow;
-    protected $widthShiftHigh;
+    protected object $mo;
+    protected bool $channelsFirst;
+    protected float $heightShift;
+    protected float $widthShift;
+    protected bool $verticalFlip;
+    protected bool $horizontalFlip;
+    protected ?int $heightShiftInteger=null;
+    protected ?int $heightShiftLow=null;
+    protected ?int $heightShiftHigh=null;
+    protected ?int $widthShiftInteger=null;
+    protected ?int $widthShiftLow=null;
+    protected ?int $widthShiftHigh=null;
 
     public function __construct(
         object $mo,
@@ -61,7 +60,10 @@ class ImageFilter implements DatasetFilter
         $this->horizontalFlip = $horizontal_flip;
     }
 
-    protected function adjustShiftSize($shape)
+    /**
+     * @param array<int> $shape
+     */
+    protected function adjustShiftSize(array $shape) : void
     {
         $batchSize = array_shift($shape);
         if($this->channelsFirst) {
@@ -91,7 +93,7 @@ class ImageFilter implements DatasetFilter
     public function translate(
         iterable $inputs,
         iterable $tests=null,
-        $options=null) : array
+        array $options=null) : array
     {
         $la = $this->mo->la();
         if($this->heightShiftInteger===null) {

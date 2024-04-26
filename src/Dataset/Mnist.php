@@ -8,21 +8,23 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Mnist
 {
-    protected $matrixOperator;
-    protected $urlBase = 'http://yann.lecun.com/exdb/mnist/';
+    protected object $matrixOperator;
+    protected string $urlBase = 'http://yann.lecun.com/exdb/mnist/';
+    /** @var array<string,string> $keyFiles */
     protected $keyFiles = [
         'train_images'=>'train-images-idx3-ubyte.gz',
         'train_labels'=>'train-labels-idx1-ubyte.gz',
         'test_images'=>'t10k-images-idx3-ubyte.gz',
         'test_labels'=>'t10k-labels-idx1-ubyte.gz'
     ];
-    protected $trainNum = 60000;
-    protected $testNum = 10000;
-    protected $imageShape = [1, 28, 28]; // = 784
-    protected $datasetDir;
-    protected $saveFile;
+    protected int $trainNum = 60000;
+    protected int $testNum = 10000;
+    /** @var array<int> $imageShape */
+    protected array $imageShape = [1, 28, 28]; // = 784
+    protected string $datasetDir;
+    protected string $saveFile;
 
-    public function __construct($mo)
+    public function __construct(object $mo)
     {
         $this->matrixOperator = $mo;
         $this->datasetDir = $this->getDatasetDir();
@@ -31,17 +33,21 @@ class Mnist
         }
         $this->saveFile = $this->datasetDir . "/mnist.pkl";
     }
-    protected function getDatasetDir()
+
+    protected function getDatasetDir() : string
     {
         return sys_get_temp_dir().'/rindow/nn/datasets/mnist';
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
         fwrite(STDERR,$message);
     }
 
-    public function loadData(string $filePath=null)
+    /**
+     * @return array{array{NDArray,NDArray},array{NDArray,NDArray}}
+     */
+    public function loadData(string $filePath=null) : array
     {
         $mo = $this->matrixOperator;
         if($filePath===null) {
@@ -57,7 +63,7 @@ class Mnist
                 [$dataset['test_images'],  $dataset['test_labels']]];
     }
 
-    public function cleanPickle(string $filePath=null)
+    public function cleanPickle(string $filePath=null) : void
     {
         if($filePath===null) {
             $filePath = $this->saveFile;
@@ -65,7 +71,10 @@ class Mnist
         unlink($this->saveFile);
     }
 
-    protected function loadPickle($filePath)
+    /**
+     * @return array<string,NDArray>
+     */
+    protected function loadPickle(string $filePath) : array
     {
         $this->console("Loading pickle file ...");
         $data = file_get_contents($filePath);
@@ -77,7 +86,10 @@ class Mnist
         return $dataset;
     }
 
-    protected function getFiles($filePath)
+    /**
+     * @return array<string,NDArray>
+     */
+    protected function getFiles(string $filePath) : array
     {
         $this->downloadFiles();
         $dataset = $this->convertNDArray();
@@ -89,14 +101,14 @@ class Mnist
         return $dataset;
     }
 
-    public function downloadFiles()
+    public function downloadFiles() : void
     {
         foreach($this->keyFiles as $key => $filename) {
             $this->download($filename);
         }
     }
 
-    protected function download($filename)
+    protected function download(string $filename) : void
     {
         $filePath = $this->datasetDir . "/" . $filename;
 
@@ -108,7 +120,10 @@ class Mnist
         $this->console("Done\n");
     }
 
-    protected function convertNDArray()
+    /**
+     * @return array<string,NDArray>
+     */
+    protected function convertNDArray() : array
     {
         $dataset = [];
         $dataset['train_images'] = $this->convertImage($this->keyFiles['train_images']);
@@ -119,7 +134,7 @@ class Mnist
         return $dataset;
     }
 
-    protected function convertLabel($filename)
+    protected function convertLabel(string $filename) : NDArray
     {
         $mo = $this->matrixOperator;
         $filePath = $this->datasetDir . "/" . $filename;
@@ -135,7 +150,7 @@ class Mnist
         return $labels;
     }
 
-    protected function convertImage($filename)
+    protected function convertImage(string $filename) : NDArray
     {
         $mo = $this->matrixOperator;
         $filePath = $this->datasetDir."/".$filename;
@@ -152,7 +167,7 @@ class Mnist
         return $data;
     }
 
-    protected function calcZippedDataLength($filePath)
+    protected function calcZippedDataLength(string $filePath) : int
     {
         $len = 0;
         $zp = gzopen($filePath,'rb');
@@ -166,7 +181,7 @@ class Mnist
         return $len;
     }
 
-    protected function loadZipFile(string $filePath,int $offset,NDArray $data)
+    protected function loadZipFile(string $filePath,int $offset,NDArray $data) : void
     {
         $buffer = $data->buffer();
         $bfsz = count($buffer);

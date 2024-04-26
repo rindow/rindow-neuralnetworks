@@ -4,6 +4,7 @@ namespace Rindow\NeuralNetworks\Gradient\Core;
 
 use InvalidArgumentException;
 use LogicException;
+use RuntimeException;
 use ArrayAccess;
 use Traversable;
 use Interop\Polite\Math\Matrix\NDArray;
@@ -14,15 +15,15 @@ use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
 
 class Variable implements VariableInterface
 {
-    protected $backend;
-    protected $trainable;
-    protected $undetermined;
-    protected $name;
-    protected $value;
-    protected $creator;
-    protected $generation=0;
-    protected $unbackpropagatable;
-    protected $mask;
+    protected object $backend;
+    protected bool $trainable;
+    protected bool $undetermined;
+    protected ?string $name;
+    protected mixed $value;
+    protected ?object $creator=null;
+    protected int $generation=0;
+    protected bool $unbackpropagatable;
+    protected ?NDArray $mask;
 
     public function __construct(
         object $backend,
@@ -41,7 +42,7 @@ class Variable implements VariableInterface
         $this->trainable = $trainable ?? true;
         $this->unbackpropagatable = $unbackpropagatable ?? false;
         if(!$this->undetermined) {
-            $this->assign($value, reference:$reference);
+            $this->assign($value, reference:$reference, mask:$mask);
         }
     }
 
@@ -99,7 +100,7 @@ class Variable implements VariableInterface
         return !$this->unbackpropagatable;
     }
 
-    public function value()
+    public function value() : mixed
     {
         if($this->undetermined) {
             throw new LogicException("Undetermined variable");
@@ -107,31 +108,26 @@ class Variable implements VariableInterface
         return $this->value;
     }
 
-    public function name()
+    public function name() : ?string
     {
         return $this->name;
     }
 
-    public function setName($name)
+    public function setName(string $name) : string
     {
-        return $this->name = $name;
+        $this->name = $name;
+        return $name;
     }
 
-    /**
-    * @return Function $creator
-    *   creater function
-    */
-    public function creator()
+    public function creator() : ?object
     {
         return $this->creator;
     }
 
     /**
-    * @param Function $creator
-    *   creater function
-    * @return void
-    */
-    public function setCreator($creator) : void
+     * @param object $creator
+     */
+    public function setCreator(object $creator) : void
     {
         if($this->trainable) {
             $this->creator = $creator;
@@ -144,7 +140,10 @@ class Variable implements VariableInterface
         return $this->generation;
     }
 
-    public function valueShape()
+    /**
+     * @return array<int>
+     */
+    public function valueShape() : ?array
     {
         if($this->value===null) {
             return null;
@@ -154,17 +153,17 @@ class Variable implements VariableInterface
         return $shape;
     }
 
-    public function reference()
+    public function reference() : object
     {
         return new VariableReference($this);
     }
 
-    public function _clearValue()
+    public function _clearValue() : void
     {
         $this->value = null;
     }
 
-    public function dtype()
+    public function dtype() : int
     {
         $value = $this->value;
         if($value===null) {
@@ -179,6 +178,9 @@ class Variable implements VariableInterface
         throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
+    /**
+     * @return array<int>
+     */
     public function shape() : array
     {
         $value = $this->value;
@@ -221,6 +223,9 @@ class Variable implements VariableInterface
         throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
+    /**
+     * @return ArrayAccess<int,mixed>
+     */
     public function buffer() : ArrayAccess
     {
         $value = $this->value;
@@ -249,6 +254,9 @@ class Variable implements VariableInterface
         throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
+    /**
+     * @param array<int> $shape
+     */
     public function reshape(array $shape) : NDArray
     {
         $value = $this->value;
@@ -263,7 +271,7 @@ class Variable implements VariableInterface
         throw new RuntimeException('invalid type:'.(is_object($value)?get_class($value):gettype($value)));
     }
 
-    public function toArray()
+    public function toArray() : mixed
     {
         $value = $this->value;
         if($value===null) {

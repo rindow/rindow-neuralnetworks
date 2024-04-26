@@ -3,12 +3,16 @@ declare(strict_types=1);
 namespace Rindow\NeuralNetworks\Gradient\Core;
 
 use InvalidArgumentException;
-use Rindow\NeuralNetworks\Gradient\Module;
+use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 use WeakMap;
 use ArrayAccess;
 
 trait GraphUtils
 {
+    /**
+     * @param array<VariableInterface> $graphOutputs
+     * @return array{array<object>,array<object>,array<VariableInterface>}
+     */
     protected function buildPipeline(array $graphOutputs) : array
     {
         // compile forward
@@ -72,6 +76,11 @@ trait GraphUtils
         return [$pipeline,$backprop,$constants];
     }
 
+    /**
+     * @param array<object> $pipeline
+     * @param ArrayAccess<object,object> $grads
+     * @param array<object> $oidsToCollect
+     */
     public function backwardPipeline(
         object $backend,
         array $pipeline, ArrayAccess $grads=null, array $oidsToCollect=null) : void
@@ -136,6 +145,10 @@ trait GraphUtils
         }
     }
 
+    /**
+     * @param array<mixed> $values
+     * @return array<VariableInterface|null>
+     */
     protected function packVariables(object $backend,array $values) : array
     {
         return array_map(function($value) use ($backend) {
@@ -143,6 +156,10 @@ trait GraphUtils
         },$values);
     }
 
+    /**
+     * @param array<VariableInterface|null> $variables
+     * @return array<mixed>
+     */
     protected function unpackVariables(array $variables) : array
     {
         return array_map(function($variable){
@@ -150,6 +167,10 @@ trait GraphUtils
         },$variables);
     }
 
+    /**
+     * @param array<VariableInterface|null> $variables
+     * @return array<object|null>
+     */
     protected function referenceVariables(array $variables) : array
     {
         return array_map(function($variable) {
@@ -157,19 +178,30 @@ trait GraphUtils
         },$variables);
     }
 
-    protected function maxGeneration(array $variables)
+    /**
+     * @param array<VariableInterface|null> $variables
+     */
+    protected function maxGeneration(array $variables) : int
     {
         return array_reduce($variables,function($max,$variable) {
             return ($variable!==null)?max($max,$variable->generation()):$max;},-1);
     }
 
-    protected function getObjectIds(array $variables)
+    /**
+     * @param array<VariableInterface|null> $variables
+     * @return array<int|null>
+     */
+    protected function getObjectIds(array $variables) : array
     {
         return array_map(function($variable) {
             return ($variable!==null)?spl_object_id($variable):null;
         },$variables);
     }
 
+    /**
+     * @param array<VariableInterface> $variables
+     * @return array<VariableInterface>
+     */
     protected function repackVariables(object $backend,array $variables) : array
     {
         return array_map(function($variable) use ($backend) {
@@ -177,6 +209,9 @@ trait GraphUtils
         },$variables);
     }
 
+    /**
+     * @param array<VariableInterface> $variables
+     */
     protected function setCreatorToVariables(object $creator,array $variables) : void
     {
         foreach($variables as $variable) {

@@ -6,25 +6,13 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class SimpleRNNCell extends AbstractRNNCell
 {
-    protected $backend;
-    protected $units;
-    protected $activation;
-    protected $useBias;
-    protected $kernelInitializer;
-    protected $recurrentInitializer;
-    protected $biasInitializer;
-    protected $kernelInitializerName;
-    protected $recurrentInitializerName;
-    protected $biasInitializerName;
+    protected int $units;
 
-    protected $kernel;
-    protected $recurrentKernel;
-    protected $bias;
-    protected $dKernel;
-    protected $dRecurrentKernel;
-    protected $dBias;
-    protected $inputs;
+    //protected $inputs;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $units,
@@ -47,23 +35,20 @@ class SimpleRNNCell extends AbstractRNNCell
         //'activity_regularizer'=null,
         //'kernel_constraint'=null, 'bias_constraint'=null,
         
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->units = $units;
         $this->inputShape = $input_shape;
-
-        if($use_bias) {
-            $this->useBias = $use_bias;
-        }
+        $this->useBias = $use_bias;
         $this->setActivation($activation);
-        $this->kernelInitializer = $K->getInitializer($kernel_initializer);
-        $this->recurrentInitializer = $K->getInitializer($recurrent_initializer);
-        $this->biasInitializer   = $K->getInitializer($bias_initializer);
-        $this->kernelInitializerName = $kernel_initializer;
-        $this->recurrentInitializerName = $recurrent_initializer;
-        $this->biasInitializerName = $bias_initializer;
+        $this->setKernelInitializer(
+            $kernel_initializer,
+            $recurrent_initializer,
+            $bias_initializer,
+        );
     }
 
-    public function build($inputShape=null, array $sampleWeights=null)
+    public function build(mixed $inputShape=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
@@ -101,7 +86,6 @@ class SimpleRNNCell extends AbstractRNNCell
         }
         array_push($shape,$this->units);
         $this->outputShape = $shape;
-        return $this->outputShape;
     }
 
     public function getConfig() : array
@@ -123,7 +107,7 @@ class SimpleRNNCell extends AbstractRNNCell
     {
         $K = $this->backend;
         $prev_h = $states[0];
-        if($this->bias){
+        if($this->useBias){
             $outputs = $K->batch_gemm($inputs, $this->kernel,1.0,1.0,$this->bias);
         } else {
             $outputs = $K->gemm($inputs, $this->kernel);
@@ -148,7 +132,7 @@ class SimpleRNNCell extends AbstractRNNCell
             $dOutputs = $this->activation->backward($calcState->activation,$dOutputs);
         }
         $dInputs = $K->zerosLike($calcState->inputs);
-        if($this->bias) {
+        if($this->useBias) {
             $K->update_add($this->dBias,$K->sum($dOutputs,axis:0));
         }
         // Add RecurrentKernel grad

@@ -19,11 +19,11 @@ use Traversable;
 
 class HDASqlite implements HDA
 {
-    protected $ancestor = '';
-    protected $pdo;
-    protected $table = 'hda';
+    protected string $ancestor = '';
+    protected ?PDO $pdo;
+    protected string $table = 'hda';
 
-    public function __construct($filename=null, $mode=null)
+    public function __construct(string|PDO $filename=null, string $mode=null)
     {
         if($filename===null)
             return;
@@ -35,7 +35,7 @@ class HDASqlite implements HDA
             throw new InvalidArgumentException('Invalid parent type');
     }
 
-    public function open(string $filename, string $mode=null)
+    public function open(string $filename, string $mode=null) : void
     {
         $options = [];
         if ($mode=='r' && version_compare(PHP_VERSION,'7.3')>=0) {
@@ -48,13 +48,13 @@ class HDASqlite implements HDA
         }
     }
 
-    public function node(PDO $pdo, string $ancestor)
+    public function node(PDO $pdo, string $ancestor) : void
     {
         $this->ancestor = $ancestor;
         $this->pdo = $pdo;
     }
 
-    public function close()
+    public function close() : void
     {
         if($this->ancestor!=='')
             throw new RuntimeException('This node is not root');
@@ -106,12 +106,12 @@ class HDASqlite implements HDA
         $this->deleteDir($this->ancestor, $offset);
     }
 
-    public function getIterator() :  Traversable
+    public function getIterator() : Traversable
     {
         return new HDASqliteIterator($this->pdo, $this->table, $this->ancestor);
     }
 
-    protected function createTable()
+    protected function createTable() : void
     {
         $sqls = [
             "CREATE TABLE IF NOT EXISTS ".$this->table." ( ancestor TEXT, key TEXT, type TEXT, value BLOB NOT NULL)",
@@ -125,7 +125,10 @@ class HDASqlite implements HDA
         }
     }
 
-    protected function querySingle(string $ancestor, string $key)
+    /**
+     * @return bool|array<string,mixed>
+     */
+    protected function querySingle(string $ancestor, string $key) : bool|array
     {
         $stat = $this->pdo->prepare("SELECT * FROM ".$this->table." WHERE ancestor = :ancestor AND key = :key");
         if(!$stat) {
@@ -139,7 +142,7 @@ class HDASqlite implements HDA
         return $row;
     }
 
-    protected function upsert(string $ancestor,string $key,string $type,$value)
+    protected function upsert(string $ancestor,string $key,string $type, string|int|float $value) : bool
     {
         $stat = $this->pdo->prepare("INSERT INTO ".$this->table." (ancestor,key,type,value) VALUES (:ancestor,:key,:type,:value)");
         if(!$stat) {
@@ -158,7 +161,7 @@ class HDASqlite implements HDA
         throw new RuntimeException('upsert error in '.$ancestor.'/'.$key);
     }
 
-    protected function delete(string $ancestor,string $key)
+    protected function delete(string $ancestor,string $key) : bool
     {
         $stat = $this->pdo->prepare("DELETE FROM ".$this->table." WHERE ancestor=:ancestor AND key=:key");
         if($stat->execute([':ancestor'=>$ancestor,':key'=>$key]))
@@ -166,7 +169,7 @@ class HDASqlite implements HDA
         throw new RuntimeException('delete error in '.$ancestor.'/'.$key);
     }
 
-    protected function deleteDir(string $ancestor,string $key)
+    protected function deleteDir(string $ancestor,string $key) : bool
     {
         $stat = $this->pdo->prepare("DELETE FROM ".$this->table." WHERE ancestor >= :from AND ancestor <= :to");
         $base = $ancestor.'/'.$key;

@@ -5,9 +5,9 @@ use InvalidArgumentException;
 
 trait GenericUtils
 {
-    public static $nameNumbering = 0;
+    public static int $nameNumbering = 0;
 
-    protected function initName($name,$default)
+    protected function initName(?string $name, ?string $default) : void
     {
         if($name===null) {
             if(self::$nameNumbering==0) {

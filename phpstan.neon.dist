@@ -1,0 +1,25 @@
+includes:
+	- phpstan-baseline.neon
+	- phpstan-interop.neon
+	
+parameters:
+	level: 6
+	paths:
+		- src
+	ignoreErrors:
+		-
+			message: "#Call to an undefined method Rindow\\\\NeuralNetworks\\\\Gradient\\\\Variable::value\\(\\)#"
+		-
+			message: "#^Call to an undefined method .*Rindow\\\\NeuralNetworks\\\\Model\\\\Model::forward\\(\\)#"
+		-
+			message: "#^Method Rindow\\\\NeuralNetworks\\\\Model\\\\Sequential::call\\(\\)#"
+			path: src/Model/Sequential.php
+		-
+			message: "#^Call to an undefined method Rindow\\\\NeuralNetworks\\\\Model\\\\AbstractModel::call\\(\\)#"
+			path: src/Model/AbstractModel.php
+		-
+			message: "#Call to an undefined method Rindow\\\\NeuralNetworks\\\\Builder\\\\Builder::utils\\(\\)#"
+		-
+			message: "#^Function Rindow\\\\Math\\\\Matrix\\\\R not found#"
+		-
+			message: "#^Used function Rindow\\\\Math\\\\Matrix\\\\R not found#"

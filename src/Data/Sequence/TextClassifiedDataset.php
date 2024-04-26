@@ -5,15 +5,19 @@ use Rindow\NeuralNetworks\Data\Dataset\ClassifiedDirectoryDataset;
 use Interop\Polite\Math\Matrix\NDArray;
 use ArrayObject;
 
+/**
+ * @extends ClassifiedDirectoryDataset<string>
+ */
 class TextClassifiedDataset extends ClassifiedDirectoryDataset
 {
-    protected $verbose;
+    protected ?int $verbose;
+    protected ?object $filter;
 
     public function __construct(
         object $mo,
         string $path,
         int $verbose=null,
-        ...$options
+        mixed ...$options
         )
     {
         $opts = [];
@@ -28,27 +32,31 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
         }
         parent::__construct($mo,$path, ...$opts);
         $this->verbose = $verbose;
-        if($this->filter==null) {
+        if($this->filter()==null) {
             $this->filter = new TextFilter($mo, ...$options);
+            $this->setFilter($this->filter);
         }
     }
 
-    public function getTokenizer()
+    public function getTokenizer() : object
     {
         return $this->filter->getTokenizer();
     }
 
-    public function getPreprocessor()
+    public function getPreprocessor() : object
     {
         return $this->filter->getPreprocessor();
     }
 
-    public function getLabels()
+    /**
+     * @return array<string,int>
+     */
+    public function getLabels() : array
     {
         return $this->filter->labels();
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
         if($this->verbose) {
             if(defined('STDERR')) {
@@ -57,10 +65,16 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
         }
     }
 
-    public function fitOnTexts($loadAll=null,$noFit=null)
+    /**
+     * @return array{iterable<string>,iterable<string>}
+     */
+    public function fitOnTexts(
+        bool $loadAll=null, bool $noFit=null) : ?array
     {
         $filter = $this->filter;
         $this->filter = null;
+        $this->setFilter(null);
+        
         $unclassified = $this->unclassified;
         $this->unclassified = !$loadAll;
         $batchSize = $this->batchSize;
@@ -77,6 +91,7 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
             $totalSize = count($filenames);
             $this->console(" Done. Total=$totalSize\n");
             $this->console("Loding ...\n");
+            /** @var iterable<string>  $dataset */
             $dataset = $this->getIterator();
             $startTime = time();
             $count = 0;
@@ -98,6 +113,7 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
             $this->progressBar($count,$totalSize,$startTime,25);
             $filter->setLabels($labels);
         } else {
+            /** @var iterable<string>  $inputs */
             $inputs = $this->getIterator();
         }
         $this->console("\nDone.\n");
@@ -107,23 +123,31 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
             $this->console(" Done.\n");
         }
         $this->filter = $filter;
+        $this->setFilter($filter);
         $this->unclassified = $unclassified;
         $this->batchSize = $batchSize;
         if($loadAll) {
             return [$inputs,$tests];
         }
+        return null;
     }
 
-    public function classnames()
+    /**
+     * @return array<string>
+     */
+    public function classnames() : array
     {
         return $this->filter->classnames();
     }
 
-    public function loadData()
+    /**
+     * @return array{NDArray,NDArray}  {inputsArray,testsArray}
+     */
+    public function loadData() : array
     {
         $tokenizer = $this->filter->getTokenizer();
         $noFit = count($tokenizer->wordCounts())>0?true:false;
-        [$inputs,$tests] = $this->fitOnTexts($loadAll=true,$noFit);
+        [$inputs,$tests] = $this->fitOnTexts(loadAll:true,noFit:$noFit);
         $this->console("Generating sequences ...");
         $sequences = $tokenizer->textsToSequences($inputs);
         $this->console(" Done.\n");

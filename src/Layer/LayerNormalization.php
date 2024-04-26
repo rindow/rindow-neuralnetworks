@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
+use LogicException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\GenericUtils;
 
@@ -18,24 +19,18 @@ class LayerNormalization extends AbstractNormalization
         string $name=null,
     )
     {
+        parent::__construct(
+            $backend,
+            $axis,
+            $epsilon,
+            $center,
+            $scale,
+            $beta_initializer,
+            $gamma_initializer,
+        );
         // defaults
-        $axis = $axis ?? -1;
-        $epsilon = $epsilon ?? 0.001;
-        $center = $center ?? true;
-        $scale = $scale ?? true;
-        $beta_initializer = $beta_initializer ?? 'zeros';
-        $gamma_initializer = $gamma_initializer ?? 'ones';
         $name = $name ?? null;
 
-        $this->backend = $K = $backend;
-        $this->axis = $axis;
-        $this->epsilon = $epsilon;
-        $this->center = $center;
-        $this->scale = $scale;
-        $this->betaInitializerName  = $beta_initializer;
-        $this->gammaInitializerName = $gamma_initializer;
-        $this->betaInitializer  = $K->getInitializer($beta_initializer);
-        $this->gammaInitializer = $K->getInitializer($gamma_initializer);
         $this->initName($name,'layernormalization');
         $this->allocateWeights(2);
     }
@@ -135,8 +130,9 @@ class LayerNormalization extends AbstractNormalization
         } else {
             $dxn = $dOutputs;
         }
-        if($container->std===null)
+        if($container->std===null) {
             throw new LogicException('not initialized for training');
+        }
         $dxc = $K->div($dxn, $container->std);
         $shape = $dxn->shape();
         $size = array_pop($shape);
@@ -177,6 +173,8 @@ class LayerNormalization extends AbstractNormalization
         }
 
         $this->allocateWeights(2);
-        $this->syncWeightVariables();
+        if($this->assignedWeights) {
+            $this->syncWeightVariables();
+        }
     }
 }

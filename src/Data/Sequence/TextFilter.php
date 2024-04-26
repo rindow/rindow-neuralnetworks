@@ -5,20 +5,27 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
 use InvalidArgumentException;
 
+/**
+ * @implements DatasetFilter<string>
+ */
 class TextFilter implements DatasetFilter
 {
-    protected $mo;
-    protected $tokenizer;
+    protected object $mo;
+    protected object $tokenizer;
+    /** @var array<string,int> $labels */
     protected $labels = [];
-    protected $preprocessor;
-    protected $maxlen;
-    protected $dtype;
-    protected $padding;
-    protected $truncating;
-    protected $value;
-    protected $labelNum = 0;
+    protected object $preprocessor;
+    protected ?int $maxlen;
+    protected int $dtype;
+    protected string $padding;
+    protected string $truncating;
+    protected float|int|bool $value;
+    protected int $labelNum = 0;
     
 
+    /**
+     * @param array<string> $classnames
+     */
     public function __construct(
         object $mo,
         object $tokenizer=null,
@@ -88,50 +95,60 @@ class TextFilter implements DatasetFilter
         $this->value=$value;
     }
 
-    public function getTokenizer()
+    public function getTokenizer() : object
     {
         return $this->tokenizer;
     }
 
-    public function getPreprocessor()
+    public function getPreprocessor() : object
     {
         return $this->preprocessor;
     }
 
-    public function classnames()
+    /**
+     * @return array<string>
+     */
+    public function classnames() : array
     {
         return array_flip($this->labels);
     }
 
+    /**
+     * @return array<string,int>
+     */
     public function labels()
     {
         return $this->labels;
     }
 
-    public function setLabels($labels)
+    /**
+     * @param array<string,int> $labels
+     */
+    public function setLabels(array $labels) : void
     {
         $this->labels = $labels;
     }
 
-    public function classnameToIndex(string $word) : int
+    public function classnameToIndex(string $word) : ?int
     {
         if(!array_key_exists($word,$this->labels))
             return null;
         return $this->labels[$word];
     }
 
-    public function indexToClassname(int $index) : string
+    public function indexToClassname(int $index) : ?string
     {
         $classname = array_search($index,$this->labels);
-        if($classname===false)
+        if($classname===false) {
             return null;
+        }
         return $classname;
     }
 
     public function translate(
         iterable $inputs,
         iterable $tests=null,
-        $options=null) : array
+        array $options=null) : array
     {
         //$this->tokenizer->fitOnTexts($inputs);
         $sequences = $this->tokenizer->textsToSequences($inputs);
@@ -143,6 +160,9 @@ class TextFilter implements DatasetFilter
             value: $this->value,
         );
 
+        if($tests===null) {
+            throw new InvalidArgumentException('Tests must be specified');
+        }
         $testsCount = count($tests);
         $testsArray = $this->mo->la()->alloc([$testsCount],$this->dtype);
         foreach ($tests as $key => $label) {

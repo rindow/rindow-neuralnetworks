@@ -5,12 +5,15 @@ use Throwable;
 
 class Execute
 {
+    /**
+     * @param array<mixed,mixed> $args
+     */
     static public function with(
         Context $context,
         callable $func=null,
         array $args=null,
         bool $without_ctx=null,
-        )
+        ) : mixed
     {
         if($args===null) {
             $args = [];

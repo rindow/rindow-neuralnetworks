@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy;
+use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
 
@@ -26,6 +27,15 @@ class CategoricalCrossEntropyTest extends TestCase
             'renderer.skipCleaning' => true,
             'renderer.skipRunViewer' => getenv('PLOT_RENDERER_SKIP') ? true : false,
         ];
+    }
+
+    protected function accuracy($nn,$loss,$trues,$predicts) : float
+    {
+        $metric = $loss->accuracyMetric();
+        $metricObject = MetricCatalog::factory($nn->backend(),$metric);
+        $metricObject->update($trues,$predicts);
+        $accuracy = $metricObject->result();
+        return $accuracy;
     }
 
     public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
@@ -99,7 +109,7 @@ class CategoricalCrossEntropyTest extends TestCase
 
         $y = $backend->softmax($x);
         $loss = $func->forward($t,$y);
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
 
         $this->assertLessThan(0.01,abs(0.0-$loss));
 

@@ -2,12 +2,36 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use Interop\Polite\Math\Matrix\NDArray;
+use Rindow\NeuralNetworks\Gradient\Core\Variable;
 
 /**
  *
  */
 interface RNNCell extends Layer
 {
-    public function forward(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array;
-    public function backward(NDArray $dOutputs, array $dStates, object $calcState) : array;
+    /**
+     * @param array<NDArray> $states
+     * @return array<NDArray>
+     */
+    public function forward(
+        NDArray $inputs,
+        array $states,
+        bool $training=null,
+        object $calcState=null
+    ) : array;
+
+    /**
+     * @param array<NDArray> $dStates
+     * @return array<NDArray>
+     */
+    public function backward(
+        NDArray $dOutputs,
+        array $dStates,
+        object $calcState
+    ) : array;
+
+    /**
+     * @param array<Variable> $weights
+     */
+    public function reverseSyncCellWeightVariables(array $weights) : void;
 }

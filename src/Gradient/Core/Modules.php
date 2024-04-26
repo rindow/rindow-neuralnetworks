@@ -9,11 +9,21 @@ use Countable;
 use IteratorAggregate;
 use Rindow\NeuralNetworks\Gradient\Module;
 
+/**
+ * @implements ArrayAccess<int,Module>
+ * @implements IteratorAggregate<int,Module>
+ */
 class Modules implements Module, ArrayAccess, Countable, IteratorAggregate
 {
-    protected $modules = [];
-    protected $shapeInspection=true;
+    /**
+     * @var array<Module> $modules
+     */
+    protected array $modules = [];
+    protected bool $shapeInspection=true;
 
+    /**
+     * @param array<Module> $modules
+     */
     public function __construct(array $modules=null)
     {
         if($modules) {
@@ -36,7 +46,7 @@ class Modules implements Module, ArrayAccess, Countable, IteratorAggregate
         return $this->shapeInspection;
     }
 
-    public function setShapeInspection(bool $enable)
+    public function setShapeInspection(bool $enable) : void
     {
         if($this->shapeInspection==$enable)
             return;
@@ -104,5 +114,10 @@ class Modules implements Module, ArrayAccess, Countable, IteratorAggregate
         foreach($this->modules as $i => $v) {
             yield $i => $v;
         }
+    }
+
+    public function isAwareOf(string $name) : bool
+    {
+        throw new LogicException('"isAwareOf" cannot be used with "Module Collection" objects.');        
     }
 }

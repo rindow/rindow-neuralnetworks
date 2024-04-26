@@ -1,6 +1,9 @@
 name: tests
 
-on: [push]
+on: 
+  push:
+      branches:
+          - master
 
 jobs:
   no_ext_tests:
@@ -19,6 +22,12 @@ jobs:
         uses: php-actions/composer@v6
         with:
           php_version: ${{ matrix.php }}
+
+      - name: PHP Static Analysys
+        uses: php-actions/phpstan@v3
+        with:
+          php_version: ${{ matrix.php }}
+          path: src/
 
       - name: PHPUnit Tests
         uses: php-actions/phpunit@v3

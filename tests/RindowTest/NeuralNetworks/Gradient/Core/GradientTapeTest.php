@@ -9,7 +9,7 @@ use Rindow\Math\Matrix\NDArrayPhp;
 use Rindow\Math\Matrix\NDArrayCL;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
-use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Variable;
 
 class TestNDArrayPhp extends NDArrayPhp
 {
@@ -34,7 +34,7 @@ class AbstractTestFunction extends AbstractFunction
         $this->name = $name;
     }
 
-    public function getName()
+    public function name()
     {
         return $this->name;
     }
@@ -118,7 +118,7 @@ class AbstractTestFunction extends AbstractFunction
         return $dInputs;
     }
 
-    public function __invoke(...$inputs)
+    public function __invoke(mixed ...$inputs) : mixed
     {
         $outputs = parent::__invoke(...$inputs);
         $tmp = $outputs;
@@ -134,14 +134,14 @@ class AbstractTestFunction extends AbstractFunction
 
 class TestFunction2In1Out extends AbstractTestFunction
 {
-    protected $numOfInputs = 2;
-    protected $numOfOutputs = 1;
+    protected int $numOfInputs = 2;
+    protected int $numOfOutputs = 1;
 }
 
 class TestFunction1In2Out extends AbstractTestFunction
 {
-    protected $numOfInputs = 1;
-    protected $numOfOutputs = 2;
+    protected int $numOfInputs = 1;
+    protected int $numOfOutputs = 2;
 }
 
 class TestBuilder

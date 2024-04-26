@@ -6,7 +6,8 @@ use Interop\Polite\Math\Matrix\NDArray;
 class GenericMetric extends AbstractMetric
 {
     protected string $name = 'generic_metric';
-    protected $func;
+    /** @var string|object|array{object,string} $func */
+    protected string|object|array $func;
 
     public function __construct(
         object $backend,

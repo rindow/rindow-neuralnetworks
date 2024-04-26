@@ -6,9 +6,11 @@ use Interop\Polite\Math\Matrix\OpenCL;
 use Rindow\Math\Matrix\NDArrayCL;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use InvalidArgumentException;
+use stdClass;
 
 class Backend
 {
+    /** @var array<string,string> $initializers */
     protected $initializers = [
         'glorot_uniform'    => 'glorot_uniform',
         'glorot_normal'     => 'glorot_normal',
@@ -20,15 +22,18 @@ class Backend
         'zeros'             => 'kernel_zeros',
         'ones'              => 'kernel_ones',
     ];
-    protected $epsilon = 1e-7;
-    protected $equalEpsilon = 1e-06;
-    protected $matrixOperator;
-    protected $la;
+    protected float $epsilon = 1e-7;
+    protected float $equalEpsilon = 1e-06;
+    protected object $matrixOperator;
+    protected object $la;
 
-    public function __construct($matrixOperator,$options=null)
+    /**
+     * @param array<string,mixed>|string $options
+     */
+    public function __construct(object $matrixOperator, array|string $options=null)
     {
         $this->matrixOperator = $matrixOperator;
-        if($options) {
+        if($options&&is_string($options)) {
             $options = explode('::',$options);
             array_shift($options);
             $options = implode('::',$options);
@@ -47,59 +52,67 @@ class Backend
         $this->la->blocking(true);
     }
 
-    public function localMatrixOperator()
+    public function localMatrixOperator() : object
     {
         return $this->matrixOperator;
     }
 
-    public function primaryLA()
+    public function primaryLA() : object
     {
         return $this->la;
     }
 
-    public function localLA()
+    public function localLA() : object
     {
         return $this->matrixOperator->laRawMode();
     }
 
-    public function context()
+    public function context() : object
     {
         return $this->la->getContext();
     }
 
-    public function queue()
+    public function queue() : object
     {
         return $this->la->getQueue();
     }
 
-    public function finish()
+    public function finish() : void
     {
         $this->la->finish();
     }
 
-    public function fp64()
+    public function fp64() : bool
     {
-        $this->la->fp64();
+        return $this->la->fp64();
     }
 
-    public function accelerated()
+    public function accelerated() : bool
     {
         return $this->la->accelerated();
     }
 
-    public function deviceType()
+    public function deviceType() : string
     {
         return implode(',',$this->la->deviceTypes());
     }
 
-    public function epsilon()
+    public function epsilon() : float
     {
         return $this->epsilon;
     }
 
-    public function setEpsilon($epsilon) : void
+    public function setEpsilon(float $epsilon) : void
     {
         $this->epsilon = $epsilon;
+    }
+
+    /**
+     * @param array<int> $shape
+     */
+    public function shapeToString(array $shape) : string
+    {
+        return "[".implode(',',$shape)."]";
     }
 
     public function dtypeToString(int $dtype) : string
@@ -108,57 +121,44 @@ class Backend
         return $mo->dtypeToString($dtype);
     }
 
-    public function toString(NDArray $array,string $format=null,$indent=null) : string
+    public function toString(NDArray $array,string $format=null, bool $indent=null) : string
     {
         $mo = $this->matrixOperator;
         return $mo->toString($this->array($array),$format,$indent);
     }
 
-    public function isInt(NDArray $value)
+    public function isInt(NDArray $value) : bool
     {
         return $this->la->isInt($value);
     }
 
-    public function isFloat(NDArray $value)
+    public function isFloat(NDArray $value) : bool
     {
         return $this->la->isFloat($value);
     }
 
-    public function alloc(array $shape,$dtype=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function alloc(array $shape, int $dtype=null) : NDArray
     {
         $array = $this->la->alloc($shape,$dtype);
         return $array;
     }
 
-    public function allocLike(NDArray $x)
+    public function allocLike(NDArray $x) : NDArray
     {
         $array = $this->la->alloc($x->shape(),$x->dtype());
         return $array;
     }
 
-    public function array($value, $dtype=null)
+    public function array(mixed $value, int $dtype=null) : NDArray
     {
         $array = $this->la->array($value, $dtype);
         return $array;
     }
 
-    public function variable($value, int $dtype=null, string $name=null, bool $constraint=null)
-    {
-        $array = $this->la->array($value, $dtype);
-        return $array;
-    }
-
-    public function fill(array $shape, $value, $dtype=null)
-    {
-        $la = $this->la;
-        $array = $la->alloc($shape,$dtype);
-        //$events = $la->newEventList();
-        $la->fill($value,$array);
-        //$events->wait();
-        return $array;
-    }
-
-    public function ndarray(NDArray $ndarray)
+    public function ndarray(NDArray $ndarray) : NDArray
     {
         if($ndarray instanceof Variable) {
             $ndarray = $ndarray->value();
@@ -168,7 +168,20 @@ class Backend
         return $ndarray;
     }
 
-    public function scalar($array)
+    /**
+     * @param array<int> $shape
+     */
+    public function fill(array $shape, mixed $value, int $dtype=null) : NDArray
+    {
+        $la = $this->la;
+        $array = $la->alloc($shape,$dtype);
+        //$events = $la->newEventList();
+        $la->fill($value,$array);
+        //$events->wait();
+        return $array;
+    }
+
+    public function scalar(mixed $array) : mixed
     {
         if($array instanceof NDArray) {
             return $array->toArray();
@@ -176,7 +189,7 @@ class Backend
         return $array;
     }
 
-    public function getInitializer($name,...$options)
+    public function getInitializer(mixed $name, mixed ...$options) : object
     {
         if(is_callable($name)) {
             return $name;
@@ -195,7 +208,10 @@ class Backend
         return $init;
     }
 
-    public function glorot_normal(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function glorot_normal(array $shape, mixed $nodeNum=null) : NDArray
     {
         if($nodeNum===null){
             $tmpShape = $shape;
@@ -210,7 +226,10 @@ class Backend
         return $kernel;
     }
 
-    public function glorot_uniform(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function glorot_uniform(array $shape, mixed $nodeNum=null) : NDArray
     {
         if($nodeNum===null){
             $tmpShape = $shape;
@@ -224,7 +243,10 @@ class Backend
         return $kernel;
     }
 
-    public function random_normal(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function random_normal(array $shape, mixed $nodeNum=null) : NDArray
     {
         $mean=0.0;
         $stddev=0.05;
@@ -240,7 +262,10 @@ class Backend
         return $kernel;
     }
 
-    public function random_uniform(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function random_uniform(array $shape, mixed $nodeNum=null) : NDArray
     {
         $minval=-0.05;
         $maxval=0.05;
@@ -256,7 +281,10 @@ class Backend
         return $kernel;
     }
 
-    public function orthogonal(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function orthogonal(array $shape, mixed $nodeNum=null) : NDArray
     {
         $tmpShape = $shape;
         $num_cols = array_pop($tmpShape);
@@ -274,7 +302,10 @@ class Backend
     }
 
 
-    public function he_normal(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function he_normal(array $shape, mixed $nodeNum=null) : NDArray
     {
         if($nodeNum===null){
             $tmpShape = $shape;
@@ -288,7 +319,10 @@ class Backend
         return $kernel;
     }
 
-    public function he_uniform(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function he_uniform(array $shape, mixed $nodeNum=null) : NDArray
     {
         if($nodeNum===null){
             $tmpShape = $shape;
@@ -303,17 +337,26 @@ class Backend
         return $kernel;
     }
 
-    public function kernel_zeros(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function kernel_zeros(array $shape, mixed $nodeNum=null) : NDArray
     {
         return $this->zeros($shape);
     }
 
-    public function kernel_ones(array $shape,$nodeNum=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function kernel_ones(array $shape, mixed $nodeNum=null) : NDArray
     {
         return $this->ones($shape);
     }
 
-    public function zeros(array $shape,$dtype=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function zeros(array $shape, int $dtype=null) : NDArray
     {
         $la = $this->la;
         $x = $la->alloc($shape,$dtype);
@@ -323,12 +366,15 @@ class Backend
         return $x;
     }
 
-    public function ones(array $shape,$dtype=null)
+    /**
+     * @param array<int> $shape
+     */
+    public function ones(array $shape, int $dtype=null) : NDArray
     {
         return $this->fill($shape,1.0,$dtype);
     }
 
-    public function zerosLike(NDArray $x)
+    public function zerosLike(NDArray $x) : NDArray
     {
         $la = $this->la;
         $y = $la->alloc($x->shape(),$x->dtype());
@@ -338,33 +384,36 @@ class Backend
         return $y;
     }
 
-    public function onesLike(NDArray $x)
+    public function onesLike(NDArray $x) : NDArray
     {
         return $this->fill($x->shape(),1.0,$x->dtype());
     }
 
-    public function clear(NDArray $x)
+    public function clear(NDArray $x) : NDArray
     {
         $this->la->zeros($x);
         return $x;
     }
 
-    public function copy(NDArray $from,NDArray $to=null)
+    public function copy(NDArray $from,NDArray $to=null) : NDArray
     {
         return $this->la->copy($from, $to);
     }
 
-    public function cast(NDArray $x,$dtype)
+    public function cast(NDArray $x, int $dtype) : NDArray
     {
         return $this->la->astype($x,$dtype);
     }
 
-    public function transpose(NDArray $x,NDArray|array $perm=null)
+    /**
+     * @param array<int> $perm
+     */
+    public function transpose(NDArray $x,NDArray|array $perm=null) : NDArray
     {
         return $this->la->transpose($x,perm:$perm);
     }
 
-    public function batch_transpose(NDArray $x)
+    public function batch_transpose(NDArray $x) : NDArray
     {
         $la = $this->la;
         if($x->ndim()<3) {
@@ -395,7 +444,7 @@ class Backend
         return $x;
     }
 
-    public function add(NDArray $x, NDArray $y)
+    public function add(NDArray $x, NDArray $y) : NDArray
     {
         $la = $this->la;
         $ndimX = $x->ndim();
@@ -415,7 +464,7 @@ class Backend
         }
     }
 
-    public function sub(NDArray $x, NDArray $y)
+    public function sub(NDArray $x, NDArray $y) : NDArray
     {
         $la = $this->la;
         $ndimX = $x->ndim();
@@ -436,7 +485,7 @@ class Backend
         }
     }
 
-    public function mul(NDArray $x, NDArray $y)
+    public function mul(NDArray $x, NDArray $y) : NDArray
     {
         $la = $this->la;
         if($x->ndim() < $y->ndim()) {
@@ -448,7 +497,7 @@ class Backend
         }
     }
 
-    public function div(NDArray $x, NDArray $y)
+    public function div(NDArray $x, NDArray $y) : NDArray
     {
         $la = $this->la;
         $y = $la->copy($y);
@@ -465,7 +514,7 @@ class Backend
     public function reciprocal(
         NDArray $x,
         float $beta=null,
-        float $alpha=null)
+        float $alpha=null) : NDArray
     {
         $la = $this->la;
         $x = $la->copy($x);
@@ -503,18 +552,18 @@ class Backend
         return $this->la->multiply($magnifications,$x,$trans);
     }
 
-    public function scale(float $a, NDArray $x)
+    public function scale(float $a, NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->scal($a, $x);
     }
 
-    public function update_scale(NDArray $x,float $a)
+    public function update_scale(NDArray $x,float $a) : NDArray
     {
         return $this->la->scal($a, $x);
     }
 
-    public function increment(NDArray $x, float $b, float $a=null)
+    public function increment(NDArray $x, float $b, float $a=null) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->increment($x, $b, $a);
@@ -525,31 +574,31 @@ class Backend
         return $this->la->increment($x, $b, $a);
     }
 
-    public function pow(NDArray $x, float|NDArray $y, bool $trans=null)
+    public function pow(NDArray $x, float|NDArray $y, bool $trans=null) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->pow($x,$y,$trans);
     }
 
-    public function square(NDArray $x)
+    public function square(NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->square($x);
     }
 
-    public function sqrt(NDArray $x)
+    public function sqrt(NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->sqrt($x);
     }
 
-    public function rsqrt(NDArray $x,float $beta=null, float $alpha=null)
+    public function rsqrt(NDArray $x,float $beta=null, float $alpha=null) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->rsqrt($x,$beta,$alpha);
     }
 
-    public function abs(NDArray $x)
+    public function abs(NDArray $x) : NDArray
     {
         $la = $this->la;
         $minus = $la->less($la->copy($x),0);
@@ -557,7 +606,7 @@ class Backend
         return $y;
     }
 
-    public function sign(NDArray $x)
+    public function sign(NDArray $x) : NDArray
     {
         $la = $this->la;
         $plus = $la->greater($la->copy($x),0);
@@ -566,98 +615,103 @@ class Backend
         return $y;
     }
 
-    public function maximum(NDArray $x, float $a)
+    public function maximum(NDArray $x, float $a) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->maximum($x,$a);
     }
 
-    public function minimum(NDArray $x, float $a)
+    public function minimum(NDArray $x, float $a) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->minimum($x,$a);
     }
 
-    public function greater(NDArray $x, float $a)
+    public function greater(NDArray $x, float $a) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->greater($x,$a);
     }
 
-    public function greaterEqual(NDArray $x, float $a)
+    public function greaterEqual(NDArray $x, float $a) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->greaterEqual($x,$a);
     }
 
-    public function less(NDArray $x, float $a)
+    public function less(NDArray $x, float $a) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->less($x,$a);
     }
 
-    public function lessEqual(NDArray $x, float $a)
+    public function lessEqual(NDArray $x, float $a) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->lessEqual($x,$a);
     }
 
-    public function exp(NDArray $x)
+    public function exp(NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->exp($x);
     }
 
-    public function log(NDArray $x)
+    public function log(NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->log($x);
     }
 
-    public function equal($x,$y)
+    public function equal(NDArray $x,NDArray $y) : NDArray
     {
         $y = $this->la->copy($y);
         return $this->la->equal($x,$y);
     }
 
-    public function notEqual($x,$y)
+    public function notEqual(NDArray $x, NDArray $y) : NDArray
     {
         $z = $this->la->copy($y);
         return $this->la->notEqual($x,$z);
     }
 
-    public function not($x)
+    public function not(NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
         return $this->la->not($x);
     }
 
-    public function sin($x)
+    public function sin(NDArray $x) : NDArray
     {
         return $this->la->sin($this->la->copy($x));
     }
 
-    public function cos($x)
+    public function cos(NDArray $x) : NDArray
     {
         return $this->la->cos($this->la->copy($x));
     }
 
-    public function tan($x)
+    public function tan(NDArray $x) : NDArray
     {
         return $this->la->tan($this->la->copy($x));
     }
 
-    public function tanh($x)
+    public function tanh(NDArray $x) : NDArray
     {
         return $this->la->tanh($this->la->copy($x));
     }
 
-    public function asum(NDArray $x)
+    public function asum(NDArray $x) : float|object
     {
         return $this->la->asum($x);
     }
 
-    public function sum(NDArray $x, int $axis=null, bool $keepdims=null, NDArray $output=null)
+    public function sum(
+        NDArray $x,
+        int $axis=null,
+        bool $keepdims=null,
+        NDArray $output=null
+        ) : int|float|NDArray
     {
         if($axis===null) {
             return $this->la->sum($x);
@@ -666,7 +720,12 @@ class Backend
         }
     }
 
-    public function mean(NDArray $x,int $axis=null, bool $keepdims=null, NDArray $output=null)
+    public function mean(
+        NDArray $x,
+        int $axis=null,
+        bool $keepdims=null,
+        NDArray $output=null
+        ) : int|float|NDArray
     {
         if($axis===null) {
             return $this->la->scalar($this->la->sum($x)) / $x->size();
@@ -675,7 +734,10 @@ class Backend
         }
     }
 
-    public function std(NDArray $x,int $axis=null)
+    public function std(
+        NDArray $x,
+        int $axis=null
+        ) : int|float|NDArray
     {
         $la = $this->la;
         /// std = sqrt((x - mean(x))**2 / N)
@@ -693,7 +755,12 @@ class Backend
         return $std;
     }
 
-    public function max(NDArray $x,int $axis=null, bool $keepdims=null,NDArray $output=null)
+    public function max(
+        NDArray $x,
+        int $axis=null,
+        bool $keepdims=null,
+        NDArray $output=null
+        ) : int|float|NDArray
     {
         if($axis===null) {
             return $this->la->max($x);
@@ -702,7 +769,11 @@ class Backend
         }
     }
 
-    public function min(NDArray $x,int $axis=null,bool $keepdims=null)
+    public function min(
+        NDArray $x,
+        int $axis=null,
+        bool $keepdims=null
+        ) : int|float|NDArray
     {
         $mo = $this->matrixOperator;
         if($axis===null) {
@@ -714,17 +785,21 @@ class Backend
         }
     }
 
-    public function amax(NDArray $x)
+    public function amax(NDArray $x) : float|object
     {
         return $this->la->amax($x);
     }
 
-    public function amin(NDArray $x)
+    public function amin(NDArray $x) : float|object
     {
         return $this->la->amin($x);
     }
 
-    public function argMax(NDArray $x,int $axis=null,bool $keepdims=null,int $dtype=null)
+    public function argMax(
+        NDArray $x,
+        int $axis=null,
+        bool $keepdims=null,
+        int $dtype=null) : float|object
     {
         $la = $this->la;
         if($axis===null) {
@@ -739,46 +814,63 @@ class Backend
         }
     }
 
-    public function argMin(NDArray $x,int $axis=null)
+    public function argMin(NDArray $x,int $axis=null) : int|NDArray
     {
-        $mo = $this->matrixOperator;
-        return $mo->argMin($x,$axis);
+        //$mo = $this->matrixOperator;
+        //return $mo->argMin($x,$axis);
+        if($axis===null) {
+            $la = $this->la;
+            return $la->imin($x);
+        } else {
+            throw new InvalidArgumentException("axis must be null, because reduced argMin is not implemented on RindowCLBlast");
+        }
     }
 
-    public function nrm2(NDArray $x)
+    public function nrm2(NDArray $x) : float|NDArray
     {
         return $this->la->nrm2($x);
     }
 
-    public function rand($shape)
+    /**
+     * @param array<int> $shape
+     */
+    public function rand(array $shape) : NDArray
     {
         $mo = $this->matrixOperator;
         return $this->randomUniformVariables($shape,0.0,1.0);
     }
 
-    public function randomChoice($a,int $size=null, bool $replace=null)
-    {
-        $mo = $this->matrixOperator;
-        return $mo->random()->choice($a, $size, $replace);
-    }
-
-    public function randomSequence(int $base, int $size=null, int  $seed=null)
+    public function randomSequence(int $base, int $size=null, int $seed=null) : NDArray
     {
         $mo = $this->matrixOperator;
         return $this->la->randomSequence($base, $size, $seed);
     }
 
-    public function dot($x,$y)
+    public function dot(NDArray $x,NDArray $y) : float|NDArray
     {
-        return $this->la->gemm($x,$y);
+        return $this->la->dot($x,$y);
     }
 
-    public function gemm(NDArray $a,NDArray $b,float $alpha=null,float $beta=null,NDArray $c=null,$transA=null,$transB=null)
+    public function gemm(
+        NDArray $a,
+        NDArray $b,
+        float $alpha=null,
+        float $beta=null,
+        NDArray $c=null,
+        bool $transA=null,
+        bool $transB=null
+        ) : NDArray
     {
         return $this->la->gemm($a, $b,$alpha,$beta,$c,$transA,$transB);
     }
 
-    public function batch_gemm(NDArray $a,NDArray $b,float $alpha=null,float $beta=null,NDArray $c=null)
+    public function batch_gemm(
+        NDArray $a,
+        NDArray $b,
+        float $alpha=null,
+        float $beta=null,
+        NDArray $c=null
+        ) : NDArray
     {
         $batchSize = $a->shape()[0];
         if($c==null) {
@@ -798,51 +890,77 @@ class Backend
         NDArray $c=null,
         float $alpha=null,
         float $beta=null
-        )
+        ) : NDArray
     {
         return $this->la->matmul($a,$b,$transA,$transB,$c,$alpha,$beta);
     }
 
-    public function expandDims(NDArray $x, int $axis)
+    public function expandDims(NDArray $x, int $axis) : NDArray
     {
         return $this->la->expandDims($x,$axis);
     }
 
-    public function squeeze(NDArray $x, int $axis=null)
+    public function squeeze(NDArray $x, int $axis=null) : NDArray
     {
         return $this->la->squeeze($x,$axis);
     }
 
-    public function gather(NDArray $source,NDArray $indices,$axis=null)
+    public function gather(
+        NDArray $source,
+        NDArray $indices,
+        int $axis=null
+        ) : NDArray
     {
         return $this->la->gather($source,$indices,$axis);
     }
 
-    public function scatter(NDArray $indices,NDArray $values,int  $numClass,$axis=null,NDArray $target=null)
+    public function scatter(
+        NDArray $indices,
+        NDArray $values,
+        int $numClass,
+        int $axis=null,
+        NDArray $target=null
+        ) : NDArray
     {
         return $this->la->scatter($indices,$values,$numClass,$axis,$target);
     }
 
-    public function scatterAdd(NDArray $target,NDArray $indices,NDArray $values,$axis=null)
+    public function scatterAdd(
+        NDArray $target,
+        NDArray $indices,
+        NDArray $values,
+        int $axis=null
+        ) : NDArray
     {
         return $this->la->scatterAdd($indices,$values,$target,$axis);
     }
 
+    /**
+     * @param array<int> $begin
+     * @param array<int> $size
+     */
     public function slice(
         NDArray $input,
         array $begin, array $size,
-        NDArray $output=null) {
+        NDArray $output=null
+        ) : NDArray
+    {
         return $this->la->slice(
             $input,
             $begin,$size,
             $output);
     }
 
+    /**
+     * @param array<int> $begin
+     * @param array<int> $size
+     */
     public function stick(
         NDArray $input,
         NDArray $output,
         array $begin, array $size
-        ) {
+        ) : NDArray
+    {
         return $this->la->stick(
             $input,
             $output,
@@ -850,31 +968,44 @@ class Backend
             );
     }
 
+    /**
+     * @param array<NDArray> $inputs
+     */
     public function stack(
         array $inputs,
         int $axis=null
-        ) {
+        ) : NDArray
+    {
         return $this->la->stack(
             $inputs,
             $axis
             );
     }
 
+    /**
+     * @param array<NDArray> $inputs
+     */
     public function concat(
         array $inputs,
         int $axis=null
-        ) {
+        ) : NDArray 
+    {
         return $this->la->concat(
             $inputs,
             $axis
             );
     }
 
+    /**
+     * @param array<int> $sizeSplits
+     * @return array<NDArray>
+     */
     public function split(
         NDArray $value,
         array $sizeSplits,
         int $axis=null
-        ) {
+        ) : array
+    {
         return $this->la->split(
             $value,
             $sizeSplits,
@@ -887,7 +1018,8 @@ class Backend
         int $repeats,
         int $axis=null,
         bool $keepdims=null,
-        ) {
+        ) : NDArray
+    {
         return $this->la->repeat(
             $inputs,
             $repeats,
@@ -904,17 +1036,23 @@ class Backend
         return $this->la->onehot($indices,$numClass);
     }
 
-    public function randomUniformVariables(array $shape, $low, $high, $dtype=null, int $seed=null, NDArray $x=null) : NDArray
+    /**
+     * @param array<int> $shape
+     */
+    public function randomUniformVariables(array $shape, int|float $low, int|float $high, int $dtype=null, int $seed=null, NDArray $x=null) : NDArray
     {
         return $this->la->randomUniform($shape,$low,$high,$dtype,$seed,$x);
     }
 
-    public function randomNormalVariables(array $shape, $mean, $scale, $dtype=null, int $seed=null, NDArray $x=null) : NDArray
+    /**
+     * @param array<int> $shape
+     */
+    public function randomNormalVariables(array $shape, float $mean, float $scale, int $dtype=null, int $seed=null, NDArray $x=null) : NDArray
     {
         return $this->la->randomNormal($shape,$mean,$scale,$dtype,$seed,$x);
     }
 
-    public function relu($x) : NDArray
+    public function relu(NDArray $x) : NDArray
     {
         return $this->maximum($x,0.0);
     }
@@ -1035,6 +1173,10 @@ class Backend
         return $dInputs->reshape($orgShape);
     }
 
+    /**
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     public function conv1d(
         object $status,
         NDArray $inputs,
@@ -1077,6 +1219,11 @@ class Backend
         );
     }
 
+    /**
+     * @param array<int> $poolSize
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     public function pool1d(
         object $status,
         NDArray $inputs,
@@ -1115,6 +1262,10 @@ class Backend
         );
     }
 
+    /**
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     public function conv2d(
         object $status,
         NDArray $inputs,
@@ -1157,6 +1308,11 @@ class Backend
         );
     }
 
+    /**
+     * @param array<int> $poolSize
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     public function pool2d(
         object $status,
         NDArray $inputs,
@@ -1195,6 +1351,10 @@ class Backend
         );
     }
 
+    /**
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     public function conv3d(
         object $status,
         NDArray $inputs,
@@ -1237,6 +1397,11 @@ class Backend
         );
     }
 
+    /**
+     * @param array<int> $poolSize
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     public function pool3d(
         object $status,
         NDArray $inputs,
@@ -1275,6 +1440,10 @@ class Backend
         );
     }
 
+    /**
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     protected function doConv(
         int $rank,
         object $status,
@@ -1407,6 +1576,11 @@ class Backend
         return $dInputs;
     }
 
+    /**
+     * @param array<int> $poolSize
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     */
     protected function doPool(
         int $rank,
         object $status,
@@ -1551,6 +1725,13 @@ class Backend
         return $dInputs;
     }
 
+    /**
+     * @param array<int> $inputShape
+     * @param array<int> $filterSize
+     * @param array<int> $strides
+     * @param array<int> $dilation_rate
+     * @return array<int>
+     */
     public function calcConvOutputShape(
         array $inputShape,
         array $filterSize,
@@ -1580,9 +1761,10 @@ class Backend
             throw new InvalidArgumentException('dilation_rate is not specified');
         }
         $inputShape = array_values($inputShape);
+        $outputShape = [];
         foreach($inputShape as $idx=>$value) {
             //$outputShape[$idx] = intval(floor(($inputShape[$idx]-$filterSize[$idx])/$strides[$idx])+1);
-            $outputShape[$idx] = intval(floor(($inputShape[$idx]-($filterSize[$idx]-1)*$dilation_rate[$idx]-1)/$strides[$idx])+1);
+            $outputShape[$idx] = intdiv(($inputShape[$idx]-($filterSize[$idx]-1)*$dilation_rate[$idx]-1), $strides[$idx])+1;
         }
         $outputShape = array_values($outputShape);
         return $outputShape;
@@ -1648,8 +1830,8 @@ class Backend
     {
         $la = $this->la;
         $ndim = $trues->ndim();
-        $orgTrues = $trues;
-        $orgPredicts = $predicts;
+        $orgPredictsShape = $predicts->shape();
+        $orgTruesShape = $trues->shape();
 /*
         if($ndim==1){
             if($predicts->ndim()!=2){
@@ -1710,7 +1892,8 @@ class Backend
         ) : NDArray
     {
         $la = $this->la;
-        $origPredictsShape = $predicts->shape();
+        $orgPredictsShape = $predicts->shape();
+        $orgTruesShape = $trues->shape();
         $ndim = $trues->ndim();
 /*
         if($ndim==1){
@@ -1836,7 +2019,7 @@ class Backend
         if($loss instanceof NDArray) {
             return $la->scal(-1.0/$batchSize,$loss);
         }
-        return $K->array(-1.0*$loss/$batchSize,$predicts->dtype());
+        return $la->array(-1.0*$loss/$batchSize,$predicts->dtype());
     }
 
     public function dCategoricalCrossEntropy(
@@ -1999,8 +2182,12 @@ class Backend
         return $dest;
     }
 
+    /**
+     * @param array<NDArray> $initialStates
+     * @return array{NDArray,array<NDArray>,array<stdClass>}
+     */
     public function rnn(
-        $stepFunction,
+        callable $stepFunction,
         NDArray $inputs,
         array $initialStates,
         bool $training=null,
@@ -2015,8 +2202,9 @@ class Backend
         if($goBackwards){
             $tm = array_reverse($tm);
         }
+        $outputs_t = null;
         foreach($tm as $t){
-            $calcState = new \stdClass();
+            $calcState = new stdClass();
             $calcStates[$t] = $calcState;
             [$outputs_t, $states_t] = $stepFunction(
                 $this->rnnGetTimestep($inputs, $t),
@@ -2031,8 +2219,13 @@ class Backend
         return [$outputs, $states_t, $calcStates];
     }
 
+    /**
+     * @param array<NDArray> $dStates
+     * @param array<stdClass> $calcStates
+     * @return array{NDArray,array<NDArray>}
+     */
     public function rnnBackward(
-        $stepFunction,
+        callable $stepFunction,
         NDArray $dOutputs,
         array $dStates,
         array $calcStates,
@@ -2078,7 +2271,7 @@ class Backend
     }
 
 
-    public function equalTest($a,$b)
+    public function equalTest(mixed $a, mixed $b) : bool
     {
         $mo = $this->matrixOperator;
         if($a instanceof NDArray) {

@@ -4,73 +4,28 @@ namespace Rindow\NeuralNetworks\Data\Sequence;
 use InvalidArgumentException;
 use ArrayObject;
 
-if(version_compare(PHP_VERSION, '7.4.0') < 0) {
-    function mb_str_split($string, $split_length = 1, $encoding = null)
-    {
-        if (null !== $string && !\is_scalar($string) && !(\is_object($string) && \method_exists($string, '__toString'))) {
-            trigger_error('mb_str_split(): expects parameter 1 to be string, '.\gettype($string).' given', E_USER_WARNING);
-            return null;
-        }
-        if (null !== $split_length && !\is_bool($split_length) && !\is_numeric($split_length)) {
-            trigger_error('mb_str_split(): expects parameter 2 to be int, '.\gettype($split_length).' given', E_USER_WARNING);
-            return null;
-        }
-        $split_length = (int) $split_length;
-        if (1 > $split_length) {
-            trigger_error('mb_str_split(): The length of each segment must be greater than zero', E_USER_WARNING);
-            return false;
-        }
-        if (null === $encoding) {
-            $encoding = mb_internal_encoding();
-        } else {
-            $encoding = (string) $encoding;
-        }
-
-        if (! in_array($encoding, mb_list_encodings(), true)) {
-            static $aliases;
-            if ($aliases === null) {
-                $aliases = [];
-                foreach (mb_list_encodings() as $encoding) {
-                    $encoding_aliases = mb_encoding_aliases($encoding);
-                    if ($encoding_aliases) {
-                        foreach ($encoding_aliases as $alias) {
-                            $aliases[] = $alias;
-                        }
-                    }
-                }
-            }
-            if (! in_array($encoding, $aliases, true)) {
-                trigger_error('mb_str_split(): Unknown encoding "'.$encoding.'"', E_USER_WARNING);
-                return null;
-            }
-        }
-
-        $result = [];
-        $length = mb_strlen($string, $encoding);
-        for ($i = 0; $i < $length; $i += $split_length) {
-            $result[] = mb_substr($string, $i, $split_length, $encoding);
-        }
-        return $result;
-    }
-}
-
 class Tokenizer
 {
-    protected $mo;
-    protected $analyzer;
-    protected $numWords;
-    protected $filters;
-    protected $specials;
-    protected $lower;
-    protected $split;
-    protected $charLevel;
-    protected $oovToken;
-    protected $documentCount;
-    protected $wordCounts = [];
-    protected $wordToIndex = [];
-    protected $indexToWord = [];
-    protected $filtersMap;
-    protected $specialsMap;
+    protected object $mo;
+    protected mixed $analyzer;
+    protected ?int $numWords;
+    protected ?string $filters;
+    protected ?string $specials;
+    protected bool $lower;
+    protected string $split;
+    protected bool $charLevel;
+    protected ?string $oovToken;
+    protected int $documentCount;
+    /** @var array<string,int> $wordCounts */
+    protected array $wordCounts = [];
+    /** @var array<string,int> $wordToIndex */
+    protected array $wordToIndex = [];
+    /** @var array<int,string> $indexToWord */
+    protected array $indexToWord = [];
+    /** @var array<string,int> $filtersMap */
+    protected ?array $filtersMap = null;
+    /** @var array<string,int> $specialsMap */
+    protected ?array $specialsMap = null;
 
     public function __construct(
         object $mo,
@@ -107,8 +62,16 @@ class Tokenizer
         $this->documentCount = $document_count;
     }
 
+    /**
+     * @return array<string>
+     */
     protected function textToWordSequence(
-        $text,$filters,$specials,$lower,$split)
+        string $text,
+        ?string $filters,
+        ?string $specials,
+        bool $lower,
+        string $split
+        ) : array
     {
         if($lower)
             $text = mb_strtolower($text);
@@ -144,6 +107,9 @@ class Tokenizer
         return $seq;
     }
 
+    /**
+     * @param iterable<string> $texts
+     */
     public function fitOnTexts(iterable $texts) : void
     {
         foreach ($texts as $text) {
@@ -180,6 +146,11 @@ class Tokenizer
     //public function fitOnSequences($sequences) : void
     //{
     //}
+
+    /**
+     * @param iterable<string> $texts
+     * @return iterable<iterable<int>>
+     */
     public function textsToSequences(iterable $texts) : iterable
     {
         $sequences = new ArrayObject();
@@ -189,11 +160,15 @@ class Tokenizer
         return $sequences;
     }
 
+    /**
+     * @param iterable<string> $texts
+     * @return iterable<iterable<int>>
+     */
     public function textsToSequencesGenerator(iterable $texts) : iterable
     {
         $numWords = $this->numWords;
         $oovTokenIndex = ($this->oovToken) ?
-            $this->wordToindex[$this->oovToken] : null;
+            $this->wordToIndex[$this->oovToken] : null;
         foreach ($texts as $text) {
             if($this->analyzer) {
                 $analyzer = $this->analyzer;
@@ -223,6 +198,10 @@ class Tokenizer
         }
     }
 
+    /**
+     * @param iterable<iterable<int>> $sequences
+     * @return iterable<string>
+     */
     public function sequencesToTexts(iterable $sequences) : iterable
     {
         $texts = new ArrayObject();
@@ -232,6 +211,10 @@ class Tokenizer
         return $texts;
     }
 
+    /**
+     * @param iterable<iterable<int>> $sequences
+     * @return iterable<string>
+     */
     public function sequencesToTextsGenerator(iterable $sequences) : iterable
     {
         if(!is_iterable($sequences)) {
@@ -239,7 +222,7 @@ class Tokenizer
         }
         $numWords = $this->numWords;
         $oovTokenIndex = ($this->oovToken) ?
-            $this->wordToindex[$this->oovToken] : null;
+            $this->wordToIndex[$this->oovToken] : null;
         foreach ($sequences as $seq) {
             if(!is_iterable($seq)) {
                 throw new InvalidArgumentException('sequences must be list of sequence.');
@@ -274,12 +257,18 @@ class Tokenizer
         return $this->documentCount;
     }
 
+    /**
+     * @return array<string,int>
+     */
     public function wordCounts() : array
     {
         return $this->wordCounts;
     }
 
-    public function getWords()
+    /**
+     * @return array<int,string>
+     */
+    public function getWords() : array
     {
         return $this->indexToWord;
     }
@@ -319,7 +308,7 @@ class Tokenizer
         ]);
     }
 
-    public function load(string $string)
+    public function load(string $string) : void
     {
         [
             $this->documentCount,

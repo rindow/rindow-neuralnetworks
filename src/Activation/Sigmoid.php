@@ -5,7 +5,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Sigmoid extends AbstractActivation
 {
-    protected $incorporatedLoss = false;
+    protected bool $incorporatedLoss = false;
 
     protected function call(NDArray $inputs, bool $training=null) : NDArray
     {

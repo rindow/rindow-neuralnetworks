@@ -8,22 +8,32 @@ use IteratorAggregate;
 use Traversable;
 use function Rindow\Math\Matrix\R;
 
-class NDArrayDataset implements Countable,IteratorAggregate,Dataset
+/**
+ * @implements Dataset<NDArray>
+ * @implements IteratorAggregate<int,array{NDArray|array<NDArray>,NDArray}>
+ */
+class NDArrayDataset implements IteratorAggregate,Dataset
 {
-    protected $mo;
-    protected $inputs;
-    protected $tests;
-    protected $batchSize;
-    protected $shuffle;
-    protected $filter;
-    protected $multiInputs;
+    protected object $mo;
+    /** @var array<NDArray> $inputs */
+    protected array $inputs;
+    protected ?NDArray $tests;
+    protected int $batchSize;
+    protected bool $shuffle;
+    /** @var DatasetFilter<NDArray> $filterGeneric */
+    protected ?DatasetFilter $filterGeneric;
+    protected bool $multiInputs=false;
 
+    /**
+     * @param array<NDArray>|NDArray $inputs
+     * @param DatasetFilter<NDArray> $filter
+     */
     public function __construct(
-        $mo,
-        $inputs,
+        object $mo,
+        array|NDArray $inputs,
         NDArray $tests=null,
         int $batch_size=null,
-        $shuffle=null,
+        bool $shuffle=null,
         DatasetFilter $filter=null,
     )
     {
@@ -68,12 +78,17 @@ class NDArrayDataset implements Countable,IteratorAggregate,Dataset
         $this->tests = $tests;
         $this->batchSize = $batch_size;
         $this->shuffle = $shuffle;
-        $this->filter = $filter;
+        $this->setFilter($filter);
     }
 
-    public function setFilter(DatasetFilter $filter) : void
+    public function filter() : ?DatasetFilter
     {
-        $this->filter = $filter;
+        return $this->filterGeneric;
+    }
+
+    public function setFilter(?DatasetFilter $filter) : void
+    {
+        $this->filterGeneric = $filter;
     }
 
     public function batchSize() : int
@@ -119,11 +134,11 @@ class NDArrayDataset implements Countable,IteratorAggregate,Dataset
             if($this->tests) {
                 $tests = $this->tests[R($start,$end)];
             }
-            if($this->filter) {
+            if($this->filter()) {
                 if($this->multiInputs) {
-                    [$inputs,$tests] = $this->filter->translate($inputs,$tests);
+                    [$inputs,$tests] = $this->filter()->translate($inputs,$tests);
                 } else {
-                    [$inputs,$tests] = $this->filter->translate($inputs[0],$tests);
+                    [$inputs,$tests] = $this->filter()->translate($inputs[0],$tests);
                     $inputs = [$inputs];
                 }
             }

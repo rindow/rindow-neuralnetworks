@@ -3,24 +3,32 @@ namespace Rindow\NeuralNetworks\Support\HDA;
 
 use RuntimeException;
 use PDO;
+use PDOStatement;
 use Iterator;
 
+/**
+ * @implements Iterator<mixed,mixed> 
+ */
 class HDASqliteIterator implements Iterator
 {
-    protected $key;
-    protected $value;
-    protected $stat;
-    protected $eof = false;
-    protected $fetched = false;
+    protected mixed $key;
+    protected mixed $value;
+    protected PDOStatement $stat;
+    protected mixed $eof = false;
+    protected bool $fetched = false;
 
     public function __construct(PDO $pdo, string $table, string $ancestor)
     {
-        $this->stat = $pdo->prepare("SELECT * FROM ".$table." WHERE ancestor = :ancestor");
+        $stat = $pdo->prepare("SELECT * FROM ".$table." WHERE ancestor = :ancestor");
+        if($stat==false) {
+            throw new RuntimeException('PDO prepare error');
+        }
+        $this->stat = $stat;
         if(!$this->stat->execute([':ancestor'=>$ancestor]))
             throw new RuntimeException('query error in '.$ancestor);
     }
 
-    protected function fetch()
+    protected function fetch() : void
     {
         if($this->fetched)
             return;

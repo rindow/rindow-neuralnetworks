@@ -3,17 +3,19 @@ declare(strict_types=1);
 namespace Rindow\NeuralNetworks\Gradient\Core;
 
 use InvalidArgumentException;
+use LogicException;
 use RuntimeException;
 use Throwable;
 use ArrayAccess;
 use WeakMap;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Support\Control\Execute;
-use Rindow\NeuralNetworks\Gradient\Module;
 use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
 use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
+use Rindow\NeuralNetworks\Gradient\GraphFunction as GraphFunctionInterface;
+use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 
-class GraphFunction
+class GraphFunction implements GraphFunctionInterface
 {
     use GraphUtils;
 
@@ -21,55 +23,27 @@ class GraphFunction
     const UNDER_CONSTRUCTION = 1;
     const EXECUTING = 2;
 
-    static public $mode = self::EAGER_EXECUTION;
-
-    protected $backupMode = [];
-
-    /**
-    *  @var object   backend
-    */
-    protected $backend;
-
-    /**
-    *  @var callable func
-    */
-    protected $func;
-
-    /**
-    *  @var bool built
-    */
-    protected $built = false;
-
-    /**
-    *  @var int   numOfInputs
-    */
-    protected $numOfInputs;
-
-    /**
-    *  @var int   numOfOutputs
-    */
-    protected $numOfOutputs;
-
+    static public int $mode = self::EAGER_EXECUTION;
+    /** @var array<int> $backupMode */
+    protected array $backupMode = [];
+    protected object $backend;
+    /* var callable func */
+    protected mixed $func;
+    protected bool $built = false;
+    protected int $numOfInputs;
+    protected int $numOfOutputs;
+    /** @var array<object> $startInputOids using at iWeakMap */
     protected $startInputOids;
+    /** @var array<object> $endOutputOids using at WeakMap */
+    protected array $endOutputOids;
 
-    protected $endOutputOids;
-
-    /**
-    *  @var array<AbstractFunction>   graph forward pipeline
-    */
-    protected $pipeline;
-
-    /**
-    *  @var array<AbstractFunction>   graph backward pipeline
-    */
-    protected $backprop;
-
-    /**
-    *  @var Dict<NDArray>    constants for input oid in the graph
-    */
-    protected $constants;
-
-    protected $alternateCreator;
+    /** @var array<AbstractFunction> $pipeline  graph forward pipeline */
+    protected array $pipeline;
+    /** @var array<AbstractFunction> $backprop  graph backward pipeline */
+    protected array $backprop;
+    /** @var array<VariableInterface> $constants for input oid in the graph */
+    protected array $constants = [];
+    protected ?object $alternateCreator;
 
     public function __construct(object $backend, callable $func, object $alternateCreator=null)
     {
@@ -78,12 +52,15 @@ class GraphFunction
         $this->alternateCreator = $alternateCreator;
     }
 
-    public function backend()
+    public function backend() : object
     {
         return $this->backend;
     }
 
-    protected function executeOnMode($sessionFunc,int $mode,callable $func)
+    /**
+     * @return array<NDArray|VariableInterface>|NDArray
+     */
+    protected function executeOnMode(GraphSession $sessionFunc,int $mode,callable $func) : array|NDArray
     {
         array_push($this->backupMode,self::$mode);
         self::$mode = $mode;
@@ -105,12 +82,9 @@ class GraphFunction
     }
 
     /**
-    *  @param array<Variable>  $inputs
-    *       inputs
-    *  @return array<Variable>
-    *       outputs
+    *  @return array<VariableInterface>
     */
-    public function __invoke(...$inputs)
+    public function __invoke(VariableInterface ...$inputs)
     {
         if(!$this->built) {
             return $this->build($inputs);
@@ -133,6 +107,7 @@ class GraphFunction
         });
 
         // finalize outputs
+        $outputs = [];
         if(self::$mode!=self::EXECUTING) {
             $outputs = $this->packVariables($this->backend,$outValues);
             if(GradientTape::$autoBackProp) {
@@ -195,7 +170,11 @@ class GraphFunction
         return $outValues;
     }
 
-    protected function build(array $inputs)
+    /**
+     * @param array<VariableInterface> $inputs
+     * @return VariableInterface|array<VariableInterface>
+     */
+    protected function build(array $inputs) : NDArray|array
     {
         $K = $this->backend;
         $creator = $this->alternateCreator ?? $this;
@@ -249,12 +228,13 @@ class GraphFunction
     }
 
     /**
-    *  @param array<NDArray>  $inputs
-    *       inputs
-    *  @return array<NDArray>
-    *       outputs
-    */
-    public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<object,object> $grads
+     * @param array<NDArray> $oidsToCollect
+     * @return array<NDArray>
+     */
+    public function backward(
+        array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
     {
         if(!$this->built) {
             throw new RuntimeException('Not yet built');
@@ -266,7 +246,6 @@ class GraphFunction
             $grads[$oid] = $dOut;
             //echo "set grads(".spl_object_id($oid).") from endOutputs\n";
         }
-        unset($output);
         unset($dOut);
         unset($oset);
         unset($dOutputs);
@@ -274,6 +253,7 @@ class GraphFunction
         $backprop = $this->backprop;
         $this->backwardPipeline($this->backend, $backprop, $grads, $oidsToCollect);
 
+        $dInputs = [];
         foreach($this->startInputOids as $oid) {
             if(!isset($grads[$oid])) {
                 //throw new InvalidArgumentException("Invalid input variables");

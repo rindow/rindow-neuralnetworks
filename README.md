@@ -44,7 +44,7 @@ Required environment
 --------------------
 
 - PHP 8.1, 8.2, 8.3
-- For PHP 7.x environments, use Release 1.x.
+- For PHP 7.x, 8.0 environments, use Release 1.x.
 
 Install
 -------
@@ -61,7 +61,7 @@ Please set up an external library.
 
 Prebuilt binaries:
 - Rindow-matlib: https://github.com/rindow/rindow-matlib/releases
-- OpenBLAS: https://github.com/xianyi/OpenBLAS/releases
+- OpenBLAS: https://github.com/OpenMathLib/OpenBLAS/releases
 
 Please set up according to your environment. Click [here](https://github.com/rindow/rindow-math-matrix-matlibffi) for detailed instructions.
 

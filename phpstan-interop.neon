@@ -1,0 +1,25 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray::setPortableSerializeMode\\(\\)#"
+		-
+			message: "#of function count expects array\\|Countable, Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray given#"
+
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\.*[Device\\|Linear]*Buffer\\:\\:dtype\\(\\)#"
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\.*[Device\\|Linear]*Buffer\\:\\:addr\\(\\)#"
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\.*[Device\\|Linear]*Buffer\\:\\:value_size\\(\\)#"
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\.*[Device\\|Linear]*Buffer\\:\\:dump\\(\\)#"
+#		-
+#			message: "#function count expects array|Countable, Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray given#"
+#		-
+#			message: "#^Argument of an invalid type Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray supplied for foreach, only iterables are supported#"
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\DeviceBuffer\\:\\:bytes\\(\\)#"
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\DeviceBuffer\\:\\:copy\\(\\)#"
+#		-
+#			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\DeviceBuffer\\:\\:read\\(\\)#"

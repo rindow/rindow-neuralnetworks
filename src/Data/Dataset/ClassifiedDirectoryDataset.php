@@ -10,22 +10,34 @@ use Countable;
 use IteratorAggregate;
 use Traversable;
 
-class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
+/**
+ * @template T
+ * @implements Dataset<T>
+ * @implements IteratorAggregate<int,array{NDArray|array<NDArray>,NDArray}>
+ */
+class ClassifiedDirectoryDataset implements IteratorAggregate,Dataset
 {
-    protected $mo;
-    protected $path;
-    protected $pattern;
-    protected $batchSize;
-    protected $crawler;
-    protected $filter;
-    protected $unclassified;
-    protected $shuffle;
-    protected $limit;
-    protected $restrictedByClass;
-    protected $filenames;
-    protected $maxSteps=0;
-    protected $maxDatasetSize=0;
+    protected object $mo;
+    protected string $path;
+    protected ?string $pattern;
+    protected int $batchSize;
+    protected object $crawler;
+    /** @var DatasetFilter<T> */
+    protected ?DatasetFilter $filterGeneric;
+    protected bool $unclassified;
+    protected bool $shuffle;
+    protected ?int $limit;
+    /** @var array<string,int> $restrictedByClass */
+    protected ?array $restrictedByClass=null;
+    /** @var array<string> $filenames */
+    protected ?array $filenames=null;
+    protected int $maxSteps=0;
+    protected int $maxDatasetSize=0;
 
+    /**
+     * @param array<string> $restricted_by_class
+     * @param DatasetFilter<T> $filter
+     */
     public function __construct(
         object $mo,
         string $path,
@@ -41,7 +53,9 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
     {
         $pattern = $pattern ?? null;
         $batch_size = $batch_size ?? 32;
-        $crawler = $crawler ?? null;
+        if($crawler==null) {
+            $crawler = new Dir();
+        }
         $filter = $filter ?? null;
         $unclassified = $unclassified ?? false;
         $shuffle = $shuffle ?? false;
@@ -49,15 +63,11 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
         $restricted_by_class = $restricted_by_class ?? null;
 
         $this->mo = $mo;
-        $this->crawler = $crawler;
         $this->path = $path;
         $this->pattern = $pattern;
         $this->batchSize = $batch_size;
-        if($crawler==null) {
-            $crawler = new Dir();
-        }
         $this->crawler = $crawler;
-        $this->filter = $filter;
+        $this->setFilter($filter);
         $this->unclassified = $unclassified;
         $this->shuffle = $shuffle;
         $this->limit = $limit;
@@ -66,9 +76,14 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
         }
     }
 
-    public function setFilter(DatasetFilter $filter) : void
+    public function filter() : ?DatasetFilter
     {
-        $this->filter = $filter;
+        return $this->filterGeneric;
+    }
+
+    public function setFilter(?DatasetFilter $filter) : void
+    {
+        $this->filterGeneric = $filter;
     }
 
     public function batchSize() : int
@@ -86,7 +101,10 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
         return $this->maxSteps;
     }
 
-    protected function getFilenames()
+    /**
+     * @return array<string>
+     */
+    protected function getFilenames() : array
     {
         if($this->filenames!==null) {
             return $this->filenames;
@@ -124,17 +142,23 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
         return $this->filenames;
     }
 
-    protected function readContents($filename)
+    protected function readContents(string $filename) : mixed
     {
         return file_get_contents($filename);
     }
 
-    protected function makeBatchInputs($inputs)
+    /**
+     * @param iterable<int,NDArray> $inputs
+     */
+    protected function makeBatchInputs(mixed $inputs) : mixed
     {
         return $inputs;
     }
 
-    protected function makeBatchTests($tests)
+    /**
+     * @param iterable<int,string> $tests
+     */
+    protected function makeBatchTests(mixed $tests) : mixed
     {
         return $tests;
     }
@@ -176,8 +200,8 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
                 $inputs = $this->makeBatchInputs($inputs);
                 $tests = $this->makeBatchTests($tests);
                 $inputsets = [$inputs,$tests];
-                if($this->filter) {
-                    $inputsets = $this->filter->translate($inputs,$tests,$paths);
+                if($this->filter()) {
+                    $inputsets = $this->filter()->translate($inputs,$tests,$paths);
                 }
                 $this->maxDatasetSize += $rows;
                 $rows = 0;
@@ -203,8 +227,8 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
             $inputs = $this->makeBatchInputs($inputs);
             $tests = $this->makeBatchTests($tests);
             $inputsets = [$inputs,$tests];
-            if($this->filter) {
-                $inputsets = $this->filter->translate($inputs,$tests,$paths);
+            if($this->filter()) {
+                $inputsets = $this->filter()->translate($inputs,$tests,$paths);
             }
             if($this->unclassified) {
                 $data = $inputsets[0];
@@ -217,12 +241,12 @@ class ClassifiedDirectoryDataset implements Countable,IteratorAggregate,Dataset
         }
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
 
     }
 
-    protected function progressBar($done,$total,$startTime,$maxDot)
+    protected function progressBar(int $done,int $total,int $startTime,int $maxDot) : void
     {
         if($done==0) {
             $this->console("\r{$done}/{$total} ");

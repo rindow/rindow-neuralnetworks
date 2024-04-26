@@ -1,23 +1,31 @@
 <?php
 namespace Rindow\NeuralNetworks\Data\Image;
 
+use RuntimeException;
 use Rindow\NeuralNetworks\Data\Dataset\ClassifiedDirectoryDataset;
 use Interop\Polite\Math\Matrix\NDArray;
 use ArrayObject;
 use function Rindow\Math\Matrix\R;
 
+/**
+ * @extends ClassifiedDirectoryDataset<NDArray>
+ */
 class ImageClassifiedDataset extends ClassifiedDirectoryDataset
 {
-    protected $verbose;
-    protected $classnames = [];
-    protected $height;
-    protected $width;
-    protected $channels;
-    protected $fit;
-    protected $maxClassId;
-    protected $dtype;
-    protected $dtypeClassId;
+    protected ?int $verbose;
+    /** @var array<string,int> $classnames */
+    protected array $classnames = [];
+    protected int $height;
+    protected int $width;
+    protected int $channels;
+    protected bool $fit;
+    protected int $maxClassId;
+    protected int $dtype;
+    protected int $dtypeClassId;
 
+    /**
+     * @param array<string> $classnames
+     */
     public function __construct(
         object $mo,
         string $path,
@@ -29,7 +37,7 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         int $dtype_class_id=null,
         array $classnames=null,
         int $verbose=null,
-        ...$options
+        mixed ...$options
         )
     {
         parent::__construct($mo, $path, ...$options);
@@ -54,7 +62,7 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         $this->verbose = $verbose;
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
         if($this->verbose) {
             if(defined('STDERR')) {
@@ -63,7 +71,7 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         }
     }
 
-    protected function readContents($filename)
+    protected function readContents(string $filename) : mixed
     {
         $ext = strtolower(pathinfo($filename,PATHINFO_EXTENSION));
         switch($ext) {
@@ -85,7 +93,7 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
                 break;
             }
             default: {
-                break;
+                throw new RuntimeException('unknown file-extension :'.$ext);
             }
         }
         $height = $this->height;
@@ -137,7 +145,10 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         return $array;
     }
 
-    protected function makeBatchInputs($inputs)
+    /**
+     * @param iterable<int,NDArray> $inputs
+     */
+    protected function makeBatchInputs(mixed $inputs) : mixed
     {
         $channels = 3;
         $batchSize = count($inputs);
@@ -150,7 +161,10 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         return $batch;
     }
 
-    protected function makeBatchTests($tests)
+    /**
+     * @param iterable<int,string> $tests
+     */
+    protected function makeBatchTests(mixed $tests) : mixed
     {
         $batchSize = count($tests);
         $batch = $this->mo->zeros([$batchSize], $this->dtypeClassId);
@@ -167,12 +181,18 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
         return $batch;
     }
 
-    public function classnames()
+    /**
+     * @return array<string>
+     */
+    public function classnames() : array
     {
         return array_flip($this->classnames);
     }
 
-    public function loadData()
+    /**
+     * @return array{NDArray,NDArray}  {inputsArray,testsArray}
+     */
+    public function loadData() : array
     {
         $la = $this->mo->la();
         $this->console("Generating filename list ...");

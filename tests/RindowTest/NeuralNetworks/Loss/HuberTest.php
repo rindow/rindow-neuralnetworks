@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Loss\Huber;
+use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Plot\Plot;
@@ -19,6 +20,15 @@ class HuberTest extends TestCase
     public function newNeuralNetworks($mo)
     {
         return new NeuralNetworks($mo);
+    }
+
+    protected function accuracy($nn,$loss,$trues,$predicts) : float
+    {
+        $metric = $loss->accuracyMetric();
+        $metricObject = MetricCatalog::factory($nn->backend(),$metric);
+        $metricObject->update($trues,$predicts);
+        $accuracy = $metricObject->result();
+        return $accuracy;
     }
 
     public function verifyGradient($mo, $nn, $K, $g, $function, NDArray $t, NDArray $x,$fromLogits=null)
@@ -127,7 +137,7 @@ class HuberTest extends TestCase
             }
         );
         $loss = $K->scalar($outputsVariable);
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         $this->assertLessThan(1e-5, abs(0.109375-$loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -141,7 +151,7 @@ class HuberTest extends TestCase
                 [-0.093750,-0.062500, 0.031250, 0.000000],
         ]),$dx));
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
@@ -167,7 +177,7 @@ class HuberTest extends TestCase
             }
         );
         $loss = $K->scalar($outputsVariable);
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         $this->assertLessThan(1e-5, abs(0.2734375-$loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -181,7 +191,7 @@ class HuberTest extends TestCase
             [0.0, 0.03125, 0.09375, 0.15625],
         ]),$dx));
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
@@ -207,7 +217,7 @@ class HuberTest extends TestCase
             }
         );
         $loss = $K->scalar($outputsVariable);
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         $this->assertLessThan(1e-5, abs(2.5-$loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -222,7 +232,7 @@ class HuberTest extends TestCase
             [-0.125, -0.125,  0.125,  0.125]
         ]),$dx));
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -249,7 +259,7 @@ class HuberTest extends TestCase
         );
         $loss = $K->scalar($outputsVariable);
         
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         $this->assertLessThan(1e-5, abs(4.5-$loss));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -263,7 +273,7 @@ class HuberTest extends TestCase
             [-0.25, -0.25,  0.25,  0.25]
         ]),$dx));
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());
         $this->assertEquals($copyt->toArray(),$t->toArray());
@@ -317,7 +327,7 @@ class HuberTest extends TestCase
             }
         );
         $loss = $K->ndarray($outputsVariable);
-        #$accuracy = $func->accuracy($t,$x);
+        #$accuracy = $this->accuracy($nn,$func,$t,$x);
         $this->assertTrue($mo->la()->isclose($mo->la()->array(
             [0.109375, 0.109375],
         ),$loss));
@@ -334,7 +344,7 @@ class HuberTest extends TestCase
                 [-0.1875, -0.125 ,  0.0625,  0.0    ],
         ]),$dx));
 
-        $accuracy = $func->accuracy($t,$x);
+        $accuracy = $this->accuracy($nn,$func,$t,$x);
         $accuracy = $K->scalar($accuracy);
         //$this->assertLessThan(0.0001,abs(1-$accuracy));
         $this->assertEquals($copyx->toArray(),$x->toArray());

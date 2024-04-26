@@ -6,7 +6,8 @@ use InvalidArgumentException;
 
 class MetricCatalog
 {
-    protected static $catalog = [
+    /** @var array<string,string> $catalog */
+    protected static array $catalog = [
         'binary_accuracy' => BinaryAccuracy::class,
         'categorical_accuracy' => CategoricalAccuracy::class,
         'mean_norm2_error' => MeanNorm2Error::class,

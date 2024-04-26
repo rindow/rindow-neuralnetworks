@@ -1,19 +1,21 @@
 <?php
 namespace Rindow\NeuralNetworks\Optimizer;
 
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Optimizer\Schedule\LearningRateSchedule;
 use Rindow\NeuralNetworks\Optimizer\Schedule\InverseTimeDecay;
 
 class RMSprop implements Optimizer
 {
-    protected $backend;
-    protected $lr;
-    protected $rho;
-    protected $decay;
-    protected $iter;
-    protected $a;
-    protected $epsilon;
+    protected object $backend;
+    protected float|LearningRateSchedule $lr;
+    protected float $rho;
+    protected float $decay;
+    protected NDArray $iter;
+    /** @var array<NDArray> $a */
+    protected ?array $a=null;
+    protected float $epsilon;
 
     public function __construct(
         object $backend,
@@ -43,6 +45,9 @@ class RMSprop implements Optimizer
         $this->epsilon = $epsilon;
     }
 
+    /**
+     * @return array<NDArray>
+     */
     public function getWeights() : array
     {
         if($this->a === null) {
@@ -52,12 +57,18 @@ class RMSprop implements Optimizer
         return array_merge([$this->iter],$this->a);
     }
 
+    /**
+     * @param array<NDArray> $params
+     */
     public function loadWeights(array $params) : void
     {
         $this->iter = array_shift($params);
         $this->a = $params;
     }
 
+    /**
+     * @return array<string,mixed>
+     */
     public function getConfig() : array
     {
         return [
@@ -70,6 +81,9 @@ class RMSprop implements Optimizer
         ];
     }
 
+    /**
+     * @param array<NDArray|Variable> $params
+     */
     public function build(array $params) : void
     {
         $K = $this->backend;
@@ -77,7 +91,11 @@ class RMSprop implements Optimizer
         $this->iter = $K->zeros([]);
     }
 
-    protected function extractVariable($params)
+    /**
+     * @param array<NDArray|Variable> $params
+     * @return array<NDArray>
+     */
+    protected function extractVariable(array $params)
     {
         $params2 = [];
         foreach($params as $p) {
@@ -89,7 +107,7 @@ class RMSprop implements Optimizer
         return $params2;
     }
 
-    protected function learningRate(float $step) : float
+    protected function learningRate(int $step) : float
     {
         $lr = $this->lr;
         if(is_numeric($lr)) {
@@ -98,6 +116,10 @@ class RMSprop implements Optimizer
         return $lr($step);
     }
 
+    /**
+     * @param array<NDArray|Variable> $params
+     * @param array<NDArray|Variable> $grads
+     */
     public function update(array $params, array $grads) : void
     {
         $K = $this->backend;
@@ -108,7 +130,7 @@ class RMSprop implements Optimizer
 
         $K->update_increment($this->iter,1.0);
         $iter = $this->iter->toArray();
-        $lr = $this->learningRate($iter);
+        $lr = $this->learningRate((int)floor($iter));
         //if($this->decay > 0) {
         //    $lr = $lr * (1 / (1 + $this->decay * $iter));
         //}
@@ -133,7 +155,7 @@ class RMSprop implements Optimizer
             }
             $this->a = $a;
         }
-        if($this->iter!=null) {
+        if(isset($this->iter)) {
             $this->iter = clone $this->iter;
         }
     }

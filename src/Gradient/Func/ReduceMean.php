@@ -7,8 +7,8 @@ use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
 class ReduceMean extends AbstractFunction
 {
-    protected $axis;
-    protected $keepdims;
+    protected ?int $axis;
+    protected ?bool $keepdims;
     
     public function __construct(
         object $backend,
@@ -43,7 +43,7 @@ class ReduceMean extends AbstractFunction
             $n = $x->size();
         } else {
             if($axis<0) {
-                $axis = $ndim+$x->ndim();
+                $axis += $x->ndim();
             }
             $shape = $x->shape();
             $n = $shape[$axis];

@@ -10,9 +10,10 @@ use function Rindow\Math\Matrix\R;
 
 class Cifar10
 {
-    protected $matrixOperator;
-    protected $baseUrl = 'https://www.cs.toronto.edu/~kriz/';
-    protected $downloadFile = 'cifar-10-binary.tar.gz';
+    protected object $matrixOperator;
+    protected string $baseUrl = 'https://www.cs.toronto.edu/~kriz/';
+    protected string $downloadFile = 'cifar-10-binary.tar.gz';
+    /** @var array<string,string> $keyFiles */
     protected $keyFiles = [
         'data_file_1'=>'data_batch_1.bin',
         'data_file_2'=>'data_batch_2.bin',
@@ -21,13 +22,14 @@ class Cifar10
         'data_file_5'=>'data_batch_5.bin',
         'test_file'=>'test_batch.bin',
     ];
-    protected $trainNum = 50000;
-    protected $testNum = 10000;
-    protected $imageShape = [32, 32, 3]; // = 784
-    protected $datasetDir;
-    protected $saveFile;
+    protected int $trainNum = 50000;
+    protected int $testNum = 10000;
+    /** @var array<int> $imageShape */
+    protected array $imageShape = [32, 32, 3]; // = 784
+    protected string $datasetDir;
+    protected string $saveFile;
 
-    public function __construct($mo)
+    public function __construct(object $mo)
     {
         $this->matrixOperator = $mo;
         $this->datasetDir = $this->getDatasetDir();
@@ -36,16 +38,20 @@ class Cifar10
         }
         $this->saveFile = $this->datasetDir . "/cifar10.pkl";
     }
-    protected function getDatasetDir()
+
+    protected function getDatasetDir() : string
     {
         return sys_get_temp_dir().'/rindow/nn/datasets/cifar-10-batches-bin';
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
         fwrite(STDERR,$message);
     }
 
+    /**
+     * @return array{array{NDArray,NDArray},array{NDArray,NDArray}}
+     */
     public function loadData(string $filePath=null)
     {
         $mo = $this->matrixOperator;
@@ -62,7 +68,7 @@ class Cifar10
                 [$dataset['test_images'],  $dataset['test_labels']]];
     }
 
-    public function cleanPickle(string $filePath=null)
+    public function cleanPickle(string $filePath=null) : void
     {
         if($filePath===null) {
             $filePath = $this->saveFile;
@@ -70,7 +76,10 @@ class Cifar10
         unlink($this->saveFile);
     }
 
-    protected function loadPickle($filePath)
+    /**
+     * @return array<string,NDArray>
+     */
+    protected function loadPickle(string $filePath) : array
     {
         $this->console("Loading pickle file ...");
         $data = file_get_contents($filePath);
@@ -82,7 +91,10 @@ class Cifar10
         return $dataset;
     }
 
-    protected function getFiles($filePath)
+    /**
+     * @return array<string,NDArray>
+     */
+    protected function getFiles(string $filePath) : array
     {
         $this->downloadFiles();
         $dataset = $this->convertNDArray();
@@ -94,12 +106,12 @@ class Cifar10
         return $dataset;
     }
 
-    public function downloadFiles()
+    public function downloadFiles() : void
     {
         $this->download($this->downloadFile);
     }
 
-    protected function download($filename)
+    protected function download(string $filename) : void
     {
         $filePath = $this->datasetDir . "/" . $filename;
 
@@ -122,7 +134,10 @@ class Cifar10
         $this->console("Done\n");
     }
 
-    protected function convertNDArray()
+    /**
+     * @return array<string,NDArray>
+     */
+    protected function convertNDArray() : array
     {
         $mo = $this->matrixOperator;
         $filenames = $this->keyFiles;
@@ -142,7 +157,14 @@ class Cifar10
         return $dataset;
     }
 
-    protected function convertDataset($filenames, $image_dataset, $labels_dataset)
+    /**
+     * @param array<string> $filenames
+     */
+    protected function convertDataset(
+        array $filenames,
+        NDArray $image_dataset,
+        NDArray $labels_dataset
+        ) : void
     {
         $shape = $image_dataset->shape();
         $rows = array_shift($shape);
@@ -160,7 +182,11 @@ class Cifar10
         }
     }
 
-    protected function convertImage($filename,$images,$labels) : void
+    protected function convertImage(
+        string $filename,
+        NDArray $images,
+        NDArray $labels
+        ) : void
     {
         $mo = $this->matrixOperator;
         $filePath = $this->datasetDir."/".$filename;
@@ -170,7 +196,7 @@ class Cifar10
         $p = 0;
         $f = fopen($filePath,'rb');
         if($f===false) {
-            new RuntimeException('file not found:'.$filePath);
+            throw new RuntimeException('file not found:'.$filePath);
         }
         $j=0;
         while(true){
@@ -206,7 +232,9 @@ class Cifar10
     }
 
     protected function unpackLabel(
-        $data,$buffer)
+        string $data,
+        NDArray $buffer
+        ) : void
     {
         $values = unpack("C*",$data);
         $i=0;
@@ -215,8 +243,13 @@ class Cifar10
             $i++;
         }
     }
+    
     protected function unpackImage(
-        $reddata,$greendata,$bluedata,$buffer)
+        string $reddata,
+        string $greendata,
+        string $bluedata,
+        NDArray $buffer
+        ) : void
     {
         $red = unpack("C*",$reddata);
         $green = unpack("C*",$greendata);

@@ -5,8 +5,8 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Conv3D extends AbstractConv
 {
-    protected $rank = 3;
-    protected $defaultLayerName = 'conv3d';
+    protected int $rank = 3;
+    protected string $defaultLayerName = 'conv3d';
 
     protected function call(NDArray $inputs, bool $training=null) : NDArray
     {

@@ -8,8 +8,7 @@ use InvalidArgumentException;
 class Dropout extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $rate;
+    protected float $rate;
     //protected $mask;
 
     public function __construct(
@@ -18,7 +17,7 @@ class Dropout extends AbstractLayer
         string $name=null,
         )
     {
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
         $this->rate = min(1.0,max(0.0,$rate));
         $this->initName($name,'dropout');
         $this->callOptions['training'] = true;

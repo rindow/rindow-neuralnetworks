@@ -91,7 +91,7 @@ class ImageClassification extends AbstractModel
 }
 
 echo "device type: ".$nn->deviceType()."\n";
-$model = new ImageClassification($nn->backend(),$nn);
+$model = new ImageClassification($nn);
 echo "creating model ...\n";
 $model->compile(
     loss:$nn->losses()->SparseCategoricalCrossentropy(from_logits:true),

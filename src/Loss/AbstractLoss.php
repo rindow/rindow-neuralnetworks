@@ -3,7 +3,7 @@ namespace Rindow\NeuralNetworks\Loss;
 
 use Interop\Polite\Math\Matrix\NDArray;
 //use Rindow\NeuralNetworks\Activation\Activation;
-use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 use InvalidArgumentException;
@@ -13,16 +13,26 @@ use ArrayAccess;
 abstract class AbstractLoss implements Loss
 {
     use GradientUtils;
-    protected $generation;
-    protected $inputsVariables;
-    protected $outputsVariables;
+
+    //protected int $generation;
+    ///** @var array<Variable> */
+    //protected array $inputsVariables;
+    ///** @return array<Variable> */
+    //protected array $outputsVariables;
 
     abstract protected function call(NDArray $trues, NDArray $predicts) : NDArray;
+
+    /**
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<object,object> $grads
+     * @param array<NDArray> $oidsToCollect
+     * @return array<NDArray>
+     */
     abstract protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array;
 
-    protected $backend;
-    protected $fromLogits = false;
-    protected $reduction = 'sum';
+    protected object $backend;
+    protected bool $fromLogits = false;
+    protected string $reduction = 'sum';
 
     public function __construct(
         object $backend,
@@ -39,12 +49,12 @@ abstract class AbstractLoss implements Loss
         $this->reduction = $reduction;
     }
 
-    public function setFromLogits(bool $fromLogits)
+    public function setFromLogits(bool $fromLogits) : void
     {
         $this->fromLogits = $fromLogits;
     }
 
-    public function fromLogits()
+    public function fromLogits() : bool
     {
         return $this->fromLogits;
     }
@@ -56,31 +66,36 @@ abstract class AbstractLoss implements Loss
     }
 
     /*
+    * temporary disabled but rerise when it is used the RT
     *  dinamic step interfaces
     */
-    /**
-    *  @return int
-    */
-    public function generation() : int
-    {
-        return $this->generation;
-    }
-    /**
-    *  @return array<Variable>
-    */
-    public function inputs()
-    {
-        return $this->inputsVariables;
-    }
+    ///**
+    //*  @return int
+    //*/
+    //public function generation() : int
+    //{
+    //    return $this->generation;
+    //}
+
+    ///**
+    //*  @return array<Variable>
+    //*/
+    //public function inputs() : array
+    //{
+    //    return $this->inputsVariables;
+    //}
+
+    ///**
+    //*  @return array<Variable>
+    //*/
+    //public function outputs() : array
+    //{
+    //    return $this->outputsVariables;
+    //}
 
     /**
-    *  @return array<Variable>
-    */
-    public function outputs()
-    {
-        return $this->outputsVariables;
-    }
-
+     * @return array{NDArray,NDArray}
+     */
     protected function flattenShapes(NDArray $trues, NDArray $predicts) : array
     {
         $origTrueShape = $trues->shape();
@@ -115,7 +130,7 @@ abstract class AbstractLoss implements Loss
         return [$trues,$predicts];
     }
 
-    protected function reshapeLoss($loss) : mixed
+    protected function reshapeLoss(NDArray $loss) : NDArray
     {
         $container = $this->container();
         if($this->reduction=='none') {
@@ -124,7 +139,7 @@ abstract class AbstractLoss implements Loss
         return $loss;
     }
 
-    protected function flattenLoss($loss) : mixed
+    protected function flattenLoss(float|NDArray $loss) : NDArray
     {
         $container = $this->container();
         if($this->reduction=='none') {
@@ -144,6 +159,9 @@ abstract class AbstractLoss implements Loss
         return $predicts;
     }
 
+    /**
+     * @return array{NDArray,NDArray}
+     */
     protected function flattenShapesForSparse(NDArray $trues, NDArray $predicts) : array
     {
         $origTrueShape = $trues->shape();
@@ -154,7 +172,7 @@ abstract class AbstractLoss implements Loss
         $batchSize = array_product($batchShape);
         if($trues->shape()!=$batchShape){
             throw new InvalidArgumentException('trues and predicts must be same batch-shape of dimensions. '.
-                'trues,predicts are ['.implode(',',$origTrueShape).'],['.implode(',',$origPredictsShape->shape()).']');
+                'trues,predicts are ['.implode(',',$origTrueShape).'],['.implode(',',$origPredictsShape).']');
         }
 
         $container = $this->container();
@@ -178,16 +196,14 @@ abstract class AbstractLoss implements Loss
         return $dInputs;
     }
 
-    public function __invoke(...$args)
+    public function __invoke(mixed ...$args) : mixed
     {
         return $this->forward(...$args);
     }
 
     /**
-    *  @param array<Variable>  $inputs
-    *       inputs
-    *  @return array<Variable>
-    *       outputs
+    *  @param Variable  $trues
+    *  @param Variable  $predicts
     */
     public function forward(NDArray $trues, NDArray $predicts) : Variable
     {
@@ -209,8 +225,11 @@ abstract class AbstractLoss implements Loss
 
     /**
      * Call from SessionFunc in compiled graph
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
      */
-    public function _rawCall(array $inputs,array $options)
+    public function _rawCall(array $inputs, array $options) : array
     {
         $K = $this->backend;
         [$trues, $predicts] = $inputs;

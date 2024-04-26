@@ -8,25 +8,17 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class SimpleRNN extends AbstractRNNLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $units;
-    protected $activationName;
-    protected $useBias;
-    protected $kernelInitializerName;
-    protected $recurrentInitializerName;
-    protected $biasInitializerName;
-    protected $returnSequences;
-    protected $returnState;
-    protected $goBackwards;
-    protected $stateful;
-    protected $cell;
-    protected $timesteps;
-    protected $feature;
+    protected bool $useBias;
+    //protected $timesteps;
+    //protected $feature;
 
-    protected $calcStates;
-    protected $initialStates;
-    protected $origInputsShape;
+    //protected $calcStates;
+    //protected $initialStates;
+    //protected $origInputsShape;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $units,
@@ -59,23 +51,26 @@ class SimpleRNN extends AbstractRNNLayer
         //'activity_regularizer'=null,
         //'kernel_constraint'=null, 'bias_constraint'=null,
         
-        $this->backend = $K = $backend;
-        $this->units = $units;
+        parent::__construct($backend);
+        $K = $backend;
+        $this->setUnits($units);
         $this->inputShape = $input_shape;
-        if($use_bias) {
-            $this->useBias = $use_bias;
-        }
+        $this->useBias = $use_bias;
         $this->allocateWeights($this->useBias?3:2);
-        $this->activationName = $activation;
-        $this->kernelInitializerName = $kernel_initializer;
-        $this->recurrentInitializerName = $recurrent_initializer;
-        $this->biasInitializerName = $bias_initializer;
-        $this->returnSequences=$return_sequences;
-        $this->returnState = $return_state;
-        $this->goBackwards = $go_backwards;
-        $this->stateful = $stateful;
+        $this->activationName = $this->toStringName($activation);
+        $this->setKernelInitializerNames(
+            $kernel_initializer,
+            $recurrent_initializer,
+            $bias_initializer,
+        );
+        $this->setFlags(
+            returnSequences:$return_sequences,
+            returnState:$return_state,
+            goBackwards:$go_backwards,
+            stateful:$stateful,
+        );
         $this->initName($name,'simplernn');
-        $this->cell = new SimpleRNNCell(
+        $this->setCell(new SimpleRNNCell(
             $this->backend,
             $this->units,
             activation:$activation,
@@ -83,10 +78,10 @@ class SimpleRNN extends AbstractRNNLayer
             kernel_initializer:$this->kernelInitializerName,
             recurrent_initializer:$this->recurrentInitializerName,
             bias_initializer:$this->biasInitializerName,
-            );
+        ));
     }
 
-    public function build($variables=null, array $sampleWeights=null)
+    public function build(mixed $variables=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -101,12 +96,12 @@ class SimpleRNN extends AbstractRNNLayer
         if(count($inputShape)!=2){
             throw new InvalidArgumentException('Unsuppored input shape.:['.implode(',',$inputShape).']');
         }
-        $this->timesteps = $inputShape[0];
-        $this->feature = $inputShape[1];
-        $this->cell->build([$this->feature], sampleWeights:$sampleWeights);
+        $timesteps = $inputShape[0];
+        $feature = $inputShape[1];
+        $this->cell()->build([$feature], sampleWeights:$sampleWeights);
         $this->statesShapes = [[$this->units]];
         if($this->returnSequences){
-            $this->outputShape = [$this->timesteps,$this->units];
+            $this->outputShape = [$timesteps,$this->units];
         }else{
             $this->outputShape = [$this->units];
         }
@@ -132,10 +127,10 @@ class SimpleRNN extends AbstractRNNLayer
         ];
     }
 
-    protected function numOfOutputStates($options)
-    {
-        if($this->returnState)
-            return 1;
-        return 0;
-    }
+    //protected function numOfOutputStates($options) : int
+    //{
+    //    if($this->returnState)
+    //        return 1;
+    //    return 0;
+    //}
 }

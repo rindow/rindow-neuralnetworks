@@ -8,10 +8,10 @@ use Rindow\NeuralNetworks\Gradient\Core\Scalar;
 
 class Repeat extends AbstractFunction
 {
-    protected $numOfInputs = 2;
+    protected int $numOfInputs = 2;
 
-    protected $axis;
-    protected $keepdims;
+    protected ?int $axis;
+    protected ?bool $keepdims;
     
     public function __construct(
         object $backend,

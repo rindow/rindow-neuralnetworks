@@ -10,34 +10,34 @@ use Rindow\NeuralNetworks\Loss\Huber;
 
 class Losses
 {
-    protected $backend;
+    protected object $backend;
 
     public function __construct(object $backend)
     {
         $this->backend = $backend;
     }
 
-    public function MeanSquaredError(...$options)
+    public function MeanSquaredError(mixed ...$options) : object
     {
         return new MeanSquaredError($this->backend, ...$options);
     }
 
-    public function SparseCategoricalCrossEntropy(...$options)
+    public function SparseCategoricalCrossEntropy(mixed ...$options) : object
     {
         return new SparseCategoricalCrossEntropy($this->backend, ...$options);
     }
 
-    public function CategoricalCrossEntropy(...$options)
+    public function CategoricalCrossEntropy(mixed ...$options) : object
     {
         return new CategoricalCrossEntropy($this->backend, ...$options);
     }
 
-    public function BinaryCrossEntropy(...$options)
+    public function BinaryCrossEntropy(mixed ...$options) : object
     {
         return new BinaryCrossEntropy($this->backend, ...$options);
     }
 
-    public function Huber(...$options)
+    public function Huber(mixed ...$options) : object
     {
         return new Huber($this->backend, ...$options);
     }

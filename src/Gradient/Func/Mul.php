@@ -5,7 +5,7 @@ use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 
 class Mul extends AbstractFunction
 {
-    protected $numOfInputs = 2;
+    protected int $numOfInputs = 2;
 
     protected function call(array $inputs) : array
     {

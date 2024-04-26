@@ -8,8 +8,12 @@ use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
 
 class ArrayShape implements ArrayShapeInterface
 {
+    /** @var array<int> $shape */
     protected $shape;
 
+    /**
+     * @param array<int> $shape
+     */
     public function __construct(array $shape)
     {
         $this->shape = $shape;

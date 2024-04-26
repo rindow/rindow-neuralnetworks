@@ -9,37 +9,24 @@ use function Rindow\Math\Matrix\R;
 class GRUCell extends AbstractRNNCell
 {
     use GenericUtils;
-    protected $backend;
-    protected $units;
-    protected $useBias;
-    protected $kernelInitializer;
-    protected $recurrentInitializer;
-    protected $biasInitializer;
-    protected $kernelInitializerName;
-    protected $recurrentInitializerName;
-    protected $biasInitializerName;
-    protected $resetAfter;
-    protected $activation;
-    protected $recurrentActivation;
+    protected int $units;
+    protected bool $resetAfter;
 
-    protected $kernel;
-    protected $recurrentKernel;
-    protected $r_kernel_z;
-    protected $r_kernel_r;
-    protected $r_kernel_hh;
-    protected $bias;
-    protected $inputBias;
-    protected $recurrentBias;
-    protected $dKernel;
-    protected $dRecurrentKernel;
-    protected $dR_kernel_z;
-    protected $dR_kernel_r;
-    protected $dR_kernel_hh;
-    protected $dBias;
-    protected $dInputBias;
-    protected $dRecurrentBias;
-    protected $inputs;
+    protected NDArray $r_kernel_z;
+    protected NDArray $r_kernel_r;
+    protected NDArray $r_kernel_hh;
+    protected NDArray $inputBias;
+    protected NDArray $recurrentBias;
+    protected NDArray $dR_kernel_z;
+    protected NDArray $dR_kernel_r;
+    protected NDArray $dR_kernel_hh;
+    protected ?NDArray $dInputBias=null;
+    protected ?NDArray $dRecurrentBias=null;
+    //protected $inputs;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         int $units,
@@ -66,24 +53,22 @@ class GRUCell extends AbstractRNNCell
         //'activity_regularizer'=null,
         //'kernel_constraint'=null, 'bias_constraint'=null,
         
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->units = $units;
         $this->inputShape = $input_shape;
-        if($use_bias) {
-            $this->useBias = $use_bias;
-        }
-        $this->activation = $this->createFunction($activation);
-        $this->recurrentActivation = $this->createFunction($recurrent_activation);
-        $this->kernelInitializer = $K->getInitializer($kernel_initializer);
-        $this->recurrentInitializer = $K->getInitializer($recurrent_initializer);
-        $this->biasInitializer   = $K->getInitializer($bias_initializer);
-        $this->kernelInitializerName = $kernel_initializer;
-        $this->recurrentInitializerName = $recurrent_initializer;
-        $this->biasInitializerName = $bias_initializer;
+        $this->useBias = $use_bias;
+        $this->setActivation($activation);
+        $this->setRecurrentActivation($recurrent_activation);
+        $this->setKernelInitializer(
+            $kernel_initializer,
+            $recurrent_initializer,
+            $bias_initializer,
+        );
         $this->resetAfter = $reset_after;
     }
 
-    public function build($inputShape=null, array $sampleWeights=null)
+    public function build(mixed $inputShape=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
@@ -155,7 +140,6 @@ class GRUCell extends AbstractRNNCell
         }
         array_push($shape,$this->units);
         $this->outputShape = $shape;
-        return $this->outputShape;
     }
 
     public function getConfig() : array

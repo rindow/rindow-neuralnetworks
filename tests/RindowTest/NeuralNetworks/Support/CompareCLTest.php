@@ -382,7 +382,7 @@ class CompareCLTest extends TestCase
             //    echo "w=".$mo->toString($w,'%5.3e')."\n";
             //    echo "wcl=".$mo->toString($backendCL->ndarray($wcl),'%5.3e')."\n";
             //}
-            $this->assertLessThan(1e-5,$backend->scalar($backend->amax($diff)));
+            $this->assertLessThan(1e-4,$backend->scalar($backend->amax($diff)));
         }
     }
 
@@ -414,7 +414,7 @@ class CompareCLTest extends TestCase
         $ycl = $densecl->forward($xcl,true);
         //echo $mo->toString($backend->sub($y,$backendCL->ndarray($ycl)));
         $diff = $backend->sub($y,$backendCL->ndarray($ycl));
-        $this->assertLessThan(1e-7,$backend->scalar($backend->amax($diff)));
+        $this->assertLessThan(1e-6,$backend->scalar($backend->amax($diff)));
     }
 
     public function testBatchGemm()

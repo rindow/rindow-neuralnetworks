@@ -2,6 +2,7 @@
 namespace Rindow\NeuralNetworks\Gradient\Func;
 
 use InvalidArgumentException;
+use LogicException;
 use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
 use Rindow\NeuralNetworks\Gradient\Core\AbstractFunction;
 use Rindow\NeuralNetworks\Gradient\Core\Scalar;
@@ -9,7 +10,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Increment extends AbstractFunction
 {
-    protected $numOfInputs = 3;
+    protected int $numOfInputs = 3;
 
     protected function preprocess(array $inputs) : array
     {
@@ -70,6 +71,8 @@ class Increment extends AbstractFunction
             if(!($dBeta instanceof NDArray)) {
                 $dBeta = $K->array($dBeta);
             }
+        } else {
+            throw new LogicException('beta must Scalar or NDArray');
         }
 
         // da = sum(dOut * X)
@@ -83,6 +86,8 @@ class Increment extends AbstractFunction
             if(!($dAlpha instanceof NDArray)) {
                 $dAlpha = $K->array($dAlpha);
             }
+        } else {
+            throw new LogicException('alpha must Scalar or NDArray');
         }
         $alpha = $container->alpha;
 

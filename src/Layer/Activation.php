@@ -8,8 +8,10 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Activation extends AbstractLayer
 {
     use GenericUtils;
-    protected $backend;
 
+    /**
+     * @param array<int> $input_shape
+     */
     public function __construct(
         object $backend,
         string|object $activation,
@@ -21,7 +23,8 @@ class Activation extends AbstractLayer
         $input_shape = $input_shape ?? null;
         $name = $name ?? null;
 
-        $this->backend = $K = $backend;
+        parent::__construct($backend);
+        $K = $backend;
         $this->inputShape = $input_shape;
         $this->initName($name,'activation');
         $this->setActivation($activation);

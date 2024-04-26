@@ -10,23 +10,23 @@ use LogicException;
 
 class NeuralNetworks implements Builder
 {
-    protected $backendClasses = [
+    /** @var array<string,string> $backendClasses */
+    protected array $backendClasses = [
         'rindowblas' => RindowBlasBackend::class,
         'rindowclblast' => RindowCLBlastBackend::class,
     ];
-    protected $backend;
-    protected $matrixOperator;
-    protected $functions;
-    protected $models;
-    protected $layers;
-    protected $losses;
-    protected $metrics;
-    protected $optimizers;
-    protected $networks;
-    protected $datasets;
-    protected $data;
-    protected $utils;
-    protected $gradient;
+    protected object $backend;
+    protected object $matrixOperator;
+    protected ?object $models=null;
+    protected ?object $layers=null;
+    protected ?object $losses=null;
+    protected ?object $metrics=null;
+    protected ?object $optimizers=null;
+    protected ?object $networks=null;
+    protected ?object $datasets=null;
+    protected ?object $data=null;
+    protected ?object $utils=null;
+    protected ?object $gradient=null;
 
     public function __construct(object $matrixOperator=null, object $backend=null)
     {
@@ -51,7 +51,7 @@ class NeuralNetworks implements Builder
         $this->matrixOperator = $matrixOperator;
     }
 
-    public function __get( string $name )
+    public function __get( string $name ) : object
     {
         if(!method_exists($this,$name)) {
             throw new LogicException('Unknown builder: '.$name);
@@ -59,22 +59,22 @@ class NeuralNetworks implements Builder
         return $this->$name();
     }
 
-    public function __set( string $name, $value ) : void
+    public function __set( string $name, mixed $value ) : void
     {
         throw new LogicException('Invalid operation to set');
     }
 
-    public function backend()
+    public function backend() : object
     {
         return $this->backend;
     }
 
-    public function deviceType()
+    public function deviceType() : string
     {
         return $this->backend->deviceType();
     }
 
-    public function models()
+    public function models() : object
     {
         if($this->models==null) {
             $this->models = new Models($this);
@@ -82,7 +82,7 @@ class NeuralNetworks implements Builder
         return $this->models;
     }
 
-    public function layers()
+    public function layers() : object
     {
         if($this->layers==null) {
             $this->layers = new Layers($this->backend);
@@ -90,7 +90,7 @@ class NeuralNetworks implements Builder
         return $this->layers;
     }
 
-    public function losses()
+    public function losses() : object
     {
         if($this->losses==null) {
             $this->losses = new Losses($this->backend);
@@ -98,7 +98,7 @@ class NeuralNetworks implements Builder
         return $this->losses;
     }
 
-    public function metrics()
+    public function metrics() : object
     {
         if($this->metrics==null) {
             $this->metrics = new Metrics($this->backend);
@@ -106,7 +106,7 @@ class NeuralNetworks implements Builder
         return $this->metrics;
     }
 
-    public function optimizers()
+    public function optimizers() : object
     {
         if($this->optimizers==null) {
             $this->optimizers = new Optimizers($this->backend);
@@ -114,7 +114,7 @@ class NeuralNetworks implements Builder
         return $this->optimizers;
     }
 
-    public function datasets()
+    public function datasets() : object
     {
         if($this->datasets==null) {
             $this->datasets = new Datasets($this->matrixOperator);
@@ -122,7 +122,7 @@ class NeuralNetworks implements Builder
         return $this->datasets;
     }
 
-    public function data()
+    public function data() : object
     {
         if($this->data==null) {
             $this->data = new Data($this->matrixOperator);
@@ -130,7 +130,7 @@ class NeuralNetworks implements Builder
         return $this->data;
     }
 
-    public function utils()
+    public function utils() : object
     {
         if($this->utils==null) {
             $this->utils = new Utils($this->matrixOperator);
@@ -138,7 +138,7 @@ class NeuralNetworks implements Builder
         return $this->utils;
     }
 
-    public function gradient()
+    public function gradient() : object
     {
         if($this->gradient==null) {
             $this->gradient = new Gradient($this->backend);
@@ -146,7 +146,7 @@ class NeuralNetworks implements Builder
         return $this->gradient;
     }
 
-    public function with(...$args)
+    public function with(mixed ...$args) : mixed
     {
         return Execute::with(...$args);
     }

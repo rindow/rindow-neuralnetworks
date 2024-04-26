@@ -8,8 +8,7 @@ use ArrayAccess;
 
 class Huber extends AbstractLoss
 {
-    protected $backend;
-    protected $delta;
+    protected float $delta;
 
     public function __construct(
         object $backend,
@@ -97,30 +96,6 @@ class Huber extends AbstractLoss
         $K->update_mul($dInputs,$dLoss,trans:$trans);
         $dInputs = $this->reshapePredicts($dInputs);
         return [$dInputs];
-    }
-
-    public function accuracy(
-        NDArray $trues, NDArray $predicts) : float
-    {
-        $K = $this->backend;
-        [$trues,$predicts] = $this->flattenShapes($trues,$predicts);
-        // calc accuracy
-        $shape=$predicts->shape();
-        if(count($shape)>=2) {
-            if($shape[1]>2147483648) {
-                $dtype = NDArray::int64;
-            } else {
-                $dtype = NDArray::int32;
-            }
-            $predicts = $K->argmax($predicts, axis:1,dtype:$dtype);
-            $trues = $K->argmax($trues, axis:1,dtype:$dtype);
-            $sum = $K->sum($K->equal($trues, $predicts));
-        } else {
-            $sum = $K->nrm2($K->sub($predicts,$trues));
-        }
-        $sum = $K->scalar($sum);
-        $accuracy = $sum/$trues->shape()[0];
-        return $accuracy;
     }
 
     public function accuracyMetric() : string

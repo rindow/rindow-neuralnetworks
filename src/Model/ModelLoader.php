@@ -2,21 +2,26 @@
 namespace Rindow\NeuralNetworks\Model;
 
 use Rindow\NeuralNetworks\Builder\Builder;
+use Rindow\NeuralNetworks\Support\HDA\HDAFactory;
 
 class ModelLoader
 {
-    protected $backend;
-    protected $builder;
-    protected $hda;
+    protected object $backend;
+    protected Builder $builder;
+    protected ?HDAFactory $hdaFactory;
 
-    public function __construct(Builder $builder,$hdaFactory=null)
+    public function __construct(Builder $builder,HDAFactory $hdaFactory=null)
     {
         $this->builder = $builder;
         $this->backend = $builder->backend();
-        $this->hda = $hdaFactory;
+        $this->hdaFactory = $hdaFactory;
     }
 
-    protected function configToArgs($config)
+    /**
+     * @param array<mixed> $config
+     * @return array<mixed>
+     */
+    protected function configToArgs(array $config) : array
     {
         $opts = $config['options'] ?? [];
         unset($config['options']);
@@ -24,10 +29,15 @@ class ModelLoader
         return $args;
     }
 
-    public function modelFromConfig($config)
+    /**
+     * @param array<mixed> $config
+     */
+    public function modelFromConfig(array $config) : Model
     {
         $modelClass = $config['model']['class'];
-        $model = new $modelClass($this->builder,$this->hda);
+        $model = new $modelClass($this->builder,$this->hdaFactory);
+        $class = null;
+        $layer = null;
         foreach($config['layer']['layers'] as $layerName => $layerConfig) {
             $class = $layerConfig['class'];
             if(isset($args['builder'])) {
@@ -44,7 +54,7 @@ class ModelLoader
             $model->add($layer);
         }
         $lossFunctionName = $config['loss']['class'];
-        if($class===$lossFunctionName) {
+        if($class!=null && $layer!=null && $class===$lossFunctionName) {
             $loss = $layer;
         } else {
             //$args = array_values($config['loss']['config']);
@@ -62,9 +72,9 @@ class ModelLoader
         return $model;
     }
 
-    public function loadModel($filepath)
+    public function loadModel(string $filepath) : Model
     {
-        $f = $this->hda->open($filepath,'r');
+        $f = $this->hdaFactory->open($filepath,'r');
         $config = json_decode($f['modelConfig'],true);
         $model = $this->modelFromConfig($config);
         $model->loadWeights($f['modelWeights']);

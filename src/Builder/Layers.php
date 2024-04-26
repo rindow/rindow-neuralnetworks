@@ -2,6 +2,8 @@
 namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
+use Rindow\NeuralNetworks\Activation\Activation as ActivationInterface;
+
 use Rindow\NeuralNetworks\Layer\Activation;
 use Rindow\NeuralNetworks\Layer\Embedding;
 use Rindow\NeuralNetworks\Layer\Dense;
@@ -37,7 +39,7 @@ use Rindow\NeuralNetworks\Layer\Attention;
 
 class Layers
 {
-    protected $backend;
+    protected object $backend;
 
     public function __construct(object $backend)
     {
@@ -45,62 +47,65 @@ class Layers
     }
 
     public function Activation(
-        $activation, ...$options)
+        string|ActivationInterface $activation, mixed ...$options) : object
     {
         return new Activation($this->backend,$activation,...$options);
     }
 
-    public function Dense(int $units, ...$options)
+    public function Dense(int $units, mixed ...$options) : object
     {
         return new Dense($this->backend, $units, ...$options);
     }
 
     public function Input(
-        ...$options)
+        mixed ...$options) : object
     {
         return new Input($this->backend, ...$options);
     }
 
     public function Flatten(
-        ...$options)
+        mixed ...$options) : object
     {
         return new Flatten($this->backend, ...$options);
     }
 
     public function ExpandDims(
         int $axis,
-        ...$options)
+        mixed ...$options) : object
     {
         return new ExpandDims($this->backend, $axis, ...$options);
     }
 
     public function RepeatVector(
         int $repeats,
-        ...$options)
+        mixed ...$options) : object
     {
         return new RepeatVector($this->backend, $repeats, ...$options);
     }
 
     public function Concatenate(
-        ...$options)
+        mixed ...$options) : object
     {
         return new Concatenate($this->backend, ...$options);
     }
 
     public function Max(
-        ...$options)
+        mixed ...$options) : object
     {
         return new Max($this->backend, ...$options);
     }
 
     public function Gather(
-        ...$options)
+        mixed ...$options) : object
     {
         return new Gather($this->backend, ...$options);
     }
 
+    /**
+     * @param int|array<int> $kernel_size
+     */
     public function Conv1D(
-        int $filters, int|array $kernel_size, ...$options)
+        int $filters, int|array $kernel_size, mixed ...$options) : object
     {
         return new Conv1D(
             $this->backend,
@@ -109,8 +114,11 @@ class Layers
             ...$options);
     }
 
+    /**
+     * @param int|array<int> $kernel_size
+     */
     public function Conv2D(
-        int $filters, int|array $kernel_size, ...$options)
+        int $filters, int|array $kernel_size, mixed ...$options) : object
     {
         return new Conv2D(
             $this->backend,
@@ -119,8 +127,11 @@ class Layers
             ...$options);
     }
 
+    /**
+     * @param int|array<int> $kernel_size
+     */
     public function Conv3D(
-        int $filters, int|array $kernel_size, ...$options)
+        int $filters, int|array $kernel_size, mixed ...$options) : object
     {
         return new Conv3D(
             $this->backend,
@@ -130,7 +141,7 @@ class Layers
     }
 
     public function MaxPooling1D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new MaxPooling1D(
             $this->backend,
@@ -138,7 +149,7 @@ class Layers
     }
 
     public function MaxPooling2D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new MaxPooling2D(
             $this->backend,
@@ -146,7 +157,7 @@ class Layers
     }
 
     public function MaxPooling3D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new MaxPooling3D(
             $this->backend,
@@ -154,7 +165,7 @@ class Layers
     }
 
     public function AveragePooling1D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new AveragePooling1D(
             $this->backend,
@@ -162,7 +173,7 @@ class Layers
     }
 
     public function AveragePooling2D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new AveragePooling2D(
             $this->backend,
@@ -170,7 +181,7 @@ class Layers
     }
 
     public function AveragePooling3D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new AveragePooling3D(
             $this->backend,
@@ -178,7 +189,7 @@ class Layers
     }
 
     public function GlobalMaxPooling1D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new GlobalMaxPooling1D(
             $this->backend,
@@ -186,7 +197,7 @@ class Layers
     }
 
     public function GlobalMaxPooling2D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new GlobalMaxPooling2D(
             $this->backend,
@@ -194,7 +205,7 @@ class Layers
     }
 
     public function GlobalMaxPooling3D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new GlobalMaxPooling3D(
             $this->backend,
@@ -202,7 +213,7 @@ class Layers
     }
 
     public function GlobalAveragePooling1D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new GlobalAveragePooling1D(
             $this->backend,
@@ -210,7 +221,7 @@ class Layers
     }
 
     public function GlobalAveragePooling2D(
-        ...$options)
+        mixed  ...$options) : object
     {
         return new GlobalAveragePooling2D(
             $this->backend,
@@ -218,7 +229,7 @@ class Layers
     }
 
     public function GlobalAveragePooling3D(
-        ...$options)
+        mixed ...$options) : object
     {
         return new GlobalAveragePooling3D(
             $this->backend,
@@ -226,42 +237,42 @@ class Layers
     }
 
     public function Dropout(
-        float $rate, ...$options)
+        float $rate, mixed ...$options) : object
     {
         return new Dropout($this->backend,$rate,...$options);
     }
 
-    public function BatchNormalization(...$options)
+    public function BatchNormalization(mixed ...$options) : object
     {
         return new BatchNormalization($this->backend,...$options);
     }
 
-    public function LayerNormalization(...$options)
+    public function LayerNormalization(mixed ...$options) : object
     {
         return new LayerNormalization($this->backend,...$options);
     }
 
-    public function Embedding(int $inputDim,int $outputDim, ...$options)
+    public function Embedding(int $inputDim,int $outputDim, mixed ...$options) : object
     {
         return new Embedding($this->backend, $inputDim, $outputDim, ...$options);
     }
 
-    public function SimpleRNN(int $units, ...$options)
+    public function SimpleRNN(int $units, mixed ...$options) : object
     {
         return new SimpleRNN($this->backend, $units, ...$options);
     }
 
-    public function LSTM(int $units, ...$options)
+    public function LSTM(int $units, mixed ...$options) : object
     {
         return new LSTM($this->backend, $units, ...$options);
     }
 
-    public function GRU(int $units, ...$options)
+    public function GRU(int $units, mixed ...$options) : object
     {
         return new GRU($this->backend, $units, ...$options);
     }
 
-    public function Attention(...$options)
+    public function Attention(mixed ...$options) : object
     {
         return new Attention($this->backend, ...$options);
     }

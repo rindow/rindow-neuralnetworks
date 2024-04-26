@@ -8,10 +8,14 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Concatenate extends AbstractMultiInputLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $axis;
+
+    protected int $axis;
+    /** @var array<int|array<int>> $shapes */
     protected $shapes;
 
+    /**
+     * @param array<array<int>> $input_shapes
+     */
     public function __construct(
         object $backend,
         int $axis=null,
@@ -24,7 +28,7 @@ class Concatenate extends AbstractMultiInputLayer
         $input_shapes = $input_shapes ?? null;
         $name = $name ?? null;
 
-        $this->backend = $backend;
+        parent::__construct($backend);
         if(!is_int($axis)) {
             throw new InvalidArgumentException('axis must be integer.');
         }
@@ -33,15 +37,15 @@ class Concatenate extends AbstractMultiInputLayer
         $this->initName($name,'concatenate');
     }
 
-    public function build($variables=null, array $sampleWeights=null)
+    public function build(mixed $variables=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         if(!is_array($variables) && $variables!==null) {
             throw new InvalidArgumentException('inputs must be list of variable');
         }
-        $inputShapes = $this->normalizeInputShape($variables);
+        $inputShapes = $this->normalizeInputShapes($variables);
         if(count($inputShapes)<2) {
-            throw new InvalidArgumentException('num of inputs must be greater then 2 or equal: input dims is '.count($inputShape));
+            throw new InvalidArgumentException('num of inputs must be greater then 2 or equal: input dims is '.count($inputShapes));
         }
         $m = 0;
         $baseShape = null;
@@ -118,6 +122,7 @@ class Concatenate extends AbstractMultiInputLayer
         } else {
             $axis = $this->axis;
         }
+        $sizeSplits = [];
         foreach ($container->shapes as $shape) {
             $sizeSplits[] = $shape[$axis];
         }

@@ -10,44 +10,73 @@ abstract class AbstractNormalization extends AbstractLayer
     use GenericUtils;
 
     abstract protected function call(NDArray $inputs, bool $training=null) : NDArray;
+
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
+
+    /**
+     * @param array<int> $kernelShape
+     */
     abstract protected function buildNoTrainingMode(array $kernelShape) : void;
 
-    protected $trainingAware = true;
+    //protected $trainingAware = true;
 
-    protected $backend;
-    protected $axis;
-    protected $momentum;
-    protected $epsilon;
-    protected $center;
-    protected $scale;
-    protected $betaInitializerName;
-    protected $gammaInitializerName;
-    protected $movingMeanInitializerName;
-    protected $movingVarianceInitializerName;
-    protected $betaInitializer;
-    protected $gammaInitializer;
-    protected $movingMeanInitializer;
-    protected $movingVarianceInitializer;
+    protected int $axis;
+    protected float $epsilon;
+    protected bool $center;
+    protected bool $scale;
+    protected string $betaInitializerName;
+    protected string $gammaInitializerName;
+    protected mixed $betaInitializer;
+    protected mixed $gammaInitializer;
 
-    protected $calcAxis;
-    protected $beta;
-    protected $gamma;
-    protected $dBeta;
-    protected $dGamma;
-    protected $movingMean;
-    protected $movingVariance;
+    //protected $calcAxis;
+    protected ?NDArray $beta=null;
+    protected ?NDArray $gamma=null;
+    protected ?NDArray $dBeta=null;
+    protected ?NDArray $dGamma=null;
+
     //protected $xc;
     //protected $xn;
     //protected $std;
-    protected $orignalShape1;
-    protected $orignalShape2;
-    protected $transformShapePhase1Pre;
-    protected $transformShapePhase1Post;
-    protected $transformShapePhase2Pre;
-    protected $transformShapePhase2Post;
+    /** @var array<int> $orignalShape1 */
+    protected array $orignalShape1;
+    /** @var array<int> $orignalShape2 */
+    protected array $orignalShape2;
+    protected int $transformShapePhase1Pre=0;
+    protected int $transformShapePhase1Post=0;
+    protected int $transformShapePhase2Pre=0;
+    protected int $transformShapePhase2Post=0;
 
-    public function build($variable=null, array $sampleWeights=null)
+    public function __construct(
+        object $backend,
+        int $axis=null,
+        float $epsilon=null,
+        bool $center=null,
+        bool $scale=null,
+        string|callable $beta_initializer=null,
+        string|callable $gamma_initializer=null,
+        )
+    {
+        parent::__construct($backend);
+        $axis = $axis ?? -1;
+        $epsilon = $epsilon ?? 0.001;
+        $center = $center ?? true;
+        $scale = $scale ?? true;
+        $beta_initializer = $beta_initializer ?? 'zeros';
+        $gamma_initializer = $gamma_initializer ?? 'ones';
+
+        $K = $this->backend;
+        $this->axis = $axis;
+        $this->epsilon = $epsilon;
+        $this->center = $center;
+        $this->scale = $scale;
+        $this->betaInitializerName  = $this->toStringName($beta_initializer);
+        $this->gammaInitializerName = $this->toStringName($gamma_initializer);
+        $this->betaInitializer  = $K->getInitializer($beta_initializer);
+        $this->gammaInitializer = $K->getInitializer($gamma_initializer);
+    }
+
+    public function build(mixed $variable=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $betaInitializer = $this->betaInitializer;
@@ -93,7 +122,7 @@ abstract class AbstractNormalization extends AbstractLayer
             $this->dGamma = $K->zerosLike($this->gamma);
         }
 
-        $this->calcAxis = $axis;
+        //$this->calcAxis = $axis;
         if($ndim>$axis) {
             $nnn = array_slice($inputShape,0,$axis);
             $this->transformShapePhase1Pre = (int)array_product($nnn);
@@ -108,7 +137,7 @@ abstract class AbstractNormalization extends AbstractLayer
         $this->syncWeightVariables();
     }
 
-    protected function transformShape($inputs)
+    protected function transformShape(NDArray $inputs) : NDArray
     {
         $K = $this->backend;
         $batches = $inputs->shape()[0];
@@ -130,7 +159,7 @@ abstract class AbstractNormalization extends AbstractLayer
         return $inputs;
     }
 
-    protected function untransformShape($inputs)
+    protected function untransformShape(NDArray $inputs) : NDArray
     {
         $K = $this->backend;
         if($this->transformShapePhase2Pre) {

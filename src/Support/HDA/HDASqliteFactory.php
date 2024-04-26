@@ -1,9 +1,9 @@
 <?php
 namespace Rindow\NeuralNetworks\Support\HDA;
 
-class HDASqliteFactory
+class HDASqliteFactory implements HDAFactory
 {
-    public function open(string $filename, string $mode=null)
+    public function open(string|object $filename, string $mode=null) : HDASqlite
     {
         return new HDASqlite($filename, $mode);
     }

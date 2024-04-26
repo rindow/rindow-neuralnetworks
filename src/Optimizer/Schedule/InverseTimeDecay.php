@@ -10,7 +10,7 @@ class  InverseTimeDecay implements LearningRateSchedule
 
     public function __construct(
         float $initialLearningRate,
-        float $decaySteps,
+        int $decaySteps,
         float $decayRate,
         bool $staircase=null,
         )
@@ -23,7 +23,7 @@ class  InverseTimeDecay implements LearningRateSchedule
         $this->staircase = $staircase;
     }
 
-    public function __invoke(mixed $step) : float
+    public function __invoke(int $step) : float
     {
         $progress = ($step / $this->decaySteps);
         if($this->staircase) {

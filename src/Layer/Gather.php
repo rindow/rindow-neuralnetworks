@@ -8,11 +8,13 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 class Gather extends AbstractMultiInputLayer
 {
     use GenericUtils;
-    protected $backend;
-    protected $axis;
-    protected $realAxis;
-    protected $reduceNumClass;
+    protected int $axis;
+    protected int $realAxis;
+    protected int $reduceNumClass;
 
+    /**
+     * @param array<array<int>> $input_shapes
+     */
     public function __construct(
         object $backend,
         int $axis=null,
@@ -25,17 +27,17 @@ class Gather extends AbstractMultiInputLayer
         $input_shapes = $input_shapes ?? null;
         $name = $name ?? null;
         
-        $this->backend = $backend;
+        parent::__construct($backend);
         $this->axis = $axis;
         $this->inputShape = $input_shapes;
         $this->initName($name,'gather');
     }
 
-    public function build($variables=null, array $sampleWeights=null)
+    public function build(mixed $variables=null, array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
-        $inputShapes = $this->normalizeInputShape($variables);
+        $inputShapes = $this->normalizeInputShapes($variables);
         if(count($inputShapes)!=2) {
             throw new InvalidArgumentException('num of inputs must be 2: inputs is '.count($inputShapes));
         }
@@ -46,9 +48,9 @@ class Gather extends AbstractMultiInputLayer
             }
         }
         [$sourceShape,$indexShape] = $inputShapes;
-        if($this->axis===null) {
-            throw new InvalidArgumentException('Null axis is not supported.');
-        }
+        //if($this->axis===null) {
+        //    throw new InvalidArgumentException('Null axis is not supported.');
+        //}
         $axis = $this->axis;
         if($axis < 0) {
             $axis = count($sourceShape) + $axis;

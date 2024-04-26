@@ -9,52 +9,54 @@ use ArrayAccess;
 use Rindow\NeuralNetworks\Builder\Builder;
 use Rindow\NeuralNetworks\Optimizer\Optimizer;
 use Rindow\NeuralNetworks\Layer\Layer;
-use Rindow\NeuralNetworks\Activation\Softmax;
-use Rindow\NeuralNetworks\Activation\Sigmoid;
 use Rindow\NeuralNetworks\Loss\Loss;
 use Rindow\NeuralNetworks\Loss\SparseCategoricalCrossEntropy;
-use Rindow\NeuralNetworks\Loss\CategoricalCrossEntropy;
-use Rindow\NeuralNetworks\Loss\BinaryCrossEntropy;
 use Rindow\NeuralNetworks\Metric\Metric;
 use Rindow\NeuralNetworks\Metric\MetricCatalog;
 use Rindow\NeuralNetworks\Callback\CallbackList;
+use Rindow\NeuralNetworks\Callback\Callback;
+use Rindow\NeuralNetworks\Callback\Broadcaster;
 use Rindow\NeuralNetworks\Data\Dataset\Dataset;
 use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Gradient\Module;
+use Rindow\NeuralNetworks\Gradient\GraphFunction;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
+use Rindow\NeuralNetworks\Support\HDA\HDAFactory;
 use Interop\Polite\Math\Matrix\NDArray;
 
 abstract class AbstractModel implements Model
 {
-    protected $backend;
-    protected $builder;
-    protected $hda;
-    protected $name;
-    protected $optimizer;
-    protected $metrics = [];
-    protected $lossFunction;
-    protected $accuracyFunction;
-    protected $built = false;
-    protected $shapeInspection=true;
-    protected $backupShapeInspection;
-    protected $inputsVariables;
-    protected $outputsVariables;
-    protected $weightVariables = [];
-    protected $trainableVariables;
-    protected $generation;
-    protected $graph = [];
-    protected $weights;
-    protected $callOptions;
+    protected object $backend;
+    protected object $builder;
+    protected HDAFactory $hdaFactory;
+    protected ?string $name;
+    protected ?Optimizer $optimizer;
+    /** @var array<Metric> */
+    protected array $metrics = [];
+    protected ?Loss $lossFunction;
+    protected bool $built = false;
+    protected bool $shapeInspection = true;
+    protected bool $backupShapeInspection;
+    //protected $inputsVariables;
+    //protected $outputsVariables;
+    //protected $weightVariables = [];
+    //protected $trainableVariables;
+    //protected int $generation;
+    //protected $weights;
+    /** @var array<string,mixed> */
+    protected array $graph = [];
+    /** @var array<string,bool> $callOptions */
+    protected ?array $callOptions;
 
-    public function __construct(Builder $builder,$hda=null)
+    public function __construct(Builder $builder, HDAFactory $hdaFactory=null)
     {
         $this->builder = $builder;
         $this->backend = $builder->backend();
-        if($hda===null) {
-            $this->hda = $builder->utils()->HDA();
+        if($hdaFactory===null) {
+            $this->hdaFactory = $builder->utils()->HDA();
         } else {
-            $this->hda = $hda;
+            $this->hdaFactory = $hdaFactory;
         }
         $refClass = new ReflectionClass($this);
         $refParams = $refClass->getMethod('call')->getParameters();
@@ -64,34 +66,34 @@ abstract class AbstractModel implements Model
         }
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
         if(defined('STDERR')) {
             fwrite(STDERR,$message);
         }
     }
 
-    protected function display($message)
+    protected function display(string $message) : void
     {
         echo $message;
     }
 
-    public function setName($name)
+    public function setName(string $name) : void
     {
         $this->name = $name;
     }
 
-    public function name()
+    public function name() : ?string
     {
         return $this->name;
     }
 
-    public function backend()
+    public function backend() : object
     {
         return $this->backend;
     }
 
-    public function lossFunction()
+    public function lossFunction() : ?Loss
     {
         return $this->lossFunction;
     }
@@ -101,12 +103,12 @@ abstract class AbstractModel implements Model
     //     return $this->accuracyFunction;
     // }
 
-    public function optimizer()
+    public function optimizer() : ?Optimizer
     {
         return $this->optimizer;
     }
 
-    protected function basename($object) : string
+    protected function basename(object $object) : string
     {
         $classname = get_class($object);
         return substr($classname,strrpos($classname,'\\')+1);
@@ -117,10 +119,10 @@ abstract class AbstractModel implements Model
         return isset($this->callOptions[$name]);
     }
 
-    protected function setAwareOf(string $name) : bool
-    {
-        $this->callOptions[$name] = true;
-    }
+    //protected function setAwareOf(string $name) : bool
+    //{
+    //    $this->callOptions[$name] = true;
+    //}
 
     protected function resolveOptimizer(mixed $optimizer) : mixed
     {
@@ -172,10 +174,14 @@ abstract class AbstractModel implements Model
         return $loss;
     }
 
+    /**
+     * @param array<int|string,mixed> $metrics
+     * @return array<string,Metric>
+     */
     protected function resolveMetricFunctions(?array $metrics) : array
     {
-        if(empty($metric)) {
-            $metric = [];
+        if(empty($metrics)) {
+            $metrics = [];
         }
         $newMetrics = [];
         foreach($metrics as $idx => $metric) {
@@ -185,7 +191,7 @@ abstract class AbstractModel implements Model
                     $metricObject = $this->builder->metrics()->ScalarMetric(name:'loss');
                 } else {
                     if($metric=='accuracy') {
-                        $metric = $this->lossFunction->accuracyMetric($metric); // string name
+                        $metric = $this->lossFunction->accuracyMetric(); // string name
                     }
                     $metricObject = MetricCatalog::factory($this->backend,$metric);
                 }
@@ -226,16 +232,16 @@ abstract class AbstractModel implements Model
         $this->optimizer = $this->resolveOptimizer($optimizer);
 
         $this->lossFunction = $this->resolveLossFunction($loss);
-        if($this->lossFunction instanceof Loss) {
-            $this->accuracyFunction = [$this->lossFunction,'accuracy'];
-        }
+        //if($this->lossFunction instanceof Loss) {
+        //    $this->accuracyFunction = [$this->lossFunction,'accuracy'];
+        //}
         // resolve metrics
         $metrics = $this->resolveMetricFunctions($metrics);
         $this->metrics = $metrics;
     }
 
     public function fit(
-        $inputs,
+        mixed $inputs,
         NDArray $tests=null,
         int $batch_size=null,
         int $epochs=null,
@@ -334,6 +340,7 @@ abstract class AbstractModel implements Model
         $totalSteps = count($dataset);
         $this->backupShapeInspection = $this->shapeInspection;
         $callbacks->onTrainBegin();
+        $history = [];
         for($epoch=0;$epoch<$epochs;$epoch++) {
             $callbacks->onEpochBegin($epoch);
             $startTime = time();
@@ -379,8 +386,12 @@ abstract class AbstractModel implements Model
         return $history;
     }
 
+    /**
+     * @param iterable<int,array{NDArray|array<NDArray>,NDArray}>|Dataset $dataset 
+     */
     protected function trainProcess(
-        $dataset,$epoch,$epochs,$startTime,$totalSteps,$verbose,$callbacks) : void
+        iterable|Dataset $dataset,int $epoch, int $epochs,
+        int $startTime, int $totalSteps, int $verbose, Broadcaster $callbacks) : void
     {
         $K = $this->backend;
         if($verbose>=1) {
@@ -433,7 +444,8 @@ abstract class AbstractModel implements Model
         }
     }
 
-    protected function progressBar($epoch,$epochs,$startTime,$batchIndex,$batchIndexCount,$maxDot)
+    protected function progressBar(
+        int $epoch,int $epochs,int $startTime,int $batchIndex,int $batchIndexCount,int $maxDot) : void
     {
         $epoch++;
         if($batchIndex==0) {
@@ -475,11 +487,11 @@ abstract class AbstractModel implements Model
     //}
 
     public function evaluate(
-        $inputs,
+        mixed $inputs,
         NDArray $trues=null,
         int $batch_size=null,
         int $verbose=null,
-        object|array $callbacks=null,
+        array|object $callbacks=null,
     ) : array
     {
         // defaults
@@ -552,9 +564,9 @@ abstract class AbstractModel implements Model
     }
 
     public function predict(
-        $inputs,
-        array|object $callbacks=null,
-        ...$options
+        mixed $inputs,
+        array|Broadcaster $callbacks=null,
+        mixed ...$options
     ) : NDArray
     {
         //if(!$this->built) {
@@ -562,7 +574,7 @@ abstract class AbstractModel implements Model
         //}
         $callbacks = $callbacks ?? null;
 
-        if(!($callbacks instanceof CallbackList)) {
+        if(!($callbacks instanceof Broadcaster)) {
             $callbacks = new CallbackList($this,$callbacks);
         }
         if(!is_array($inputs)) {
@@ -582,30 +594,31 @@ abstract class AbstractModel implements Model
         return $outputs;
     }
 
-    /**
-    *  @return int
-    */
-    public function generation() : int
-    {
-        return $this->generation;
-    }
-    /**
-    *  @return array<Variable>
-    */
-    public function inputs()
-    {
-        return $this->inputsVariables;
-    }
+    ///**
+    //*  @return int
+    //*/
+    //public function generation() : int
+    //{
+    //    return $this->generation;
+    //}
 
-    /**
-    *  @return array<Variable>
-    */
-    public function outputs()
-    {
-        return $this->outputsVariables;
-    }
+    ///**
+    //*  @return array<Variable>
+    //*/
+    //public function inputs()
+    //{
+    //    return $this->inputsVariables;
+    //}
+//
+    ///**
+    //*  @return array<Variable>
+    //*/
+    //public function outputs()
+    //{
+    //    return $this->outputsVariables;
+    //}
 
-    protected function getModelGraph()
+    protected function getModelGraph() : GraphFunction
     {
         if(isset($this->graph['model'])) {
             return $this->graph['model'];
@@ -630,7 +643,7 @@ abstract class AbstractModel implements Model
         return $this->shapeInspection;
     }
 
-    public function setShapeInspection(bool $enable)
+    public function setShapeInspection(bool $enable) : void
     {
         if($this->shapeInspection==$enable)
             return;
@@ -709,12 +722,20 @@ abstract class AbstractModel implements Model
     {
     }
 
-    public function __invoke(...$inputs)
+    /**
+     * @param mixed ...$inputs
+     * @return mixed
+     */
+    public function __invoke(mixed ...$inputs)
     {
         $outputs = $this->forward(...$inputs);
         return $outputs;
     }
 
+    /**
+     * @param mixed ...$inputs
+     * @return mixed
+     */
     public function forward(...$inputs)
     {
         $outputs = $this->call(...$inputs);
@@ -722,17 +743,33 @@ abstract class AbstractModel implements Model
         return $outputs;
     }
 
-    public function _rawCall($inputs)
-    {
-        return $this->graph['model']->_rawCall($inputs);
-    }
+    ///**
+    // * @param array<NDArray> $inputs
+    // * @param array<string,mixed> $options
+    // * @return array<NDArray>
+    // */
+    //public function _rawCall(array $inputs, array $options) : array
+    //{
+    //    return $this->graph['model']->_rawCall($inputs,$options);
+    //}
 
-    public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    /**
+     * @param array<NDArray> $dOutputs
+     * @param ArrayAccess<mixed,mixed> $grads
+     * @param array<object> $oidsToCollect
+     * @return array<NDArray>
+     */
+    public function backward(
+        array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
     {
         return $this->graph['model']->backward($dOutputs, $grads, $oidsToCollect);
     }
 
-    protected function trainStep($batchIndex, $inputs, $trues ,$callbacks) : void
+    /**
+     * @param NDArray|array<NDArray> $inputs
+     */
+    protected function trainStep(
+        int $batchIndex, NDArray|array $inputs, NDArray $trues, Broadcaster $callbacks) : void
     {
         $K = $this->backend;
         $nn = $this->builder;
@@ -754,7 +791,7 @@ abstract class AbstractModel implements Model
         $model = $this->getModelGraph();
         $lossfunc = $this->lossFunction;
         [$loss,$preds] = $nn->with($tape=$g->GradientTape(),
-            function() use ($K,$model,$lossfunc,$inputs,$trues) {
+            function() use ($model,$lossfunc,$inputs,$trues) {
                 $predicts = $model(...$inputs);
                 return [$lossfunc($trues,$predicts),$predicts];
             }
@@ -777,7 +814,11 @@ abstract class AbstractModel implements Model
         $callbacks->onTrainBatchEnd($batchIndex,$this->metrics);
     }
 
-    protected function evaluateStep($batchIndex,$inputs,$trues,$callbacks) : void
+    /**
+     * @param NDArray|array<NDArray> $inputs
+     */
+    protected function evaluateStep(
+        int $batchIndex,NDArray|array $inputs,NDArray $trues, Broadcaster $callbacks) : void
     {
         $nn = $this->builder;
         $callbacks->onTestBatchBegin($batchIndex);
@@ -811,7 +852,11 @@ abstract class AbstractModel implements Model
         $callbacks->onTestBatchEnd($batchIndex,$this->metrics);
     }
 
-    protected function predictStep($inputs,$options)
+    /**
+     * @param array<NDArray>|NDArray $inputs
+     * @param array<mixed,mixed> $options
+     */
+    protected function predictStep(array|NDArray $inputs,array $options) : NDArray
     {
         $nn = $this->builder;
         $g = $nn->gradient();
@@ -830,7 +875,7 @@ abstract class AbstractModel implements Model
         return $predicts->value();
     }
 
-    public function build(...$inputShapes) : void
+    public function build(array|NDArray|Variable ...$inputShapes) : void
     {
         if($this->built) {
             return;
@@ -851,7 +896,7 @@ abstract class AbstractModel implements Model
         $this->forward(...$inputs);
     }
 
-    public function summary()
+    public function summary() : void
     {
         if(!$this->built) {
             throw new LogicException('You need to build the model before you can see the summary.');
@@ -865,21 +910,23 @@ abstract class AbstractModel implements Model
         $totalParams = 0;
         foreach ($this->layers() as $layer) {
             $type = $this->basename($layer);
-            $layerName = $layer->getName().'('.$type.')';
+            $layerName = $layer->name().'('.$type.')';
             $this->display(substr(str_pad($layerName,29),0,29));
             if(!$layer->isBuilt()) {
                 throw new LogicException('the layer is not built: '.$layerName);
             }
             $outputShape = $layer->outputShape();
-            if(count($outputShape)>0 && is_array($outputShape[0])) {
-                $outputShape = $outputShape[0];
-            }
+            //if(count($outputShape)>0 && is_array($outputShape[0])) {
+            //    // temporary debug 
+            //    throw new LogicException('outputShape must not be outputShapes');
+            //    //$outputShape = $outputShape[0];
+            //}
             $this->display(str_pad('('.implode(',',$outputShape).')',27));
             $nump = 0;
             foreach($layer->getParams() as $p) {
                 $nump += $p->size();
             }
-            $this->display(str_pad($nump,10));
+            $this->display(str_pad(strval($nump),10));
             $this->display("\n");
             $totalParams += $nump;
         }
@@ -900,7 +947,7 @@ abstract class AbstractModel implements Model
                 $this->display(str_pad($name,29));
                 $this->display(str_pad('('.implode(',',$param->shape()).')',27));
                 $nump = $param->size();
-                $this->display(str_pad($nump,10));
+                $this->display(str_pad(strval($nump),10));
                 $this->display("\n");
                 $totalParams += $nump;
             }
@@ -909,7 +956,7 @@ abstract class AbstractModel implements Model
         $this->display('Total params: '.$totalParams."\n");
     }
 
-    public function saveWeights(&$modelWeights,$portable=null) : void
+    public function saveWeights(iterable &$modelWeights,bool $portable=null) : void
     {
         $K = $this->backend;
         $mo = $K->localMatrixOperator();
@@ -932,7 +979,7 @@ abstract class AbstractModel implements Model
         }
     }
     
-    public function loadWeights($modelWeights) : void
+    public function loadWeights(iterable $modelWeights) : void
     {
         $K = $this->backend;
         $mo = $K->localMatrixOperator();
@@ -961,7 +1008,7 @@ abstract class AbstractModel implements Model
         $optimizer->loadWeights($params);
     }
 
-    protected function converPortableSaveMode($ndarray) : NDArray
+    protected function converPortableSaveMode(NDArray $ndarray) : NDArray
     {
         if($ndarray instanceof \Rindow\Math\Matrix\NDArrayPhp) {
             $ndarray = $ndarray->reshape($ndarray->shape());
@@ -970,16 +1017,16 @@ abstract class AbstractModel implements Model
         return $ndarray;
     }
 
-    public function saveWeightsToFile($filepath,$portable=null) : void
+    public function saveWeightsToFile(string|object $filepath,bool $portable=null) : void
     {
-        $f = $this->hda->open($filepath);
+        $f = $this->hdaFactory->open($filepath);
         $f['modelWeights'] = [];
         $this->saveWeights($f['modelWeights'],$portable);
     }
 
-    public function loadWeightsFromFile($filepath)
+    public function loadWeightsFromFile(string|object $filepath) : void
     {
-        $f = $this->hda->open($filepath,'r');
+        $f = $this->hdaFactory->open($filepath,'r');
         $this->loadWeights($f['modelWeights']);
     }
 
@@ -994,10 +1041,9 @@ abstract class AbstractModel implements Model
             }
         }
         $this->built = false;
-        $this->outputsVariables = null;
+        //$this->outputsVariables = null;
         $this->optimizer = null;
         $this->lossFunction = null;
-        $this->accuracyFunction = null;
-        $this->metrics = null;
+        $this->metrics = [];
     }
 }

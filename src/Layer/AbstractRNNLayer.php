@@ -14,14 +14,103 @@ use Rindow\NeuralNetworks\Gradient\Variable;
 abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
 {
     use GradientUtils;
-    abstract protected function numOfOutputStates($options);
+    //abstract protected function numOfOutputStates($options) : int;
 
-    protected $initialStates; // the statefull variable is not in container
+    protected int $units;
+
+    /** @var array<NDArray|null> $initialStates */
+    protected array $initialStates; // the statefull variable is not in container
+    /** @var array<array<int>> $statesShapes */
+    protected array $statesShapes;
     //protected $calcStates;
     //protected $origInputsShape;
     //protected $enableInitialStates;
+    protected string $kernelInitializerName;
+    protected string $recurrentInitializerName;
+    protected string $biasInitializerName;
+    protected bool $returnSequences;
+    protected bool $returnState;
+    protected bool $goBackwards;
+    protected bool $stateful;
+    protected RNNCell $cell;
 
-    public function setShapeInspection(bool $enable)
+    protected function setUnits(int $units) : void
+    {
+        $this->units = $units;
+    }
+
+    protected function setKernelInitializerNames(
+        mixed $kernelInitializerName=null,
+        mixed $recurrentInitializerName=null,
+        mixed $biasInitializerName=null,
+    ) : void
+    {
+        $this->kernelInitializerName = $this->toStringName($kernelInitializerName);
+        $this->recurrentInitializerName = $this->toStringName($recurrentInitializerName);
+        $this->biasInitializerName = $this->toStringName($biasInitializerName);
+    }
+
+    protected function setFlags(
+        bool $returnSequences=null,
+        bool $returnState=null,
+        bool $goBackwards=null,
+        bool $stateful=null,
+        ) : void
+    {
+        $this->returnSequences = $returnSequences;
+        $this->returnState = $returnState;
+        $this->goBackwards = $goBackwards;
+        $this->stateful = $stateful;
+    }
+
+    protected function setCell(RNNCell $cell) : void
+    {
+        $this->cell = $cell;
+    }
+
+    protected function cell() : RNNCell
+    {
+        return $this->cell;
+    }
+
+    /**
+     * @param array<NDArray> $states
+     */
+    protected function assertStatesShape(array $states=null,string $direction) : void
+    {
+        if(!$this->shapeInspection)
+            return;
+        if($states===null) {
+            return;
+        }
+        //if($this->statesShapes===null) {
+        //    throw new InvalidArgumentException('Uninitialized status shape');
+        //}
+        if(count($states)!=count($this->statesShapes)){
+            throw new InvalidArgumentException('Unmatch num of status. status need '.count($this->statesShapes).' NDArray. '.count($states).'given.');
+        }
+        foreach($states as $idx=>$state){;
+            $stateShape = $this->statesShapes[$idx];
+            $shape = $state->shape();
+            $batchNum = array_shift($shape);
+            if($shape!=$stateShape) {
+                $shape = $this->shapeToString($shape);
+                $stateShape = $this->shapeToString($stateShape);
+                $name = $this->name ?? $this->basename($this);
+                throw new InvalidArgumentException('Shape of state'.$idx.' must be '.$stateShape.', '.$shape.' given in '.$name.':'.$direction);
+            }
+        }
+    }
+
+    /**
+     * @return array<array<int>>
+     */
+    public function statesShapes() : array
+    {
+        return $this->statesShapes;
+    }
+
+    public function setShapeInspection(bool $enable) : void
     {
         parent::setShapeInspection($enable);
         $this->cell->setShapeInspection($enable);
@@ -42,11 +131,15 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         $this->cell->reverseSyncCellWeightVariables($this->weights);
     }
 
-    /**
-    *  @param  array<NDArray> $dOutputs
-    *  @return array<NDArray>
-    */
-    final public function backward(array $dOutputs,ArrayAccess $grads=null,array $oidsToCollect=null) : array
+    /*
+     *  param  array<NDArray> $dOutputs
+     *  return array<NDArray>
+     */
+    final public function backward(
+        array $dOutputs,
+        ArrayAccess $grads=null,
+        array $oidsToCollect=null
+        ) : array
     {
         if(!$this->shapeInspection) {
             $tmpdStates = $dOutputs;
@@ -75,7 +168,11 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         return $dInputs;
     }
 
-    protected function call(array $inputs,bool $training=null)
+    /**
+     * @param array<NDArray> $inputs
+     * @return array<NDArray>
+     */
+    protected function call(array $inputs,bool $training=null) : array
     {
         $K = $this->backend;
         $container = $this->container();
@@ -128,7 +225,11 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         }
     }
 
-    protected function differentiate(array $dOutputs)
+    /**
+     * @param array<NDArray> $dOutputs
+     * @return array<NDArray>
+     */
+    protected function differentiate(array $dOutputs) : array
     {
         $K = $this->backend;
         $container = $this->container();
@@ -163,19 +264,25 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         }
     }
 
-    public function __invoke(...$args)
+    /**
+     * @return NDArray|array<Variable>
+     */
+    public function __invoke(mixed ...$args) : NDArray|array
     {
         return $this->forward(...$args);
     }
 
-    /**
-    *  @param Variable  $inputs
-    *  @param bool      $training
-    *  @param array<Variable> $initialStates
-    *  @return array<Variable>
-    *       outputs
-    */
-    final public function forward(object $inputs, Variable|bool $training=null, array $initialStates=null)
+    /*
+     * param Variable  $inputs
+     * param bool      $training
+     * param array<Variable> $initialStates
+     * return NDArray|array<Variable> outputs
+     */
+    final public function forward(
+        object $inputs,
+        Variable|bool $training=null,
+        array $initialStates=null
+        ) : NDArray|array
     {
         $inputs = [$inputs];
         if($initialStates!==null) {
@@ -233,8 +340,11 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
 
     /**
      * Call from SessionFunc in compiled graph
+     * @param array<NDArray> $inputs
+     * @param array<string,mixed> $options
+     * @return array<NDArray>
      */
-    public function _rawCall(array $inputs,array $options)
+    public function _rawCall(array $inputs,array $options) : array
     {
         $training = $options['training'] ?? false;
         $results = $this->call($inputs,training:$training);
@@ -247,6 +357,8 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             $this->cell = clone $this->cell;
         }
         $this->allocateWeights(count($this->weights));
-        $this->syncWeightVariables();
+        if($this->assignedWeights) {
+            $this->syncWeightVariables();
+        }
     }
 }

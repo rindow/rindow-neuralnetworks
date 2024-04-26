@@ -8,7 +8,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Scalar implements ScalarInterface
 {
-    protected $value;
+    protected mixed $value;
 
     public function __construct(mixed $value)
     {

@@ -2,14 +2,20 @@
 namespace Rindow\NeuralNetworks\Callback;
 
 use Rindow\NeuralNetworks\Model\Model;
+use InvalidArgumentException;
 
 /**
  *
  */
-class CallbackList
+class CallbackList implements Broadcaster
 {
-    protected $callbacks;
-    protected $model;
+    /** @var array<mixed> $callbacks */
+    protected ?array $callbacks=null;
+    protected Model $model;
+
+    /**
+     * @param array<mixed> $callbacks
+     */
     public function __construct(Model $model, array $callbacks=null)
     {
         $this->model = $model;

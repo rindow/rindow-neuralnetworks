@@ -2104,73 +2104,78 @@ class SequentialTest extends TestCase
         $this->assertTrue(true);
     }
 
-    public function testAddCustomModel()
-    {
-        Dense::$nameNumbering = 0;
-        $mo = $this->newMatrixOperator();
-        $nn = $this->newNeuralNetworks($mo);
-        $K = $nn->backend();
-        $g = $nn->gradient();
-
-        $seq = $nn->models->Sequential();
-        $seq->add(new TestCustomSubModel($nn));
-        $seq->add(new TestCustomSubModel($nn));
-        // Raw data
-        $x = $K->array([[2],[3]]);
-        $y = $seq($x);
-        $this->assertEquals("[[16],[81]]",$mo->toString($y));
-        // Pure model
-        $x = $g->Variable($x);
-        $y = $seq($x);
-        $this->assertEquals("[[16],[81]]",$mo->toString($y));
-        // Gradient on pure model
-        $y = $nn->with($tape=$g->GradientTape(),fn() =>
-            $seq($x)
-        );
-        $this->assertEquals("[[16],[81]]",$mo->toString($y));
-        $this->assertEquals("[[32],[108]]",$mo->toString($tape->gradient($y,$x)));
-        // In function graph
-        $func = $g->Function(fn($x) =>
-            $seq($x)
-        );
-        // ...  building graph
-        $y = $func($x);
-        $this->assertEquals("[[16],[81]]",$mo->toString($y));
-        // ...  execute graph
-        $y = $func($x);
-        $this->assertEquals("[[16],[81]]",$mo->toString($y));
-        // Gradient on graph
-        $y = $nn->with($tape=$g->GradientTape(),fn() =>
-            $func($x)
-        );
-        $this->assertEquals("[[16],[81]]",$mo->toString($y));
-        $this->assertEquals("[[32],[108]]",$mo->toString($tape->gradient($y,$x)));
-
-        // get params
-        $params =  $seq->trainableVariables();
-        $this->assertCount(6,$params);
-
-        $layerParams = $nn->layers->Dense(10)->trainableVariables();
-        $this->assertEquals(get_class($layerParams[0]),get_class($params[0]));
-
-        ob_start();
-        $seq->summary();
-        $dump = ob_get_clean();
-        $summary =
-        'Layer(type)                  Output Shape               Param #   '."\n".
-        '=================================================================='."\n".
-        'dense(Dense)                 (10)                       20        '."\n".
-        'dense_1(Dense)               (10)                       20        '."\n".
-        '=================================================================='."\n".
-        'Weights                      Shape                      Param #   '."\n".
-        '=================================================================='."\n".
-        'No name                      (2)                        2         '."\n".
-        'No name                      (2)                        2         '."\n".
-        '=================================================================='."\n".
-        'Total params: 44'."\n";
-        $this->assertEquals($summary,$dump);
-
-    }
+    //
+    //  The function of organizing models has been moved to 
+    //  Rindow\NeuralNetworks\Gradient\Core\Modules
+    //  
+    //
+    //public function testAddCustomModel()
+    //{
+    //    Dense::$nameNumbering = 0;
+    //    $mo = $this->newMatrixOperator();
+    //    $nn = $this->newNeuralNetworks($mo);
+    //    $K = $nn->backend();
+    //    $g = $nn->gradient();
+    //
+    //    $seq = $nn->models->Sequential();
+    //    $seq->add(new TestCustomSubModel($nn));
+    //    $seq->add(new TestCustomSubModel($nn));
+    //    // Raw data
+    //    $x = $K->array([[2],[3]]);
+    //    $y = $seq($x);
+    //    $this->assertEquals("[[16],[81]]",$mo->toString($y));
+    //    // Pure model
+    //    $x = $g->Variable($x);
+    //    $y = $seq($x);
+    //    $this->assertEquals("[[16],[81]]",$mo->toString($y));
+    //    // Gradient on pure model
+    //    $y = $nn->with($tape=$g->GradientTape(),fn() =>
+    //        $seq($x)
+    //    );
+    //    $this->assertEquals("[[16],[81]]",$mo->toString($y));
+    //    $this->assertEquals("[[32],[108]]",$mo->toString($tape->gradient($y,$x)));
+    //    // In function graph
+    //    $func = $g->Function(fn($x) =>
+    //        $seq($x)
+    //    );
+    //    // ...  building graph
+    //    $y = $func($x);
+    //    $this->assertEquals("[[16],[81]]",$mo->toString($y));
+    //    // ...  execute graph
+    //    $y = $func($x);
+    //    $this->assertEquals("[[16],[81]]",$mo->toString($y));
+    //    // Gradient on graph
+    //    $y = $nn->with($tape=$g->GradientTape(),fn() =>
+    //        $func($x)
+    //    );
+    //    $this->assertEquals("[[16],[81]]",$mo->toString($y));
+    //    $this->assertEquals("[[32],[108]]",$mo->toString($tape->gradient($y,$x)));
+    //
+    //    // get params
+    //    $params =  $seq->trainableVariables();
+    //    $this->assertCount(6,$params);
+    //
+    //    $layerParams = $nn->layers->Dense(10)->trainableVariables();
+    //    $this->assertEquals(get_class($layerParams[0]),get_class($params[0]));
+    //
+    //    ob_start();
+    //    $seq->summary();
+    //    $dump = ob_get_clean();
+    //    $summary =
+    //    'Layer(type)                  Output Shape               Param #   '."\n".
+    //    '=================================================================='."\n".
+    //    'dense(Dense)                 (10)                       20        '."\n".
+    //    'dense_1(Dense)               (10)                       20        '."\n".
+    //    '=================================================================='."\n".
+    //    'Weights                      Shape                      Param #   '."\n".
+    //    '=================================================================='."\n".
+    //    'No name                      (2)                        2         '."\n".
+    //    'No name                      (2)                        2         '."\n".
+    //    '=================================================================='."\n".
+    //    'Total params: 44'."\n";
+    //    $this->assertEquals($summary,$dump);
+    //
+    //}
 
     public function testCustomMetric()
     {

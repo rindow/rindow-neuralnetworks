@@ -5,9 +5,9 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class MaxPooling1D extends AbstractPooling
 {
-    protected $rank = 1;
-    protected $pool_mode = 'max';
-    protected $defaultLayerName = 'maxpooling1d';
+    protected int $rank = 1;
+    protected string $pool_mode = 'max';
+    protected string $defaultLayerName = 'maxpooling1d';
 
     protected function call(NDArray $inputs, bool $training=null) : NDArray
     {
