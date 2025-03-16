@@ -26,7 +26,7 @@ class GradientTape implements Context
     /** @var array<int,ArrayAccess<object,object>> $persistentGrads */
     protected array $persistentGrads = [];
 
-    public function __construct(object $backend,bool $persistent=null)
+    public function __construct(object $backend,?bool $persistent=null)
     {
         $this->backend = $backend;
         $this->persistent = $persistent;
@@ -38,7 +38,7 @@ class GradientTape implements Context
         self::$autoBackProp = $this;
     }
 
-    public function exit(Throwable $e=null) : bool
+    public function exit(?Throwable $e=null) : bool
     {
         self::$autoBackProp = $this->backup;
         return false;

@@ -10,4 +10,9 @@ use ArrayAccess;
  * @extends IteratorAggregate<int,int>
  */
 interface ArrayShape extends ArrayAccess, Countable, IteratorAggregate
-{}
+{
+    /**
+     * @return array<int>
+     */
+    public function toArray() : array;
+}

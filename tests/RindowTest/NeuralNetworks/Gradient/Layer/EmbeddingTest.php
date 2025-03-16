@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 
 class EmbeddingTest extends TestCase
@@ -34,7 +35,7 @@ class EmbeddingTest extends TestCase
         $x = $g->Variable($K->array([
             [0,1,2],
             [2,1,0],
-        ]));
+        ],dtype:NDArray::int32));
         $layer = $nn->layers->Embedding($inputDim=3, $outputDim=4, input_length:3);
 
         $outputs = $nn->with($tape=$g->GradientTape(),

@@ -15,19 +15,33 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 class MnistTest extends TestCase
 {
     protected $plot = false;
-    protected $pickleFilename = '/rindow/nn/datasets/mnist/mnist.pkl';
+    protected $pickleFilename = '/mnist.pkl';
     protected $pickleFile;
 
     public function setUp() : void
     {
         parent::setUp();
         $this->plot = true;
-        $this->pickleFile = sys_get_temp_dir().$this->pickleFilename;
+        $this->pickleFile = $this->getDatasetDir().$this->pickleFilename;
         $mo = new MatrixOperator();
         if(!$mo->isAdvanced()) {
             $this->markTestSkipped("The service is not Advanced.");
             return;
         }
+    }
+
+    protected function getRindowDatesetDir() : string
+    {
+        $dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
+        if(!$dataDir) {
+            $dataDir = sys_get_temp_dir().'/rindow/nn/datasets';
+        }
+        return $dataDir;
+    }
+
+    protected function getDatasetDir() : string
+    {
+        return $this->getRindowDatesetDir().'/mnist';
     }
 
     public function getPlotConfig()

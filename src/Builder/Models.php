@@ -18,7 +18,7 @@ class Models
     /**
      * @param array<Layer> $layers
      */
-    public function Sequential(array $layers=null) : object
+    public function Sequential(?array $layers=null) : object
     {
         return new Sequential($this->builder,
                         $this->builder->utils()->HDA(),$layers);

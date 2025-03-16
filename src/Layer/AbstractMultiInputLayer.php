@@ -6,6 +6,7 @@ use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 
 abstract class AbstractMultiInputLayer extends AbstractLayerBase
 {
@@ -14,7 +15,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
     /**
      * @param array<NDArray> $inputs
      */
-    abstract protected function call(array $inputs, bool $training=null) : NDArray;
+    abstract protected function call(array $inputs, ?bool $training=null) : NDArray;
 
     /**
      * @return array<NDArray>
@@ -58,7 +59,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
      * @param array<object> $oidsToCollect
      * @return array<NDArray>
      */
-    public function backward(array $dOutputs, ArrayAccess $grads=null,array $oidsToCollect=null) : array
+    public function backward(array $dOutputs, ?ArrayAccess $grads=null,?array $oidsToCollect=null) : array
     {
         if(count($dOutputs)!=1) {
             throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
@@ -79,7 +80,7 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
     *  @param array<Variable>  $inputs
     *  @return Variable
     */
-    public function __invoke(array $inputs, Variable|bool $training=null) : Variable
+    public function __invoke(array $inputs, Variable|bool|null $training=null) : Variable
     {
         $outputs = $this->forward($inputs, $training);
         return $outputs;
@@ -89,11 +90,8 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
     *  @param array<Variable>  $inputs
     *  @return Variable
     */
-    public function forward(array $inputs, Variable|bool $training=null) : Variable
+    public function forward(array $inputs, Variable|bool|null $training=null) : Variable
     {
-        if(!is_array($inputs)) {
-            throw new InvalidArgumentException('inputs must be list of Variable');
-        }
         if(count($inputs)<2) {
             throw new InvalidArgumentException('Must have arguments greater than 2 or equal');
         }
@@ -114,12 +112,13 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
         try {
             $this->assertInputShapes($inputs,'forward');
             $rawOutputs = $this->call($rawInputs,$rawTraining);
-            $this->assertOutputShape($rawOutputs,'forward');
+            $rawOutputs = $this->makeMultiMaskedValues($rawInputs, [$rawOutputs]);
+            $this->assertOutputShape($rawOutputs[0],'forward');
         } finally {
             $session->end();
         }
         $outputs = $this->postGradientProcessOnSession(
-            $this->backend, $session, $inputs, [$rawOutputs]);
+            $this->backend, $session, $inputs, $rawOutputs);
         return $outputs[0];
     }
 
@@ -133,6 +132,16 @@ abstract class AbstractMultiInputLayer extends AbstractLayerBase
     {
         $training = $options['training'] ?? null;
         $outputs = $this->call($inputs, training:$training);
-        return [$outputs];
+
+        $values = $this->makeMultiMaskedValues($inputs, [$outputs]);
+        return $values;
+    }
+
+    public function computeMask(
+        array|NDArray $inputs,
+        array|NDArray|null $previousMask
+        ) : array|NDArray|null
+    {
+        return null;
     }
 }

@@ -7,6 +7,7 @@ use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Layer\Embedding;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 use Interop\Polite\Math\Matrix\NDArray;
 
 class EmbeddingTest extends TestCase
@@ -81,7 +82,7 @@ class EmbeddingTest extends TestCase
         $inputs = $g->Variable($K->zeros([1,4]));
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [3] but [4] given in Embedding');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (3) but (4) given in Embedding');
         $layer->build($inputs);
     }
 
@@ -101,7 +102,7 @@ class EmbeddingTest extends TestCase
         $inputs = $K->array([
             [0,1,2],
             [3,2,1],
-        ]);
+        ],dtype:NDArray::int32);
 
         $kernel = $K->array($mo->arange(4*5,null,null,NDArray::float32)->reshape([4,5]));
         $layer->build($g->Variable($inputs),
@@ -120,6 +121,7 @@ class EmbeddingTest extends TestCase
             }
         );
         $outputs = $K->ndarray($outputsVariable);
+        $this->assertNotInstanceOf(MaskedNDArray::class,$outputs);
         //
         $this->assertEquals([
             [[0,1,2,3,4],
@@ -152,4 +154,160 @@ class EmbeddingTest extends TestCase
         ],$grads[0]->toArray());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
     }
+
+    public function testMaskZeroImidately()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $layer = new Embedding(
+            $K,
+            $inputDim=4,
+            $outputDim=5,
+            input_length:3,
+            mask_zero:true,
+        );
+        //  2 batch
+        $inputs = $K->array([
+            [0,1,2],
+            [3,2,0],
+        ],dtype:NDArray::int32);
+
+        $kernel = $K->array($mo->arange(4*5,null,null,NDArray::float32)->reshape([4,5]));
+        $layer->build($g->Variable($inputs),
+            sampleWeights:[$kernel]
+        );
+
+
+        //
+        // forward
+        //
+        $copyInputs = $K->copy($inputs);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs);
+                return $outputsVariable;
+            }
+        );
+        //$outputs = $K->ndarray($outputsVariable);
+        $outputs = $outputsVariable->value();
+        $this->assertInstanceOf(MaskedNDArray::class,$outputs);
+        //
+        $this->assertEquals([
+            [[0,1,2,3,4],
+             [5,6,7,8,9],
+             [10,11,12,13,14]],
+            [[15,16,17,18,19],
+             [10,11,12,13,14],
+             [0,1,2,3,4]],
+        ],$outputs->toArray());
+
+        $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
+
+        $this->assertEquals([
+            [false,true,true],
+            [true,true,false],
+        ],$outputs->mask()->toArray());
+    }
+
+    public function testMaskZeroInPipeline()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $layer = new Embedding(
+            $K,
+            $inputDim=4,
+            $outputDim=5,
+            input_length:3,
+            mask_zero:true,
+        );
+        //  2 batch
+        $inputs = $K->array([
+            [0,1,2],
+            [3,2,0],
+        ],dtype:NDArray::int32);
+        $inputs = $g->Variable($inputs);
+
+        $kernel = $K->array($mo->arange(4*5,null,null,NDArray::float32)->reshape([4,5]));
+        $layer->build($inputs,
+            sampleWeights:[$kernel]
+        );
+
+        $func = $g->Function(function($inputs) use ($layer) {
+            $outputsVariable = $layer->forward($inputs);
+            return $outputsVariable;
+        });
+
+        //
+        // forward
+        //
+
+        // Not yet built function
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$inputs) {
+                $outputs = $func($inputs);
+                return $outputs;
+            }
+        );
+
+        //$outputs = $K->ndarray($outputsVariable);
+        $outputs = $outputsVariable->value();
+        $this->assertInstanceOf(MaskedNDArray::class,$outputs);
+        //
+        $this->assertEquals([
+            [[0,1,2,3,4],
+             [5,6,7,8,9],
+             [10,11,12,13,14]],
+            [[15,16,17,18,19],
+             [10,11,12,13,14],
+             [0,1,2,3,4]],
+        ],$outputs->toArray());
+
+
+        $this->assertEquals([
+            [false,true,true],
+            [true,true,false],
+        ],$outputs->mask()->toArray());
+
+
+        // call function in pipeline
+        $inputs = $K->array([
+            [0,1,2],
+            [0,2,1],
+        ],dtype:NDArray::int32);
+        $inputs = $g->Variable($inputs);
+
+
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$inputs) {
+                $outputs = $func($inputs);
+                return $outputs;
+            }
+        );
+
+        //$outputs = $K->ndarray($outputsVariable);
+        $outputs = $outputsVariable->value();
+        $this->assertInstanceOf(MaskedNDArray::class,$outputs);
+        //
+        $this->assertEquals([
+            [[0,1,2,3,4],
+             [5,6,7,8,9],
+             [10,11,12,13,14]],
+            [[0,1,2,3,4],
+             [10,11,12,13,14],
+             [5,6,7,8,9]],
+        ],$outputs->toArray());
+
+        $this->assertEquals([
+            [false,true,true],
+            [false,true,true],
+        ],$outputs->mask()->toArray());
+
+    }
+
 }

@@ -21,14 +21,14 @@ class LSTMCell extends AbstractRNNCell
     public function __construct(
         object $backend,
         int $units,
-        array $input_shape=null,
-        string|object $activation=null,
-        string|object $recurrent_activation=null,
-        bool $use_bias=null,
-        string|callable $kernel_initializer=null,
-        string|callable $recurrent_initializer=null,
-        string|callable $bias_initializer=null,
-        bool $unit_forget_bias=null,
+        ?array $input_shape=null,
+        string|object|null $activation=null,
+        string|object|null $recurrent_activation=null,
+        ?bool $use_bias=null,
+        string|callable|null $kernel_initializer=null,
+        string|callable|null $recurrent_initializer=null,
+        string|callable|null $bias_initializer=null,
+        ?bool $unit_forget_bias=null,
     )
     {
         $input_shape = $input_shape ?? null;
@@ -59,7 +59,7 @@ class LSTMCell extends AbstractRNNCell
         );
     }
 
-    public function build(mixed $inputShape=null, array $sampleWeights=null) : void
+    public function build(mixed $inputShape=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
@@ -115,7 +115,12 @@ class LSTMCell extends AbstractRNNCell
         ];
     }
 
-    protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array
+    protected function call(
+        NDArray $inputs,
+        array $states,
+        ?bool $training=null,
+        ?object $calcState=null,
+        ) : array
     {
         $K = $this->backend;
         $prev_h = $states[0];
@@ -167,15 +172,20 @@ class LSTMCell extends AbstractRNNCell
         $calcState->x_o = $x_o;
         $calcState->ac_next_c = $ac_next_c;
 
-        return [$next_h,[$next_h,$next_c]];
+        return [$next_h,$next_c];
     }
 
-    protected function differentiate(NDArray $dOutputs, array $dStates, object $calcState) : array
+    protected function differentiate(
+        array $dStates,
+        object $calcState
+        ) : array
     {
         $K = $this->backend;
         $dNext_h = $dStates[0];
         $dNext_c = $dStates[1];
-        $dNext_h = $K->add($dOutputs,$dNext_h);
+
+        // this merging move to rnnBackward in backend.
+        // $dNext_h = $K->add($dOutputs,$dNext_h);
 
         $dAc_next_c = $K->mul($calcState->x_o,$dNext_h);
         if($this->activation){
@@ -199,27 +209,32 @@ class LSTMCell extends AbstractRNNCell
             $dx_c = $this->activation->backward($calcState->ac_c,$dx_c);
         }
 
-        $dOutputs = $K->stack(
-            [$dx_i,$dx_f,$dx_c,$dx_o],$axis=1);
+        $dOutputs = $K->stack([$dx_i,$dx_f,$dx_c,$dx_o],axis:1);
         $shape = $dOutputs->shape();
         $batches = array_shift($shape);
-        $dOutputs = $dOutputs->reshape([
-                $batches,
-                array_product($shape)
-            ]);
+        $dOutputs = $dOutputs->reshape([$batches,array_product($shape)]);
 
-        $K->gemm($calcState->prev_h, $dOutputs,1.0,1.0,
-            $this->dRecurrentKernel,true,false);
-        $K->gemm($calcState->inputs, $dOutputs,1.0,1.0,
-            $this->dKernel,true,false);
+        $K->gemm(
+            $calcState->prev_h,
+            $dOutputs,
+            beta:1.0,
+            c:$this->dRecurrentKernel,
+            transA:true,
+        );
+        $K->gemm(
+            $calcState->inputs,
+            $dOutputs,
+            beta:1.0,
+            c:$this->dKernel,
+            transA:true
+        );
+
         if($this->useBias) {
             $K->update_add($this->dBias,$K->sum($dOutputs, axis:0));
         }
 
-        $dInputs = $K->gemm($dOutputs, $this->kernel,1.0,0.0,
-            null,false,true);
-        $dPrev_h = $K->gemm($dOutputs, $this->recurrentKernel,1.0,0.0,
-            null,false,true);
+        $dInputs = $K->gemm($dOutputs, $this->kernel, transB:true);
+        $dPrev_h = $K->gemm($dOutputs, $this->recurrentKernel, transB:true);
 
         return [$dInputs,[$dPrev_h, $dPrev_c]];
     }

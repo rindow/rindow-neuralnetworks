@@ -93,7 +93,7 @@ class DenseTest extends TestCase
     
         $inputs = $g->Variable($K->zeros([1,3]));
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [2] but [3] given in Dense');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (2) but (3) given in Dense');
         $layer->build($inputs);
     }
 

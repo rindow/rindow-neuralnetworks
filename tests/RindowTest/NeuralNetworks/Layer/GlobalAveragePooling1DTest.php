@@ -71,7 +71,7 @@ class GlobalAveragePooling1DTest extends TestCase
 
         $inputs = $g->Variable($K->zeros([1,4,5]));
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [4,3] but [4,5] given in GlobalAveragePooling1D');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (4,3) but (4,5) given in GlobalAveragePooling1D');
         $layer->build($inputs);
     }
 

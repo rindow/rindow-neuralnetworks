@@ -8,7 +8,7 @@ class Conv2D extends AbstractConv
     protected int $rank = 2;
     protected string $defaultLayerName = 'conv2d';
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();

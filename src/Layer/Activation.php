@@ -15,8 +15,8 @@ class Activation extends AbstractLayer
     public function __construct(
         object $backend,
         string|object $activation,
-        array $input_shape=null,
-        string $name=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         // defaults
@@ -38,12 +38,16 @@ class Activation extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(
+        NDArray $inputs,
+        ?bool $training=null,
+        mixed ...$kargs
+    ) : NDArray
     {
         $outputs = $inputs;
         if($this->activation) {
             $container = $this->container();
-            $outputs = $this->activation->forward($container,$outputs,$training);
+            $outputs = $this->activation->forward($container,$outputs,$training, ...$kargs);
         }
         return $outputs;
     }

@@ -28,7 +28,7 @@ abstract class AbstractLoss implements Loss
      * @param array<NDArray> $oidsToCollect
      * @return array<NDArray>
      */
-    abstract protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array;
+    abstract protected function differentiate(array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array;
 
     protected object $backend;
     protected bool $fromLogits = false;
@@ -36,8 +36,8 @@ abstract class AbstractLoss implements Loss
 
     public function __construct(
         object $backend,
-        bool $from_logits=null,
-        string $reduction=null,
+        ?bool $from_logits=null,
+        ?string $reduction=null,
         )
     {
         // defaults
@@ -165,7 +165,7 @@ abstract class AbstractLoss implements Loss
     protected function flattenShapesForSparse(NDArray $trues, NDArray $predicts) : array
     {
         $origTrueShape = $trues->shape();
-        $origPredictsShape = $trues->shape();
+        $origPredictsShape = $predicts->shape();
 
         $batchShape = $predicts->shape();
         $feature = array_pop($batchShape);
@@ -186,7 +186,7 @@ abstract class AbstractLoss implements Loss
         return [$trues,$predicts];
     }
 
-    public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    public function backward(array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array
     {
         $K = $this->backend;
         $container = $this->container();

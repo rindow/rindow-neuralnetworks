@@ -70,7 +70,7 @@ class MaxPooling2DTest extends TestCase
 
         $inputs = $g->Variable($K->zeros([1,4,4,5]));
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [4,4,3] but [4,4,5] given in MaxPooling2D');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (4,4,3) but (4,4,5) given in MaxPooling2D');
         $layer->build($inputs);
     }
 

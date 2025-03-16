@@ -12,8 +12,8 @@ class ReduceMean extends AbstractFunction
     
     public function __construct(
         object $backend,
-        int $axis=null,
-        bool $keepdims=null,
+        ?int $axis=null,
+        ?bool $keepdims=null,
     )
     {
         parent::__construct($backend);

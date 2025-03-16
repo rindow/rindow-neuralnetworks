@@ -9,6 +9,8 @@ use Rindow\NeuralNetworks\Activation\FunctionFactory;
 use Rindow\NeuralNetworks\Activation\Activation as ActivationInterface;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
 use Rindow\NeuralNetworks\Layer\Embedding;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
+use Rindow\NeuralNetworks\Gradient\Core\MaskedNDArray as MaskedNDArrayImpl;
 
 /**
  *
@@ -39,6 +41,7 @@ abstract class AbstractLayerBase implements Layer
     protected bool $training = false;
     /** @var array<string,bool> $callOptions */
     protected array $callOptions = [];
+    protected ?int $inputDtype=null;
 
     public function __construct(object $backend)
     {
@@ -76,7 +79,7 @@ abstract class AbstractLayerBase implements Layer
         }
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $inputShape = $this->normalizeInputShape($variable);
         if($inputShape!==null)
@@ -88,7 +91,7 @@ abstract class AbstractLayerBase implements Layer
      * @param array<int>|Variable $variable
      * @return array<int>
      */
-    protected function normalizeInputShape(array|Variable $variable=null) : array
+    protected function normalizeInputShape(array|Variable|null $variable=null) : array
     {
         $inputShape = null;
         if($variable===null) {
@@ -152,7 +155,7 @@ abstract class AbstractLayerBase implements Layer
      * @param array<Variable> $variables
      * @return array<array<int>>
      */
-    protected function normalizeInputShapes(array $variables=null) : array
+    protected function normalizeInputShapes(?array $variables=null) : array
     {
         if($variables===null) {
             $inputShapes = $this->inputShape;
@@ -205,6 +208,11 @@ abstract class AbstractLayerBase implements Layer
         return $this->inputShape;
     }
 
+    public function inputDtype() : ?int
+    {
+        return $this->inputDtype;
+    }
+
     public function outputShape() : array
     {
         return $this->outputShape;
@@ -222,6 +230,9 @@ abstract class AbstractLayerBase implements Layer
 
     public function reverseSyncWeightVariables() : void
     {
+        if(count($this->weights)!=0) {
+            throw new LogicException("reverseSyncWeightVariables is not impremented in ".get_class($this));
+        }
     }
 
     public function getConfig() : array
@@ -249,14 +260,14 @@ abstract class AbstractLayerBase implements Layer
         if(!is_array($shape)) {
             return strval($shape);
         }
-        $string = '[';
+        $string = '(';
         foreach($shape as $value) {
-            if($string!='[') {
+            if($string!='(') {
                 $string .= ',';
             }
             $string .= $this->shapeToString($value);
         }
-        $string .= ']';
+        $string .= ')';
         return $string;
     }
 
@@ -300,16 +311,30 @@ abstract class AbstractLayerBase implements Layer
         }
     }
 
-    protected function allocateWeights(int $num,int $nonTrainables=null) : void
+    /**
+     * @param array<string> $names
+     */
+    protected function allocateWeights(array $names, ?int $nonTrainables=null) : void
     {
         $variables = [];
-        for($i=0;$i<$num;$i++) {
-            $variables[] = new Variable($this->backend, null, undetermined: true);
+        foreach($names as $name) {
+            $fullname = $name.'@'.$this->name();
+            $variables[] = new Variable(
+                $this->backend,
+                null,
+                name:$fullname,
+                undetermined: true,
+            );
         }
         if($nonTrainables) {
             for($i=0;$i<$nonTrainables;$i++) {
                 $variables[] = new Variable(
-                    $this->backend,null, undetermined: true, trainable: false);
+                    $this->backend,
+                    null,
+                    name:('nonTrainable'.$i.'@'.$this->name()),
+                    undetermined: true,
+                    trainable: false,
+                );
             }
         }
         $this->weights = $variables;
@@ -329,7 +354,6 @@ abstract class AbstractLayerBase implements Layer
         foreach(array_map(null,$this->weights,$params) as [$variable,$param]) {
             if($param!==null) {
                 $variable->assign($param, reference: true);
-                $variable->setName('weights:'.$this->basename($this));
             }
         }
         $this->assignedWeights = true;
@@ -368,5 +392,85 @@ abstract class AbstractLayerBase implements Layer
     public function isAwareOf(string $name) : bool
     {
         return isset($this->callOptions[$name]);
+    }
+
+    /**
+     * @param array<NDArray>|NDArray $inputs
+     * @param array<NDArray|null>|NDArray $previousMask
+     * @return array<NDArray>|NDArray|null
+     */
+    public function computeMask(
+        array|NDArray $inputs,
+        array|NDArray|null $previousMask
+        ) : array|NDArray|null
+    {
+        return null;
+    }
+
+    public function retrieveSingleMask(NDArray $input) : ?NDArray
+    {
+        $prevMask = null;
+        if($input instanceof MaskedNDArray) {
+            $prevMask = $input->mask();
+        }
+        return $prevMask;
+    }
+
+    protected function maskedValue(NDArray $value, NDArray $mask) : MaskedNDArray
+    {
+        return new MaskedNDArrayImpl($value,$mask);
+    }
+
+    public function makeSingleMaskedValue(NDArray $input, NDArray $output) : NDArray
+    {
+        $prevMask = null;
+        if($input instanceof MaskedNDArray) {
+            $prevMask = $input->mask();
+        }
+        $mask = $this->computeMask($input,$prevMask);
+        if($mask!=null) {
+            $output = $this->maskedValue($output,$mask);
+        }
+        return $output;
+    }
+
+    /**
+     * @param array<NDArray> $inputs
+     * @return array<NDArray|null>
+     */
+    public function retrieveMultiMasks(array $inputs) : array
+    {
+        $prevMasks = [];
+        foreach ($inputs as $input) {
+            if($input instanceof MaskedNDArray) {
+                $prevMasks[] = $input->mask();
+            } else {
+                $prevMasks[] = null;
+            }
+        }
+        return $prevMasks;
+    }
+
+    /**
+     * @param array<NDArray> $inputs
+     * @param array<NDarray> $outputs
+     * @return array<NDArray>
+     */
+    public function makeMultiMaskedValues(array $inputs, array $outputs) : array
+    {
+        $prevMasks = array_map(
+            fn($in)=>is_a($in,MaskedNDArray::class)?$in->mask():null,
+            $inputs
+        );
+        $masks = $this->computeMask($inputs,$prevMasks);
+        if($masks==null) {
+            $values = $outputs;
+        } else {
+            $values = array_map(
+                fn($out,$mask)=>($mask==null)?$out:$this->maskedValue($out,$mask),
+                $outputs,$masks
+            );
+        }
+        return $values;
     }
 }

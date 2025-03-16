@@ -15,7 +15,7 @@ class Dir
     /**
      * @return array<mixed>
      */
-    public function clawl(string $path,callable $callback=null) : array
+    public function clawl(string $path,?callable $callback=null) : array
     {
         return $this->glob($path,null,$callback);
     }
@@ -23,7 +23,7 @@ class Dir
     /**
      * @return array<mixed>
      */
-    public function glob(string $path, ?string $pattern,callable $callback=null) : array
+    public function glob(string $path, ?string $pattern,?callable $callback=null) : array
     {
         if(!file_exists($path)) {
             throw new LogicException('directory not found: '.$path);

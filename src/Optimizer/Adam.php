@@ -21,10 +21,10 @@ class Adam implements Optimizer
 
     public function __construct(
         object $backend,
-        float|LearningRateSchedule $lr=null,
-        float $beta1=null,
-        float $beta2=null,
-        float $epsilon=null,
+        float|LearningRateSchedule|null $lr=null,
+        ?float $beta1=null,
+        ?float $beta2=null,
+        ?float $epsilon=null,
     )
     {
         // defaults

@@ -3,6 +3,7 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
+use Rindow\NeuralNetworks\Gradient\Variable;
 
 /**
  *
@@ -12,7 +13,7 @@ abstract class AbstractImage extends AbstractLayer
     protected int $rank;
     protected ?string $data_format;
 
-    protected function normalizeInputShape($variable=null) : array
+    protected function normalizeInputShape(array|Variable|null $variable=null) : array
     {
         $inputShape=parent::normalizeInputShape($variable);
         if($this->rank==0) {
@@ -49,8 +50,8 @@ abstract class AbstractImage extends AbstractLayer
     protected function normalizeFilterSize(
         null|int|array $size,
         string $sizename,
-        int|array $default=null,
-        bool $notNull=null) : array
+        int|array|null $default=null,
+        ?bool $notNull=null) : array
     {
         if($size===null && !$notNull) {
             $size = $default;

@@ -1,21 +1,157 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Cannot call method dtype\\(\\) on iterable\\<Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray\\>\\.$#"
+			message: '#^Instanceof between Interop\\Polite\\Math\\Matrix\\NDArray and Interop\\Polite\\Math\\Matrix\\NDArray will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Data/Dataset/NDArrayDataset.php
+
+		-
+			message: '#^Cannot call method dtype\(\) on iterable\<Interop\\Polite\\Math\\Matrix\\NDArray\>\.$#'
+			identifier: method.nonObject
 			count: 1
 			path: src/Data/Image/ImageFilter.php
 
 		-
-			message: "#^Cannot call method shape\\(\\) on iterable\\<Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray\\>\\.$#"
+			message: '#^Cannot call method shape\(\) on iterable\<Interop\\Polite\\Math\\Matrix\\NDArray\>\.$#'
+			identifier: method.nonObject
 			count: 2
 			path: src/Data/Image/ImageFilter.php
 
 		-
-			message: "#^Else branch is unreachable because previous condition is always true\\.$#"
+			message: '#^Call to function is_iterable\(\) with iterable\<int\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Data/Sequence/Preprocessor.php
+
+		-
+			message: '#^Call to function is_int\(\) with int will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Data/Sequence/Tokenizer.php
+
+		-
+			message: '#^Call to function is_iterable\(\) with iterable\<int\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Data/Sequence/Tokenizer.php
+
+		-
+			message: '#^Call to function is_int\(\) with int will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Gradient/Core/ArrayShape.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between Rindow\\NeuralNetworks\\Gradient\\Variable and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Gradient/Core/GradientTape.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between Rindow\\NeuralNetworks\\Gradient\\Variable and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: src/Gradient/Core/GraphFunction.php
 
 		-
-			message: "#^Else branch is unreachable because previous condition is always true\\.$#"
+			message: '#^Call to function is_int\(\) with int will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Gradient/Core/Modules.php
+
+		-
+			message: '#^Instanceof between Rindow\\NeuralNetworks\\Gradient\\Module and Rindow\\NeuralNetworks\\Gradient\\Module will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Gradient/Core/Modules.php
+
+		-
+			message: '#^Instanceof between Interop\\Polite\\Math\\Matrix\\NDArray and Interop\\Polite\\Math\\Matrix\\NDArray will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
 			count: 1
 			path: src/Gradient/Func/Get.php
+
+		-
+			message: '#^Instanceof between Interop\\Polite\\Math\\Matrix\\NDArray and Interop\\Polite\\Math\\Matrix\\NDArray will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Layer/AbstractAttentionLayer.php
+
+		-
+			message: '#^Instanceof between Interop\\Polite\\Math\\Matrix\\NDArray and Interop\\Polite\\Math\\Matrix\\NDArray will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Layer/AbstractLayer.php
+
+		-
+			message: '#^Call to function is_int\(\) with int will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Layer/AbstractLayerBase.php
+
+		-
+			message: '#^Instanceof between Rindow\\NeuralNetworks\\Gradient\\Core\\Variable and Rindow\\NeuralNetworks\\Gradient\\Core\\Variable will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Layer/AbstractLayerBase.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between array\<int\> and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Layer/AbstractLayerBase.php
+
+		-
+			message: '#^Instanceof between Interop\\Polite\\Math\\Matrix\\NDArray and Interop\\Polite\\Math\\Matrix\\NDArray will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Layer/AbstractMultiInputLayer.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<int\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Layer/Attention.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<int\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Layer/Concatenate.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between int and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Layer/EinsumDense.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<int\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Layer/Gather.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<int\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Layer/MultiHeadAttention.php
+
+		-
+			message: '#^Comparison operation "\>\=" between 1 and 0 is always true\.$#'
+			identifier: greaterOrEqual.alwaysTrue
+			count: 1
+			path: src/Support/HDA/HDASqlite.php
+
+		-
+			message: '#^Loose comparison using \=\= between \(PDOStatement\|false\) and false will always evaluate to true\.$#'
+			identifier: equal.alwaysTrue
+			count: 1
+			path: src/Support/HDA/HDASqliteIterator.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Support/HDA/HDASqliteIterator.php

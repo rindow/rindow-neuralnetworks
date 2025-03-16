@@ -3,10 +3,14 @@ namespace Rindow\NeuralNetworks\Builder;
 
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable as VariableIF;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 use Rindow\NeuralNetworks\Gradient\Module;
 use Rindow\NeuralNetworks\Gradient\ArrayShape;
+use Rindow\NeuralNetworks\Gradient\ArraySpec;
+use Rindow\NeuralNetworks\Gradient\Core\ArraySpec as ArraySpecImpl;
 use Rindow\NeuralNetworks\Gradient\Core\Variable as VariableImpl;
 use Rindow\NeuralNetworks\Gradient\Core\Modules;
+
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GraphFunction;
 use Rindow\NeuralNetworks\Gradient\Core\StopGradient;
@@ -25,14 +29,15 @@ use Rindow\NeuralNetworks\Gradient\Func\ClipByValue;
 use Rindow\NeuralNetworks\Gradient\Func\Equal;
 use Rindow\NeuralNetworks\Gradient\Func\NotEqual;
 use Rindow\NeuralNetworks\Gradient\Func\Cast;
-use Rindow\NeuralNetworks\Gradient\Func\ZerosLike;
 use Rindow\NeuralNetworks\Gradient\Func\Reshape;
 use Rindow\NeuralNetworks\Gradient\Func\Transpose;
 use Rindow\NeuralNetworks\Gradient\Func\Shape;
 use Rindow\NeuralNetworks\Gradient\Func\Get;
 use Rindow\NeuralNetworks\Gradient\Func\Scale;
 use Rindow\NeuralNetworks\Gradient\Func\Zeros;
+use Rindow\NeuralNetworks\Gradient\Func\ZerosLike;
 use Rindow\NeuralNetworks\Gradient\Func\Ones;
+use Rindow\NeuralNetworks\Gradient\Func\OnesLike;
 use Rindow\NeuralNetworks\Gradient\Func\Bandpart;
 use Rindow\NeuralNetworks\Gradient\Func\Increment;
 use Rindow\NeuralNetworks\Gradient\Func\Greater;
@@ -48,12 +53,28 @@ class Gradient
         $this->backend = $backend;
     }
 
+    public function constant(mixed $value, ?int $dtype=null) : NDArray
+    {
+        return $this->backend->array($value, dtype:$dtype);
+    }
+
     public function Variable(mixed $variable, mixed ...$options) : VariableIF
     {
         if(GraphFunction::$mode==GraphFunction::EXECUTING) {
             return $variable;
         }
         return new VariableImpl($this->backend,$variable,...$options);
+    }
+
+    public function ndarray(NDArray $value) : NDArray
+    {
+        if($value instanceof VariableIF) {
+            $value = $value->value();
+        }
+        if($value instanceof MaskedNDArray) {
+            $value = $value->value();
+        }
+        return $value;
     }
 
     /**
@@ -73,14 +94,26 @@ class Gradient
     }
 
     /**
+     * @param ArrayShape|array<int> $shape
+     */
+    public function ArraySpec(
+        ArrayShape|array $shape,
+        ?int $dtype=null,
+        ?string $name=null,
+    ) : ArraySpec
+    {
+        return new ArraySpecImpl($shape,$dtype,$name);
+    }
+
+    /**
      * @param array<Module> $modules
      */
-    public function modules(array $modules=null) : object
+    public function modules(?array $modules=null) : object
     {
         return new Modules($modules);
     }
 
-    public function GradientTape(bool $persistent=null) : object
+    public function GradientTape(?bool $persistent=null) : object
     {
         return new GradientTape($this->backend,$persistent);
     }
@@ -157,8 +190,8 @@ class Gradient
 
     public function matmul(
         NDArray $x, NDArray $y,
-        bool $transpose_a=null,
-        bool $transpose_b=null,
+        ?bool $transpose_a=null,
+        ?bool $transpose_b=null,
     ) : NDArray
     {
         $func = new Matmul(
@@ -171,8 +204,8 @@ class Gradient
 
     public function reduceMean(
         NDArray $x,
-        int $axis=null,
-        bool $keepdims=null,
+        ?int $axis=null,
+        ?bool $keepdims=null,
     ) : NDArray
     {
         $func = new ReduceMean(
@@ -185,8 +218,8 @@ class Gradient
 
     public function reduceSum(
         NDArray $x,
-        int $axis=null,
-        bool $keepdims=null,
+        ?int $axis=null,
+        ?bool $keepdims=null,
     ) : NDArray
     {
         $func = new ReduceSum(
@@ -235,6 +268,12 @@ class Gradient
         return $func($x);
     }
 
+    public function onesLike(NDArray $x) : NDArray 
+    {
+        $func = new OnesLike($this->backend);
+        return $func($x);
+    }
+
     public function reshape(NDArray $x, mixed $shape) : NDArray
     {
         $func = new Reshape($this->backend);
@@ -246,7 +285,7 @@ class Gradient
      */
     public function transpose(
         NDArray $x,
-        array $perm=null,
+        ?array $perm=null,
     ) : NDArray
     {
         $func = new Transpose(
@@ -288,7 +327,7 @@ class Gradient
 
     public function zeros(
         mixed $shape,
-        int $dtype=null,
+        ?int $dtype=null,
     ) : NDArray
     {
         $func = new Zeros($this->backend,$dtype);
@@ -297,7 +336,7 @@ class Gradient
 
     public function ones(
         mixed $shape,
-        int $dtype=null,
+        ?int $dtype=null,
     ) : NDArray
     {
         $func = new Ones($this->backend,$dtype);
@@ -346,12 +385,11 @@ class Gradient
     public function repeat(
         NDArray $x,
         mixed $repeats,
-        int $axis=null,
-        bool $keepdims=null,
+        ?int $axis=null,
+        ?bool $keepdims=null,
     ) : NDArray
     {
         $func = new Repeat($this->backend,axis:$axis,keepdims:$keepdims);
         return $func($x,$repeats);
     }
-
 }

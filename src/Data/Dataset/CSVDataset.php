@@ -39,16 +39,16 @@ class CSVDataset implements IteratorAggregate,Dataset
     public function __construct(
         object $mo,
         string $path,
-        string $pattern=null,
-        int $batch_size=null,
-        bool $skip_header=null,
-        DatasetFilter $filter=null,
-        object $crawler=null,
-        bool $shuffle=null,
-        int $length=null,
-        string $delimiter=null,
-        string $enclosure=null,
-        string $escape=null,
+        ?string $pattern=null,
+        ?int $batch_size=null,
+        ?bool $skip_header=null,
+        ?DatasetFilter $filter=null,
+        ?object $crawler=null,
+        ?bool $shuffle=null,
+        ?int $length=null,
+        ?string $delimiter=null,
+        ?string $enclosure=null,
+        ?string $escape=null,
     )
     {
         // defaults 
@@ -129,9 +129,9 @@ class CSVDataset implements IteratorAggregate,Dataset
             $choiceItem = $la->alloc([1],NDArray::int32);
             $la->zeros($choiceItem);
         }
-        $inputs = $la->gather($inputs,$choiceItem);
+        $inputs = $la->gatherb($inputs,$choiceItem);
         if($tests!==null) {
-            $tests  = $la->gather($tests,$choiceItem);
+            $tests  = $la->gatherb($tests,$choiceItem);
         }
         return [$inputs,$tests];
     }

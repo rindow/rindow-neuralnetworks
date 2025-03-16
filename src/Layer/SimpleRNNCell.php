@@ -16,12 +16,12 @@ class SimpleRNNCell extends AbstractRNNCell
     public function __construct(
         object $backend,
         int $units,
-        array $input_shape=null,
-        string|object $activation=null,
-        bool $use_bias=null,
-        string|callable $kernel_initializer=null,
-        string|callable $recurrent_initializer=null,
-        string|callable $bias_initializer=null,
+        ?array $input_shape=null,
+        string|object|null $activation=null,
+        ?bool $use_bias=null,
+        string|callable|null $kernel_initializer=null,
+        string|callable|null $recurrent_initializer=null,
+        string|callable|null $bias_initializer=null,
     )
     {
         // defaults
@@ -48,7 +48,7 @@ class SimpleRNNCell extends AbstractRNNCell
         );
     }
 
-    public function build(mixed $inputShape=null, array $sampleWeights=null) : void
+    public function build(mixed $inputShape=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
@@ -103,7 +103,12 @@ class SimpleRNNCell extends AbstractRNNCell
         ];
     }
 
-    protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array
+    protected function call(
+        NDArray $inputs,
+        array $states,
+        ?bool $training=null,
+        ?object $calcState=null
+        ) : array
     {
         $K = $this->backend;
         $prev_h = $states[0];
@@ -120,14 +125,15 @@ class SimpleRNNCell extends AbstractRNNCell
 
         $calcState->inputs = $inputs;
         $calcState->prev_h = $prev_h;
-        return [$outputs,[$outputs]];
+        return [$outputs];
     }
 
-    protected function differentiate(NDArray $dOutputs, array $dStates, object $calcState) : array
+    protected function differentiate(array $dStates, object $calcState) : array
     {
         $K = $this->backend;
-        $dNext_h = $dStates[0];
-        $dOutputs = $K->add($dOutputs,$dNext_h);
+        $dOutputs = $dStates[0];
+        // this merging move to rnnBackward in backend.
+        // $dOutputs = $K->add($dOutputs,$dNext_h);
         if($this->activation) {
             $dOutputs = $this->activation->backward($calcState->activation,$dOutputs);
         }

@@ -18,9 +18,9 @@ class Concatenate extends AbstractMultiInputLayer
      */
     public function __construct(
         object $backend,
-        int $axis=null,
-        array $input_shapes=null,
-        string $name=null,
+        ?int $axis=null,
+        ?array $input_shapes=null,
+        ?string $name=null,
     )
     {
         // defaults
@@ -29,15 +29,12 @@ class Concatenate extends AbstractMultiInputLayer
         $name = $name ?? null;
 
         parent::__construct($backend);
-        if(!is_int($axis)) {
-            throw new InvalidArgumentException('axis must be integer.');
-        }
         $this->axis = $axis;
         $this->inputShape = $input_shapes;
         $this->initName($name,'concatenate');
     }
 
-    public function build(mixed $variables=null, array $sampleWeights=null) : void
+    public function build(mixed $variables=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
         if(!is_array($variables) && $variables!==null) {
@@ -101,7 +98,7 @@ class Concatenate extends AbstractMultiInputLayer
         ];
     }
 
-    protected function call(array $inputs, bool $training=null) : NDArray
+    protected function call(array $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();

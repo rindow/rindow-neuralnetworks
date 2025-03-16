@@ -9,7 +9,7 @@ use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
 class ArrayShape implements ArrayShapeInterface
 {
     /** @var array<int> $shape */
-    protected $shape;
+    protected array $shape;
 
     /**
      * @param array<int> $shape
@@ -17,6 +17,11 @@ class ArrayShape implements ArrayShapeInterface
     public function __construct(array $shape)
     {
         $this->shape = $shape;
+    }
+
+    public function toArray() : array
+    {
+        return $this->shape;
     }
 
     public function offsetExists( $offset ) : bool

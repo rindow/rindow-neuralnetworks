@@ -3,6 +3,8 @@ namespace Rindow\NeuralNetworks\Gradient;
 
 interface Module
 {
+    public function name() : ?string;
+    
     /**
      * @return array<Module>
      */

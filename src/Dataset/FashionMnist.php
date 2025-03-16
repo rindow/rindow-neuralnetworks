@@ -7,6 +7,6 @@ class FashionMnist extends Mnist
     
     protected function getDatasetDir() : string
     {
-        return sys_get_temp_dir().'/rindow/nn/datasets/fashion-mnist';
+        return $this->getRindowDatesetDir().'/fashion-mnist';
     }
 }

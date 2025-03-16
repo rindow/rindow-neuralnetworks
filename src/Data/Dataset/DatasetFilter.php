@@ -17,6 +17,6 @@ interface DatasetFilter
      */
     public function translate(
         iterable $inputs,
-        iterable $tests=null,
-        array $options=null) : array;
+        ?iterable $tests=null,
+        ?array $options=null) : array;
 }

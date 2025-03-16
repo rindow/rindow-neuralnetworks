@@ -16,8 +16,8 @@ class RepeatVector extends AbstractLayer
     public function __construct(
         object $backend,
         int $repeats,
-        array $input_shape=null,
-        string $name=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         $input_shape = $input_shape ?? null;
@@ -29,7 +29,7 @@ class RepeatVector extends AbstractLayer
         $this->initName($name,'repeatvector');
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $inputShape = $this->normalizeInputShape($variable);
@@ -60,7 +60,7 @@ class RepeatVector extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $outputs = $K->repeat($inputs,$this->repeats,axis:1);

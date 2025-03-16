@@ -9,7 +9,7 @@ class MaxPooling3D extends AbstractPooling
     protected string $pool_mode = 'max';
     protected string $defaultLayerName = 'maxpooling3d';
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();

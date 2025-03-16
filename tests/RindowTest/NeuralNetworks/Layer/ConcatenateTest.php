@@ -59,7 +59,7 @@ class ConcatenateTest extends TestCase
         ];
     
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [[4,3],[4,2]] but [[4,5],[4,2]] given in Concatenate');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as ((4,3),(4,2)) but ((4,5),(4,2)) given in Concatenate');
         $layer->build($inputs);
     }
 

@@ -6,22 +6,23 @@ use UnexpectedValueException;
 use Rindow\NeuralNetworks\Builder\Builder;
 use Rindow\NeuralNetworks\Gradient\Module;
 use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\ArrayShape;
+use Rindow\NeuralNetworks\Gradient\Core\ArraySpec;
 use Rindow\NeuralNetworks\Layer\Layer;
 use Rindow\NeuralNetworks\Support\HDA\HDAFactory;
 use Interop\Polite\Math\Matrix\NDArray;
 
-
 class Sequential extends AbstractModel
 {
     /**
-     * @var array<Model|Layer> $layers;
+     * @var array<Layer> $layers;
      */
     protected $layers = [];
 
     /**
      * @param array<Layer> $layers
      */
-    public function __construct(Builder $builder, HDAFactory $hdaFactory=null, array $layers=null)
+    public function __construct(Builder $builder, ?HDAFactory $hdaFactory=null, ?array $layers=null)
     {
         parent::__construct($builder,$hdaFactory);
         if($layers!==null) {
@@ -54,15 +55,16 @@ class Sequential extends AbstractModel
      */
     public function layers() : array
     {
-        $layers = [];
-        foreach($this->layers as $module) {
-            if($module instanceof Layer) {
-                $layers[] = $module;
-            } else {
-                $layers = array_merge($layers,$module->layers());
-            }
-        }
-        return $layers;
+        //$layers = [];
+        //foreach($this->layers as $module) {
+        //    if($module instanceof Layer) {
+        //        $layers[] = $module;
+        //    } else {
+        //        $layers = array_merge($layers,$module->layers());
+        //    }
+        //}
+        //return $layers;
+        return $this->layers;
     }
 
     /**
@@ -89,7 +91,7 @@ class Sequential extends AbstractModel
     /**
      *  CAUTION: The "call" method is untyped!!
      */
-    protected function call($x, Variable|bool $training=null, ...$args)
+    protected function call($x, Variable|bool|null $training=null, ...$args)
     {
         $trainingOpt = ['training'=> $training];
         //$trues = array_shift($args);
@@ -139,7 +141,8 @@ class Sequential extends AbstractModel
             $first = $this->layers[0];
             $inputShape = $first->inputShape();
             array_unshift($inputShape,1);
-            $this->build($inputShape);
+            $inputSpec = new ArraySpec($inputShape,dtype:$first->inputDtype());
+            $this->build($inputSpec);
         }
         parent::summary();
     }
@@ -169,7 +172,7 @@ class Sequential extends AbstractModel
         return $configJson;
     }
 
-    public function save(string $filepath,bool $portable=null) : void
+    public function save(string $filepath,?bool $portable=null) : void
     {
         $f = $this->hdaFactory->open($filepath);
         $f['modelConfig'] = $this->toJson();

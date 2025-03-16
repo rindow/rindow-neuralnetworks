@@ -2,25 +2,18 @@
 namespace Rindow\NeuralNetworks\Layer;
 
 use InvalidArgumentException;
-use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
-use Rindow\NeuralNetworks\Support\GenericUtils;
 use Rindow\NeuralNetworks\Gradient\Variable;
-use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
-use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 
-class Attention extends AbstractLayerBase
+class Attention extends AbstractAttentionLayer
 {
-    use GenericUtils;
-    use GradientUtils;
     protected bool $useScale;
     protected bool $doNotExpandMask;
     protected NDArray $scale;
     protected NDArray $dScale;
-    /** @var array<int> $scoresShape */
-    protected $scoresShape;
     /** @var array<bool> $unbackpropagatables */
     protected ?array $unbackpropagatables = null;
+    protected float $mask_exp = -1e9;
 
     //protected $returnAttentionScores;
 
@@ -34,10 +27,10 @@ class Attention extends AbstractLayerBase
      */
     public function __construct(
         object $backend,
-        array $input_shapes=null,
-        bool $use_scale=null,
-        bool $do_not_expand_mask=null,
-        string $name=null,
+        ?array $input_shapes=null,
+        ?bool $use_scale=null,
+        ?bool $do_not_expand_mask=null,
+        ?string $name=null,
     )
     {
         // defaults
@@ -51,15 +44,18 @@ class Attention extends AbstractLayerBase
         $this->inputShape = $input_shapes;
         $this->useScale = $use_scale;
         $this->doNotExpandMask = $do_not_expand_mask;
+        $this->initName($name,'attention');
         if($this->useScale) {
             $this->scale = $K->array(1.0);
             $this->dScale = $K->array(0.0);
-            $this->allocateWeights(1);
+            $this->allocateWeights(['scale']);
         }
-        $this->initName($name,'attention');
+        if($backend->deviceType()=='PHP') {
+            $this->mask_exp = -1e99;
+        }
     }
 
-    public function build(mixed $variables=null, array $sampleWeights=null) : void
+    public function build(mixed $variables=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $inputShapes = $this->normalizeInputShapes($variables);
@@ -110,6 +106,13 @@ class Attention extends AbstractLayerBase
         }
     }
 
+    public function reverseSyncWeightVariables() : void
+    {
+        if($this->useScale) {
+            $this->scale = $this->weights[0]->value();
+        }
+    }
+
     public function getConfig() : array
     {
         return [
@@ -120,98 +123,82 @@ class Attention extends AbstractLayerBase
     }
 
     /**
-     * @param array<NDArray> $inputs
+     * @param array<Variable> $inputs
+     * @param array<Variable> $mask
+     * @return array<Variable>|Variable
      */
-    protected function assertInputShapes(array $inputs,string $direction) : void
+    public function forward(
+        array $inputs, 
+        Variable|bool|null $training=null, 
+        Variable|bool|null $returnAttentionScores=null,
+        ?array $mask=null,
+        )
     {
-        if(!$this->shapeInspection)
-            return;
-        if($this->inputShape===null) {
-            throw new InvalidArgumentException('Uninitialized input shape in '.$this->name.':'.$direction);
-        }
-        if(count($inputs)!=2 && count($inputs)!=3) {
-            throw new InvalidArgumentException('Must have 2 or 3 arguments in '.$this->name.':'.$direction);
-        }
-        //$tq = $this->inputShape[0][0];
-        //$dim = $this->inputShape[0][1];
-        //$tv = $this->inputShape[1][0];
-        $qshape = $inputs[0]->shape();
-        $batchNum = array_shift($qshape);
-        $vshape = $inputs[1]->shape();
-        $vbatchNum = array_shift($vshape);
-        if($batchNum!=$vbatchNum) {
-            throw new InvalidArgumentException('Unmatch batch size of query and value: '.
-                "query=[$batchNum,".implode(',',$qshape)."],".
-                "value=[$vbatchNum,".implode(',',$vshape)."]".
-                "in ".$this->name.':'.$direction);
-        }
-        if($this->inputShape[0]!=$qshape){
-            throw new InvalidArgumentException('Unmatch query shape '.
-                ' [b,'.implode(',',$this->inputShape[0]).'] NDArray.'.
-                ' ['.$batchNum.','.implode(',',$qshape).'] given in '.$this->name.':'.$direction);
-        }
-        if($this->inputShape[1]!=$vshape){
-            throw new InvalidArgumentException('Unmatch value shape '.
-                ' [b,'.implode(',',$this->inputShape[1]).'] NDArray.'.
-                ' ['.$vbatchNum.','.implode(',',$vshape).'] given in '.$this->name.':'.$direction);
-        }
-        if(count($inputs)==3) {
-            $kshape = $inputs[2]->shape();
-            $kbatchNum = array_shift($kshape);
-            if($vbatchNum!=$kbatchNum) {
-                throw new InvalidArgumentException('Unmatch batch size of value and key: '.
-                    "query=[$vbatchNum,".implode(',',$vshape)."],".
-                    "value=[$kbatchNum,".implode(',',$kshape)."]".
-                    "in ".$this->name.':'.$direction);
+        //$outputs = null;
+        [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
+        $options = [];
+        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training,unbackpropagatable:true);
+        [$returnAttentionScores,$rawReturnAttentionScores] = $this->packAndUnpackVariable($this->backend,$returnAttentionScores,unbackpropagatable:true);
+        $options['training'] = $training;
+        $options['returnAttentionScores'] = $returnAttentionScores;
+        $rawMask = null;
+        if($mask) {
+            if(count($mask)!=2) {
+                throw new InvalidArgumentException('mask must be list of the two of masks as queryMask and valueMask');
             }
-            if($kshape!=$vshape){
-                throw new InvalidArgumentException('Unmatch value shape and key shape.:'.
-                    ' ['.implode(',',$vshape).'],['.implode(',',$kshape).'] in '.$this->name.':'.$direction);
+            [$mask,$rawMask] = $this->packAndUnpackVariables($this->backend,$mask,unbackpropagatable:true);
+            $options['queryMask'] = $mask[0];
+            $options['valueMask'] = $mask[1];
+        } else {
+            if(count($inputs)<2) {
+                throw new InvalidArgumentException('inputs must be a list of two or more NDArrays.');
             }
+            $rawMask = $this->retrieveMultiMasks($rawInputs);
+            //[$mask,$rawMask] = $this->packAndUnpackVariables($this->backend,$rawMask,unbackpropagatable:true);
+            //$options['queryMask'] = $mask[0];
+            //$options['valueMask'] = $mask[1];
         }
-    }
-
-    protected function assertScoresShape(NDArray $scores,string $direction) : void
-    {
-        if(!$this->shapeInspection)
-            return;
-        if($this->scoresShape===null) {
-            throw new InvalidArgumentException('Uninitialized scores shape');
+        if(!$this->built) {
+            $this->build($inputs);
+            $this->built = true;
         }
-        $shape = $scores->shape();
-        $batchNum = array_shift($shape);
-        if($shape!=$this->scoresShape) {
-            $shape = $this->shapeToString($shape);
-            $scoresShape = $this->shapeToString($this->scoresShape);
-            throw new InvalidArgumentException('unmatch scores shape: '.$shape.', must be '.$scoresShape.' in '.$this->name.':'.$direction);
+        $options = $this->cleanNullValue($options);
+        
+        $numOfOutputs = $this->numOfOutputs($options);
+        $session = $this->preGradientProcessOnSession($inputs,$options);
+        $session->begin();
+        try {
+            $this->assertInputShapes($rawInputs,'forward');
+            $this->unbackpropagatables = null;
+            $rawOutputs = $this->call(
+                $rawInputs, 
+                training:$rawTraining, 
+                returnAttentionScores:$rawReturnAttentionScores,
+                mask:$rawMask,
+            );
+            if($returnAttentionScores){
+                $rawOutputs[0] = $this->makeSingleMaskedValue($rawInputs[0], $rawOutputs[0]);
+                $rawOutputs[1] = $this->makeSingleMaskedValue($rawInputs[0], $rawOutputs[1]);
+                $this->assertOutputShape($rawOutputs[0],'forward');
+                $this->assertScoresShape($rawOutputs[1],'forward');
+            } else {
+                $rawOutputs = $this->makeSingleMaskedValue($rawInputs[0], $rawOutputs);
+                $this->assertOutputShape($rawOutputs,'forward');
+            }
+        } finally{
+            $session->end();
         }
-    }
-
-    /**
-     * @param array<NDArray> $dOutputs
-     * @param ArrayAccess<object,object> $grads
-     * @param array<NDArray> $oidsToCollect
-     * @return array<NDArray>
-     */
-    public function backward(
-        array $dOutputs,
-        ArrayAccess $grads=null,
-        array $oidsToCollect=null
-        ) : array
-    {
-        if(count($dOutputs)!=1&&count($dOutputs)!=2) {
-            throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
+        if($numOfOutputs==1) {
+            $rawOutputs = [$rawOutputs];
         }
-        $dOutputs = $dOutputs[0];
-        if(!($dOutputs instanceof NDArray)) {
-            throw new InvalidArgumentException('dOutputs must be list containing one NDArray');
+        $outputs = $this->postGradientProcessOnSession(
+            $this->backend, $session,$inputs,
+            $rawOutputs,$this->unbackpropagatables);
+        if($numOfOutputs==1) {
+            return $outputs[0];
+        } else {
+            return $outputs;
         }
-        $this->assertOutputShape($dOutputs,'backward');
-        $dInputs = $this->differentiate($dOutputs);
-        $this->assertInputShapes($dInputs,'backward');
-        $this->collectGradients($this->backend,array_map(null,$this->trainableVariables(),$this->getGrads()),
-            $grads,$oidsToCollect);
-        return $dInputs;
     }
 
     protected function expandMask(NDArray $sourceMask,NDArray $target) : NDArray
@@ -233,14 +220,14 @@ class Attention extends AbstractLayerBase
 
     /**
      * @param array<NDArray> $inputs
-     * @param array{NDArray,NDArray} $mask
+     * @param array<NDArray|null> $mask
      * @return NDArray|array<NDArray>
      */
     protected function call(
         array $inputs,
-        bool $training=null,
-        bool $returnAttentionScores=null,
-        array $mask=null,
+        ?bool $training=null,
+        ?bool $returnAttentionScores=null,
+        ?array $mask=null,
         ) : NDArray|array
     {
         $K = $this->backend;
@@ -259,7 +246,7 @@ class Attention extends AbstractLayerBase
         // query  = [batch_size, Tq, dim]
         // key    = [batch_size, Tv, dim]
         // scores = [batch_size, Tq, Tv]
-        $scores = $K->matmul($query, $key, null, $tranB=true);
+        $scores = $K->matmul($query, $key, transB:true);
         
         $container->useScale = $this->useScale;
         if($this->useScale) {
@@ -272,35 +259,26 @@ class Attention extends AbstractLayerBase
         $queryMask = null;
         $valueMask = null;
         if($mask) {
-            [$queryMask,$valueMask] = $mask;
+            $queryMask = $mask[0] ?? null;
+            $valueMask = $mask[1] ?? null;
         }
         if($valueMask) {
-            if($valueMask->dtype()==NDArray::bool || $K->isInt($valueMask)) {
-                $valueMask = $K->cast($valueMask,$scores->dtype());
-            }
-            $valueMask = $K->less($valueMask,0.5);              // (mask<0.5)>1.0 , (mask>0.5)=>0.0
-            // scores += (-1e9*valueMask)
+            $mask_exp = $this->mask_exp;
+            //if($valueMask->dtype()==NDArray::bool || $K->isInt($valueMask)) {
+            //    $valueMask = $K->cast($valueMask,$scores->dtype());
+            //}
             if(!$this->doNotExpandMask) { // Broadcasting 
-                // scores = [batch_size, Tq, Tv]
-                // valueMask = [batch_size, Tv]
-                $scoresShape = $scores->shape();
-                $Tv = array_pop($scoresShape);
-                $Tq = array_pop($scoresShape);
-                $maskShape = $valueMask->shape();
-                $mTv = array_pop($maskShape);
-                if($maskShape!=$scoresShape||$Tv!=$mTv) {
-                    throw new InvalidArgumentException('unmatch inputs and queryMask.'.
-                    ' scores:['.implode(',',$scores->shape()).']'.
-                    ' given mask:['.implode(',',$valueMask->shape()).']');
+                if($valueMask->ndim()<2) {
+                    throw new InvalidArgumentException('value mask must be 2D array.');
                 }
                 // scores = [batch_size, Tq, Tv]
-                // valueMask = [batch_size, Tv] =repeat=> [batch_size, Tq, Tv]
-                $valueMask = $K->repeat($valueMask,$Tq,axis:-1);
+                // valueMask = [batch_size, Tv]
+                $K->update_masking($scores,$valueMask,fill:$mask_exp,batchDims:-2,axis:-1);
             } else { // No Broadcasting 
                 // scores += (-1e9*valueMask)
                 $valueMask = $this->expandMask($valueMask,$scores);
+                $K->update_masking($scores,$valueMask,fill:$mask_exp);
             }
-            $K->update_add($scores,$valueMask,alpha:-1e9);
         }
         // weights = softmax(scores)
         $attentionWeight = $K->softmax($scores);
@@ -312,31 +290,21 @@ class Attention extends AbstractLayerBase
         $contextVector = $K->matmul($attentionWeight, $value);
 
         if($queryMask) {
-            if($K->isFloat($queryMask)) {
-                $queryMask = $K->greater($queryMask,0.5);
-            } else {
-                $queryMask = $K->cast($queryMask,$contextVector->dtype());
-            }
-            if(!$this->doNotExpandMask) { // Broadcasting 
+            //if($K->isFloat($queryMask)) {
+            //    $queryMask = $K->greater($queryMask,0.5);
+            //} else {
+            //    $queryMask = $K->cast($queryMask,$contextVector->dtype());
+            //}
+            if(!$this->doNotExpandMask) { // Broadcasting
                 // queryMask = [batch_size, Tq]
-                // vector = [batch_size, Tq, dim] => [dim, batch_size, Tq]
-                $shape = $contextVector->shape();
-                $orgShape = $shape;
-                $dim = array_pop($shape);
-                if($queryMask->shape()!=$shape) {
-                    throw new InvalidArgumentException('unmatch inputs and queryMask.'.
-                    ' contextVector:['.implode(',',$contextVector->shape()).']'.
-                    ' given mask:['.implode(',',$queryMask->shape()).']');
+                // vector    = [batch_size, Tq, dim]
+                if($queryMask->ndim()<2) {
+                    throw new InvalidArgumentException('query mask must be 2D array.');
                 }
-                $Tq = array_pop($shape);
-                $batchSize = (int)array_product($shape);
-                $queryMask = $queryMask->reshape([(int)array_product($queryMask->shape())]);
-                $contextVector = $contextVector->reshape([$batchSize*$Tq, $dim]);
-                $contextVector = $K->update_mul($contextVector, $queryMask, trans:true);
-                $contextVector = $contextVector->reshape($orgShape);
+                $K->update_masking($contextVector,$queryMask,batchDims:$queryMask->ndim(),axis:$contextVector->ndim());
             } else { // No Broadcasting 
                 $queryMask = $this->expandMask($queryMask,$contextVector);
-                $contextVector = $K->update_mul($contextVector, $queryMask);
+                $contextVector = $K->update_masking($contextVector, $queryMask);
             }
             $container->queryMask = $queryMask;
         }
@@ -353,9 +321,6 @@ class Attention extends AbstractLayerBase
         }
     }
 
-    /**
-     * @return array<NDArray>
-     */
     protected function differentiate(NDArray $dOutputs) : array
     {
         $K = $this->backend;
@@ -367,24 +332,18 @@ class Attention extends AbstractLayerBase
         //   dValue   = weights^T (*) dVector
 
         if(isset($container->queryMask)) {
+            $queryMask = $container->queryMask;
             if(!$this->doNotExpandMask) { // Broadcasting 
-                // queryMask = [batch_size*Tq]
-                // vector = [batch_size, Tq, dim] => [dim, batch_size, Tq]
-                $batchShape = $dOutputs->shape();
-                $dim = array_pop($batchShape);
-                $Tq = array_pop($batchShape);
-                $batchSize = (int)array_product($batchShape);
-                $dOutputs = $K->copy($dOutputs->reshape([$batchSize*$Tq, $dim]));
-                $dOutputs = $K->update_mul($dOutputs, $container->queryMask, trans:true);
-                $dOutputs = $dOutputs->reshape([$batchSize, $Tq, $dim]);
+                // queryMask = [batch_size, Tq]
+                // vector = [batch_size, Tq, dim]
+                $dOutputs = $K->masking($queryMask,$dOutputs,batchDims:$queryMask->ndim(),axis:$dOutputs->ndim());
             } else {
-                $dOutputs = $K->copy($dOutputs);
-                $dOutputs = $K->update_mul($dOutputs, $container->queryMask);
+                $dOutputs = $K->masking($queryMask,$dOutputs);
             }
         }
 
-        $dAttentionWeight = $K->matmul($dOutputs,$container->value,$transA=false,$transB=true);
-        $dValue = $K->matmul($container->attentionWeight,$dOutputs,$transA=true,$transB=false);
+        $dAttentionWeight = $K->matmul($dOutputs,$container->value,transA:false,transB:true);
+        $dValue = $K->matmul($container->attentionWeight,$dOutputs,transA:true,transB:false);
 
         $dScores = $K->dSoftmax($dAttentionWeight,$container->attentionWeight);
 
@@ -401,8 +360,8 @@ class Attention extends AbstractLayerBase
             $K->update_scale($dScores,$container->scale);
         }
 
-        $dQuery = $K->matmul($dScores,$container->key,$transA=false,$transB=false);
-        $dKey = $K->matmul($dScores,$container->query,$transA=true,$transB=false);
+        $dQuery = $K->matmul($dScores,$container->key,transA:false,transB:false);
+        $dKey = $K->matmul($dScores,$container->query,transA:true,transB:false);
 
         if($container->sameKey) {
             $K->update_add($dValue,$dKey);
@@ -410,124 +369,6 @@ class Attention extends AbstractLayerBase
         } else {
             return [$dQuery,$dValue,$dKey];
         }
-    }
-
-    /**
-     * @param array<string,mixed> $options
-     */
-    protected function numOfOutputs(?array $options) : int
-    {
-        if($options['returnAttentionScores'] ?? false) {
-            return 2;
-        }
-        return 1;
-    }
-
-    /**
-     * @return array<Variable>|Variable
-     */
-    final public function __invoke(mixed ...$args) : array|NDArray
-    {
-        return $this->forward(...$args);
-    }
-
-    /**
-     * @param array<Variable> $inputs
-     * @param array<Variable> $mask
-     * @return array<Variable>|Variable
-     */
-    public function forward(
-        array $inputs, 
-        Variable|bool $training=null, 
-        Variable|bool $returnAttentionScores=null,
-        array $mask=null,
-        )
-    {
-        //$outputs = null;
-        if(!is_array($inputs)) {
-            throw new InvalidArgumentException('inputs must be list of Variable');
-        }
-        [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);
-        $options = [];
-        [$training,$rawTraining] = $this->packAndUnpackVariable($this->backend,$training,unbackpropagatable:true);
-        [$returnAttentionScores,$rawReturnAttentionScores] = $this->packAndUnpackVariable($this->backend,$returnAttentionScores,unbackpropagatable:true);
-        $options['training'] = $training;
-        $options['returnAttentionScores'] = $returnAttentionScores;
-        $rawMask = null;
-        if($mask) {
-            if(count($mask)!=2) {
-                throw new InvalidArgumentException('mask must be list of the two of masks as queryMask and valueMask');
-            }
-            [$mask,$rawMask] = $this->packAndUnpackVariables($this->backend,$mask,unbackpropagatable:true);
-            $options['queryMask'] = $mask[0];
-            $options['valueMask'] = $mask[1];
-        }
-        if(!$this->built) {
-            $this->build($inputs);
-            $this->built = true;
-        }
-        $options = $this->cleanNullValue($options);
-        
-        $numOfOutputs = $this->numOfOutputs($options);
-        $session = $this->preGradientProcessOnSession($inputs,$options);
-        $session->begin();
-        try {
-            $this->assertInputShapes($rawInputs,'forward');
-            $this->unbackpropagatables = null;
-            $rawOutputs = $this->call(
-                $rawInputs, 
-                training:$rawTraining, 
-                returnAttentionScores:$rawReturnAttentionScores,
-                mask:$rawMask,
-                );
-            if($returnAttentionScores){
-                $this->assertOutputShape($rawOutputs[0],'forward');
-                $this->assertScoresShape($rawOutputs[1],'forward');
-            } else {
-                $this->assertOutputShape($rawOutputs,'forward');
-            }
-        } finally{
-            $session->end();
-        }
-        if($numOfOutputs==1) {
-            $rawOutputs = [$rawOutputs];
-        }
-        $outputs = $this->postGradientProcessOnSession(
-            $this->backend, $session,$inputs,
-            $rawOutputs,$this->unbackpropagatables);
-        if($numOfOutputs==1) {
-            return $outputs[0];
-        } else {
-            return $outputs;
-        }
-    }
-
-    /**
-     * Call from SessionFunc in compiled graph
-     * @param array<NDArray> $inputs
-     * @param array<string,mixed> $options
-     * @return array<NDArray>
-     */
-    public function _rawCall(array $inputs,array $options) : array
-    {
-        $training = $options['training'] ?? null;
-        $queryMask = $options['queryMask'] ?? null;
-        $valueMask = $options['valueMask'] ?? null;
-        $mask = null;
-        if($queryMask) {
-            $mask = [$queryMask,$valueMask];
-        }
-        $returnAttentionScores = $options['returnAttentionScores'] ?? null;
-        $outputs = $this->call(
-            $inputs,
-            training:$training,
-            returnAttentionScores:$returnAttentionScores,
-            mask:$mask,
-        );
-        if(!is_array($outputs)) {
-            $outputs = [$outputs];
-        }
-        return $outputs;
     }
 
 }

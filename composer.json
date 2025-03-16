@@ -6,15 +6,15 @@
     "license": "BSD-3-Clause",
     "require": {
         "php": "^8.1",
-        "rindow/rindow-math-matrix": "~2.0.0"
+        "rindow/rindow-math-matrix": "^2.1.0"
     },
     "require-dev": {
-        "rindow/rindow-math-plot": "~1.0.9",
+        "rindow/rindow-math-plot": "^1.0.9",
         "ext-pdo_sqlite": "*"
     },
     "suggest": {
         "rindow/rindow-math-plot": "when visualize machine learning results",
-        "rindow/rindow-math-matrix-matlibffi": "~1.0.1",
+        "rindow/rindow-math-matrix-matlibffi": "^1.0.3",
         "ext-pdo_sqlite": "for save model"
     },
     "autoload": {

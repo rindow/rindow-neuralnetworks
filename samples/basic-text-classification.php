@@ -11,7 +11,11 @@ $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
 $plt = new Plot(null,$mo);
 
-$datasetdir = sys_get_temp_dir().'/rindow/nn/datasets/aclImdb';
+$dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
+if(!$dataDir) {
+    $dataDir = sys_get_temp_dir().'/rindow/nn/datasets';
+}
+$datasetdir = $dataDir.'/aclImdb';
 $tarfile = $datasetdir.'/aclImdb_v1.tar.gz';
 $url = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz";
 $savefilename = __DIR__.'/aclImdb.pkl';
@@ -74,8 +78,7 @@ if(!file_exists($savefilename)) {
         $test_labels,
     ] = $mo->unserializeArray($tensors);
 }
-$train_labels = $mo->la()->astype($train_labels,NDArray::float32);
-$test_labels = $mo->la()->astype($test_labels,NDArray::float32);
+
 echo implode(',',$train_inputs->shape())."\n";
 echo implode(',',$train_labels->shape())."\n";
 echo implode(',',$test_inputs->shape())."\n";

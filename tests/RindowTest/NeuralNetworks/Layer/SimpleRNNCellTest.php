@@ -27,15 +27,14 @@ class SimpleRNNCellTest extends TestCase
         $f = function($x) use ($mo,$K,$function,$states){
             $x = $K->array($x);
             $object = new \stdClass();
-            [$y,$states] = $function->forward($x,$states,calcState:$object);
-            return $K->ndarray($y);
+            $states = $function->forward($x,$states,calcState:$object);
+            return $K->ndarray($states[0]);
         };
         $grads = $mo->la()->numericalGradient(1e-3,$f,$K->ndarray($x));
         $object = new \stdClass();
-        [$outputs,$next_states] = $function->forward($x,$states,calcState:$object);
-        $dOutputs = $K->ones($outputs->shape(),$outputs->dtype());
-        $dNextStates = [$K->zeros([1,3])];
-        [$dInputs,$dPrevStates] = $function->backward($dOutputs,$dNextStates,$object);
+        $next_states = $function->forward($x,$states,calcState:$object);
+        $dNextStates = [$K->ones($next_states[0]->shape(),$next_states[0]->dtype())];
+        [$dInputs,$dPrevStates] = $function->backward($dNextStates,$object);
 
         return $mo->la()->isclose($grads[0],$K->ndarray($dInputs),1e-4);
     }
@@ -101,7 +100,7 @@ class SimpleRNNCellTest extends TestCase
             );
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [3] but [4] given in SimpleRNNCell');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (3) but (4) given in SimpleRNNCell');
         $layer->build([4]);
     }
 
@@ -132,9 +131,8 @@ class SimpleRNNCellTest extends TestCase
         $object = new \stdClass();
         $copyInputs = $K->copy($inputs);
         $copyStates = [$K->copy($states[0])];
-        [$outputs,$nextStates] = $layer->forward($inputs, $states,calcState:$object);
+        $nextStates = $layer->forward($inputs, $states,calcState:$object);
         //
-        $this->assertEquals([2,4],$outputs->shape());
         $this->assertCount(1,$nextStates);
         $this->assertEquals([2,4],$nextStates[0]->shape());
         $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
@@ -144,15 +142,11 @@ class SimpleRNNCellTest extends TestCase
         // backward
         //
         // 2 batch
-        $dOutputs =
-            $K->ones([2,4]);
         $dStates =
-            [$K->ones([2,4])];
+            [$K->scale(2,$K->ones([2,4]))];
 
-        $copydOutputs = $K->copy(
-            $dOutputs);
         $copydStates = [$K->copy($dStates[0])];
-        [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates,$object);
+        [$dInputs,$dPrevStates] = $layer->backward($dStates,$object);
         // 2 batch
         $this->assertEquals([2,3],$dInputs->shape());
         $this->assertCount(1,$dPrevStates);
@@ -167,7 +161,6 @@ class SimpleRNNCellTest extends TestCase
             $mo->zerosLike($grads[2])->toArray(),
             $grads[2]->toArray());
 
-        $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
         $this->assertEquals($copydStates[0]->toArray(),$dStates[0]->toArray());
     }
 
@@ -203,12 +196,8 @@ class SimpleRNNCellTest extends TestCase
         $inputs = $K->ones([2,3]);
         $states = [$K->ones([2,4])];
         $object = new \stdClass();
-        [$outputs,$nextStates] = $layer->forward($inputs, $states,calcState:$object);
+        $nextStates = $layer->forward($inputs, $states,calcState:$object);
         //
-        $this->assertEquals([
-            [8,8,8,8],
-            [8,8,8,8],
-            ],$outputs->toArray());
         $this->assertEquals([
             [8,8,8,8],
             [8,8,8,8],
@@ -217,12 +206,10 @@ class SimpleRNNCellTest extends TestCase
         // backward
         //
         // 2 batch
-        $dOutputs =
-            $K->ones([2,4]);
         $dStates =
-            [$K->ones([2,4])];
+            [$K->scale(2,$K->ones([2,4]))];
 
-        [$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates,$object);
+        [$dInputs,$dPrevStates] = $layer->backward($dStates,$object);
         // 2 batch
         $this->assertEquals([
             [8,8,8],

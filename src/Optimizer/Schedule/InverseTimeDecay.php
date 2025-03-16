@@ -12,7 +12,7 @@ class  InverseTimeDecay implements LearningRateSchedule
         float $initialLearningRate,
         int $decaySteps,
         float $decayRate,
-        bool $staircase=null,
+        ?bool $staircase=null,
         )
     {
         $staircase = $staircase ?? false;

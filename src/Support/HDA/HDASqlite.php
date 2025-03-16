@@ -23,7 +23,7 @@ class HDASqlite implements HDA
     protected ?PDO $pdo;
     protected string $table = 'hda';
 
-    public function __construct(string|PDO $filename=null, string $mode=null)
+    public function __construct(string|PDO|null $filename=null, ?string $mode=null)
     {
         if($filename===null)
             return;
@@ -35,7 +35,7 @@ class HDASqlite implements HDA
             throw new InvalidArgumentException('Invalid parent type');
     }
 
-    public function open(string $filename, string $mode=null) : void
+    public function open(string $filename, ?string $mode=null) : void
     {
         $options = [];
         if ($mode=='r' && version_compare(PHP_VERSION,'7.3')>=0) {

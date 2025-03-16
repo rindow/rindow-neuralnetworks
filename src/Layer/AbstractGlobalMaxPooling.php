@@ -18,9 +18,9 @@ class AbstractGlobalMaxPooling extends AbstractImage
      */
     public function __construct(
         object $backend,
-        string $data_format=null,
-        array $input_shape=null,
-        string $name=null,
+        ?string $data_format=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         // defaults
@@ -34,7 +34,7 @@ class AbstractGlobalMaxPooling extends AbstractImage
         $this->initName($name,$this->defaultLayerName);
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -81,13 +81,14 @@ class AbstractGlobalMaxPooling extends AbstractImage
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();
         $batches = $inputs->shape()[0];
-        // channels_last:  shape == [batches, imageshape, channels]
-        // channels_first: shape == [batches, channels, imageshape]
+        // channels_first: inputs == (batches, channels, imageshape)
+        // channels_last:  inputs == (batches, imageshape, channels)
+        // outputs == (batches, channels)
         if($this->channels_first) {
             $reshapedInputs = $inputs->reshape([$batches,$this->outputShape[0],$this->reduceShape]);
             $axis = -1;
@@ -110,21 +111,88 @@ class AbstractGlobalMaxPooling extends AbstractImage
         //dx = dy * onehot(argMax(x))
         // argMax.shape == [batches*channels]
         // dOutputs.shape == [batches*channels]
+
+        // channels_first: inputs == (batches, channels, imageshape)
+        // channels_last:  inputs == (batches, imageshape, channels)
         if($this->channels_first) {
-            $axis=-1;
+            $axis=2;
         } else {
             $axis=1;
         }
-        $argMax = $K->argMax($container->reshapedInputs,axis:$axis);
-        $dInputs = $K->scatter(
-            $argMax,
-            $dOutputs,
-            $this->reduceShape,
-            $axis
+        // argMax == (batches, channels)
+        $argMax = $K->argMax($container->reshapedInputs,axis:$axis,dtype:NDArray::int32);
+
+        //$dInputs = $K->scatter(
+        //    $argMax,
+        //    $dOutputs,
+        //    $this->reduceShape,
+        //    axis:$axis
+        //);
+
+        // scatterb version
+        // dOutputs == (batches, channels)
+        // channels_last:  inputs == (batches, imageshape, channels)
+        // channels_first: inputs == (batches, channels, imageshape)
+        $dInputs = $K->scatterb(
+            $argMax,                    // indices
+            $dOutputs,                  // updates
+            $container->reshapedInputs->shape(),// shape
+            axis:$axis,
+            batchDims:$axis,
+            detailDepth:$container->reshapedInputs->ndim(),
+            indexDepth:$axis,
         );
-        // channels_last:  dInputs.shape == [batches, outshape, channels]
-        // channels_first: dInputs.shape == [batches, channels, outshape]
+
+        // scatterND version
+        //if($this->channels_first) {
+        //    $axis=1;
+        //    $shape = $container->reshapedInputs->shape();
+        //} else {
+        //    $axis=2;
+        //    [$batches,$imageshape,$channels] = $container->reshapedInputs->shape();
+        //    $shape = [$batches,$channels,$imageshape];
+        //}
+        //$argMax = $K->expandDims($argMax,axis:-1);
+        //// argMax(x):  (batchs,channels,1)
+        //// dOutput(b): (batchs,channels)
+        //// dInputs(a): (batchs,channels,imageshape)
+        //// batch_dims: batchs+channels
+        ////echo "===============================\n";
+        ////echo "channels_first=".($this->channels_first?'true':'false')."\n";
+        ////echo "origInputs=(".implode(',',$container->origInputsShape).")\n";
+        ////echo "shape=(".implode(',',$shape).")\n";
+        ////echo "argMax=(".implode(',',$argMax->shape()).")\n";
+        ////echo "dOutputs=(".implode(',',$dOutputs->shape()).")\n";
+        ////echo "batchDims:$axis\n";
+        //$dInputs = $K->scatterND(
+        //    $argMax,
+        //    $dOutputs,
+        //    $shape,
+        //    batchDims:$axis
+        //);
+        //if(!$this->channels_first) {
+        //    $dInputs = $K->transpose($dInputs,perm:[0,2,1]);
+        //}
+        //// channels_last:  dInputs.shape == (batches, outshape, channels)
+        //// channels_first: dInputs.shape == (batches, channels, outshape)
+        ////echo "dInputs=(".implode(',',$dInputs->shape()).")\n";
 
         return $dInputs->reshape($container->origInputsShape);
     }
 }
+
+// max(axis=1) 
+// inputs = (4,3,2)
+// [
+//   [[1,0],[0,1],[0,0]],
+//   [[1,0],[0,1],[0,0]],
+//   [[1,0],[0,1],[0,0]],
+//   [[1,0],[0,1],[0,0]],
+// ]
+// x = (4,3)
+// outputs = (4,2)
+// [
+//   [4,5],
+//   [4,5],
+// ]
+

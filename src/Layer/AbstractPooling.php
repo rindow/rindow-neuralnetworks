@@ -7,7 +7,7 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 
 abstract class AbstractPooling extends AbstractImage
 {
-    abstract protected function call(NDArray $inputs, bool $training=null) : NDArray;
+    abstract protected function call(NDArray $inputs, ?bool $training=null) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     use GenericUtils;
@@ -30,13 +30,13 @@ abstract class AbstractPooling extends AbstractImage
      */
     public function __construct(
         object $backend,
-        int|array $pool_size=null,
-        int|array $strides=null,
-        string $padding=null,
-        string $data_format=null,
-        int|array $dilation_rate=null,
-        array $input_shape=null,
-        string $name=null,
+        int|array|null $pool_size=null,
+        int|array|null $strides=null,
+        ?string $padding=null,
+        ?string $data_format=null,
+        int|array|null $dilation_rate=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         // defaults
@@ -60,7 +60,7 @@ abstract class AbstractPooling extends AbstractImage
         $this->inputShape = $input_shape;
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
 

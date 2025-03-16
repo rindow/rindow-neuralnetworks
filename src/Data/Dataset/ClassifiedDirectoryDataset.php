@@ -41,14 +41,14 @@ class ClassifiedDirectoryDataset implements IteratorAggregate,Dataset
     public function __construct(
         object $mo,
         string $path,
-        string $pattern=null,
-        int $batch_size=null,
-        object $crawler=null,
-        DatasetFilter $filter=null,
-        bool $unclassified=null,
-        bool $shuffle=null,
-        int $limit=null,
-        array $restricted_by_class=null,
+        ?string $pattern=null,
+        ?int $batch_size=null,
+        ?object $crawler=null,
+        ?DatasetFilter $filter=null,
+        ?bool $unclassified=null,
+        ?bool $shuffle=null,
+        ?int $limit=null,
+        ?array $restricted_by_class=null,
     )
     {
         $pattern = $pattern ?? null;

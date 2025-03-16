@@ -9,7 +9,10 @@ use Interop\Polite\Math\Matrix\NDArray;
 class Mnist
 {
     protected object $matrixOperator;
-    protected string $urlBase = 'http://yann.lecun.com/exdb/mnist/';
+    // Unable to download from original site.
+    // http://yann.lecun.com/exdb/mnist/'
+    // Redirecting download to alternative mirror site.
+    protected string $urlBase = 'https://storage.googleapis.com/cvdf-datasets/mnist/';
     /** @var array<string,string> $keyFiles */
     protected $keyFiles = [
         'train_images'=>'train-images-idx3-ubyte.gz',
@@ -34,9 +37,23 @@ class Mnist
         $this->saveFile = $this->datasetDir . "/mnist.pkl";
     }
 
+    public function datasetDir() : string
+    {
+        return $this->datasetDir;
+    }
+
+    protected function getRindowDatesetDir() : string
+    {
+        $dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
+        if(!$dataDir) {
+            $dataDir = sys_get_temp_dir().'/rindow/nn/datasets';
+        }
+        return $dataDir;
+    }
+
     protected function getDatasetDir() : string
     {
-        return sys_get_temp_dir().'/rindow/nn/datasets/mnist';
+        return $this->getRindowDatesetDir().'/mnist';
     }
 
     protected function console(string $message) : void
@@ -47,7 +64,7 @@ class Mnist
     /**
      * @return array{array{NDArray,NDArray},array{NDArray,NDArray}}
      */
-    public function loadData(string $filePath=null) : array
+    public function loadData(?string $filePath=null) : array
     {
         $mo = $this->matrixOperator;
         if($filePath===null) {
@@ -63,7 +80,7 @@ class Mnist
                 [$dataset['test_images'],  $dataset['test_labels']]];
     }
 
-    public function cleanPickle(string $filePath=null) : void
+    public function cleanPickle(?string $filePath=null) : void
     {
         if($filePath===null) {
             $filePath = $this->saveFile;
@@ -114,7 +131,6 @@ class Mnist
 
         if(file_exists($filePath))
             return;
-
         $this->console("Downloading " . $filename . " ... ");
         copy($this->urlBase.$filename, $filePath);
         $this->console("Done\n");

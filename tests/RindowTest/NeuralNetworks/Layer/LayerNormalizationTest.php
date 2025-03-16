@@ -2,6 +2,7 @@
 namespace RindowTest\NeuralNetworks\Layer\LayerNormalizationTest;
 
 use PHPUnit\Framework\TestCase;
+use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Layer\LayerNormalization;
@@ -21,6 +22,7 @@ class LayerNormalizationTest extends TestCase
 
     public function testNormal()
     {
+        //echo "============= testNormal ============================\n";
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
@@ -73,12 +75,13 @@ class LayerNormalizationTest extends TestCase
         ]);
         [$dx] = $outputsVariable->creator()->backward([$dout]);
         $dx = $K->ndarray($dx);
-        $this->assertTrue($mo->la()->isclose($mo->la()->array(
-            [[-0.00069,  0.15298,  0.30664],
-             [-0.00069,  0.15298,  0.30664],
-             [ 0.30664,  0.15298, -0.00069],
-             [ 0.30664,  0.15298, -0.00069]]
-        ), $dx, $r=1e-1));
+        //echo $mo->toString($dx,indent:true)."\n";
+        $this->assertTrue($mo->la()->isclose($mo->la()->array([
+            [-0.00091649,  0.0,          0.00091649],
+            [-0.00091649,  0.0,          0.00091649],
+            [ 0.00091649,  0.0,         -0.00091649],
+            [ 0.00091649,  0.0,         -0.00091649],
+        ]), $dx ));
         // 3 input x 4 batch
         $this->assertEquals([4,3],$dx->shape());
 
@@ -89,6 +92,7 @@ class LayerNormalizationTest extends TestCase
 
     public function testClone()
     {
+        //echo "============= testClone ============================\n";
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
@@ -105,12 +109,14 @@ class LayerNormalizationTest extends TestCase
 
     public function testChannelsLast()
     {
+        //echo "============= testChannelsLast ============================\n";
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
         $g = $nn->gradient();
         $layer = new LayerNormalization($K);
         // 4 batch x 2x2x3
+        // (batch,height,width,color)
         $x = $K->array([
             [[[1.0,2.0,3.0],[0.5,1.5,2.5]],[[1.5,2.5,3.5],[1.0,2.0,3.0]]],
             [[[0.5,0.5,0.5],[0.5,0.5,0.5]],[[0.5,0.5,0.5],[0.5,0.5,0.5]]],
@@ -151,6 +157,7 @@ class LayerNormalizationTest extends TestCase
 
     public function testChannelsFirst()
     {
+        //echo "============= testChannelsFirst ============================\n";
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
         $K = $nn->backend();
@@ -159,6 +166,7 @@ class LayerNormalizationTest extends TestCase
             axis:1,
         );
         // 4 batch x 3x2x2
+        // (batch,color,height,width)
         $x = $K->array([
             [[[1.0,0.5],[1.5,1.0]],[[2.0,1.5],[2.5,2.0]],[[3.0,2.5],[3.5,3.0]]],
             [[[1.0,0.5],[1.5,1.0]],[[2.0,1.5],[2.5,2.0]],[[3.0,2.5],[3.5,3.0]]],
@@ -198,4 +206,125 @@ class LayerNormalizationTest extends TestCase
         // 4 batch x 2x2 image x 3 input x
         $this->assertEquals([4,3,2,2],$dx->shape());
     }
+
+    public function testFloatingSequenceLength()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $layer = new LayerNormalization($K);
+
+        //
+        //  build and first call
+        //
+        // 4batch x 5seq x 2feature
+        //echo "==========first===============\n";
+        $shape = [4,5,2];
+        $x = $K->array($mo->la()->range(start:1,limit:1+array_product($shape),dtype:NDArray::float32)
+                ->reshape($shape));
+        //echo "x=".$mo->toString($x,indent:true)."\n";
+        $inputs = $g->Variable($x);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs, training:true);
+                return $outputsVariable;
+            }
+        );
+        $grads = $tape->gradient($outputsVariable,$inputs);
+        
+        [$beta,$gamma] = $layer->trainableVariables();
+        $this->assertEquals([2],$beta->shape());
+        $this->assertEquals([2],$gamma->shape());
+        [$dbeta,$dgamma] = $layer->getGrads();
+        $this->assertEquals([2],$dbeta->shape());
+        $this->assertEquals([2],$dgamma->shape());
+
+        //
+        // change sequence length and second call
+        //
+        //echo "==========second===============\n";
+        $layer->setShapeInspection(false);
+        // 4batch x 3seq x 2feature
+        $shape = [4,3,2];
+        $x = $K->array($mo->la()->range(start:1,limit:1+array_product($shape),dtype:NDArray::float32)
+                ->reshape($shape));
+        $inputs = $g->Variable($x);
+
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs, training:true);
+                return $outputsVariable;
+            }
+        );
+        $out = $K->ndarray($outputsVariable);
+        // 4batch x 3seq x 2feature
+        $this->assertEquals([4,3,2],$out->shape());
+        $this->assertTrue($mo->la()->isclose(
+            $mo->la()->array([
+               [[-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587]],
+                
+               [[-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587]],
+                
+               [[-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587]],
+                
+               [[-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587],
+                [-0.99800587,  0.99800587]],
+            ]),
+            $K->ndarray($out),
+            //debug:true,
+        ));
+
+        // 4batch x 3seq x 2feature
+        $dout = $x;
+        //echo "dout=".$mo->toString($dout,indent:true)."\n";
+        [$dx] = $outputsVariable->creator()->backward([$dout]);
+        // 4 batch x 2x2 image x 3 input x
+        //echo $mo->toString($dx,format:'%13.8f',indent:true)."\n";
+        //echo $mo->la()->sum($K->ndarray($dx))."\n";
+        $this->assertEquals([4,3,2],$dx->shape());
+        $this->assertTrue($mo->la()->isclose(
+            $mo->la()->array([
+                [[-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633]],
+                [[-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633]],
+                [[-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633]],
+                [[-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633],
+                 [-0.00397633,  0.00397633]],
+            ]),
+            $K->ndarray($dx),
+            rtol:1e-3,
+            //atol:1e-7,
+            //debug:true,
+        ));
+
+        $this->assertTrue($mo->la()->isclose(
+            $mo->la()->array([
+                -143.71284,  155.6889
+            ]),
+            $K->ndarray($dgamma),
+        ));
+
+        $this->assertTrue($mo->la()->isclose(
+            $mo->la()->array([
+                144.0, 156.0,
+            ]),
+            $K->ndarray($dbeta),
+        ));
+
+    }
+
 }

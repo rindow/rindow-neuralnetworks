@@ -255,7 +255,7 @@ class TestRNNMain extends AbstractModel
 
     public function predict(
         $inputs, 
-        array|object $callbacks=null, 
+        array|object|null $callbacks=null, 
         ...$options
     ) : NDArray
     {

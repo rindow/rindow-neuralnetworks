@@ -21,7 +21,21 @@ class Cifar10Test extends TestCase
             return;
         }
         $this->plot = true;
-        $this->pickleFile = sys_get_temp_dir().'/rindow/nn/datasets/cifar-10-batches-bin/cifar10.pkl';
+        $this->pickleFile = $this->getDatasetDir().'/test_batch_labels.pkl';
+    }
+
+    protected function getRindowDatesetDir() : string
+    {
+        $dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
+        if(!$dataDir) {
+            $dataDir = sys_get_temp_dir().'/rindow/nn/datasets';
+        }
+        return $dataDir;
+    }
+
+    protected function getDatasetDir() : string
+    {
+        return $this->getRindowDatesetDir().'/cifar-10-batches-bin';
     }
 
     public function getPlotConfig()
@@ -43,29 +57,45 @@ class Cifar10Test extends TestCase
 
     public function testLoadDataFromFiles()
     {
-        $pickleFile = $this->pickleFile;
-        if(file_exists($pickleFile)) {
-            unlink($pickleFile);
-            sleep(1);
-        }
-
         $mo = new MatrixOperator();
         $nn = new NeuralNetworks($mo);
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        [[$train_img,$train_label],[$test_img,$test_label]] =
+        $pickleFile = $this->pickleFile;
+        if(file_exists($pickleFile)) {
+            $nn->datasets()->cifar10()->cleanPickle();
+            //unlink($pickleFile);
+            sleep(1);
+        }
+
+        [$train,$test] =
             $nn->datasets()->cifar10()->loadData();
 
         sleep(1);
         $this->assertTrue(file_exists($pickleFile));
 
         if($this->plot) {
-            [$figure, $axes] = $plt->subplots(5,7);
-            for($i=0;$i<count($axes);$i++) {
-                $axes[$i]->setAspect('equal');
-                $axes[$i]->setFrame(false);
-                $axes[$i]->imshow($train_img[$i],
-                    null,null,null,$origin='upper');
+            foreach($train as [$img,$label]) {
+                $this->assertEquals([10000,32, 32, 3],$img->shape());
+                $this->assertEquals([10000],$label->shape());
+                [$figure, $axes] = $plt->subplots(5,7);
+                for($i=0;$i<count($axes);$i++) {
+                    $axes[$i]->setAspect('equal');
+                    $axes[$i]->setFrame(false);
+                    $axes[$i]->imshow($img[$i],
+                        null,null,null,$origin='upper');
+                }
+            }
+            foreach($test as [$img,$label]) {
+                $this->assertEquals([10000,32, 32, 3],$img->shape());
+                $this->assertEquals([10000],$label->shape());
+                [$figure, $axes] = $plt->subplots(5,7);
+                for($i=0;$i<count($axes);$i++) {
+                    $axes[$i]->setAspect('equal');
+                    $axes[$i]->setFrame(false);
+                    $axes[$i]->imshow($img[$i],
+                        null,null,null,$origin='upper');
+                }
             }
             $plt->show();
         }
@@ -88,18 +118,86 @@ class Cifar10Test extends TestCase
         //];
         $plt = new Plot($this->getPlotConfig(),$mo);
 
-        [[$train_img,$train_label],[$test_img,$test_label]] =
+        [$train,$test] =
             $nn->datasets()->cifar10()->loadData();
 
+        sleep(1);
+        $this->assertTrue(file_exists($pickleFile));
+
         if($this->plot) {
-            [$figure, $axes] = $plt->subplots(5,7);
-            for($i=0;$i<count($axes);$i++) {
-                $axes[$i]->setAspect('equal');
-                $axes[$i]->setFrame(false);
-                $axes[$i]->imshow($train_img[$i],null,null,null,$origin='upper');
+            foreach($train as [$img,$label]) {
+                $this->assertEquals([10000,32, 32, 3],$img->shape());
+                $this->assertEquals([10000],$label->shape());
+                [$figure, $axes] = $plt->subplots(5,7);
+                for($i=0;$i<count($axes);$i++) {
+                    $axes[$i]->setAspect('equal');
+                    $axes[$i]->setFrame(false);
+                    $axes[$i]->imshow($img[$i],
+                        null,null,null,$origin='upper');
+                }
+            }
+            foreach($test as [$img,$label]) {
+                $this->assertEquals([10000,32, 32, 3],$img->shape());
+                $this->assertEquals([10000],$label->shape());
+                [$figure, $axes] = $plt->subplots(5,7);
+                for($i=0;$i<count($axes);$i++) {
+                    $axes[$i]->setAspect('equal');
+                    $axes[$i]->setFrame(false);
+                    $axes[$i]->imshow($img[$i],
+                        null,null,null,$origin='upper');
+                }
             }
             $plt->show();
         }
+    }
+
+    public function testRewind()
+    {
+        $pickleFile = $this->pickleFile;
+        $this->assertTrue(file_exists($pickleFile));
+
+        $mo = new MatrixOperator();
+        $nn = new NeuralNetworks($mo);
+
+        [$train,$test] =
+            $nn->datasets()->cifar10()->loadData();
+
+        sleep(1);
+        $this->assertTrue(file_exists($pickleFile));
+
+        // first loop
+        $i = 0;
+        foreach($train as [$img,$label]) {
+            $this->assertEquals([10000,32, 32, 3],$img->shape());
+            $this->assertEquals([10000],$label->shape());
+            $i++;
+        }
+        $this->assertEquals(5,$i);
+
+        $i = 0;
+        foreach($test as [$img,$label]) {
+            $this->assertEquals([10000,32, 32, 3],$img->shape());
+            $this->assertEquals([10000],$label->shape());
+            $i++;
+        }
+        $this->assertEquals(1,$i);
+
+        // rewind
+        $i = 0;
+        foreach($train as [$img,$label]) {
+            $this->assertEquals([10000,32, 32, 3],$img->shape());
+            $this->assertEquals([10000],$label->shape());
+            $i++;
+        }
+        $this->assertEquals(5,$i);
+
+        $i = 0;
+        foreach($test as [$img,$label]) {
+            $this->assertEquals([10000,32, 32, 3],$img->shape());
+            $this->assertEquals([10000],$label->shape());
+            $i++;
+        }
+        $this->assertEquals(1,$i);
     }
 
     public function testCleanPickle()

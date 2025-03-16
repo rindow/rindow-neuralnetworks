@@ -21,6 +21,7 @@ use Rindow\NeuralNetworks\Data\Dataset\NDArrayDataset;
 use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Gradient\Module;
 use Rindow\NeuralNetworks\Gradient\GraphFunction;
+use Rindow\NeuralNetworks\Gradient\ArraySpec;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Support\HDA\HDAFactory;
 use Interop\Polite\Math\Matrix\NDArray;
@@ -34,7 +35,7 @@ abstract class AbstractModel implements Model
     protected ?Optimizer $optimizer;
     /** @var array<Metric> */
     protected array $metrics = [];
-    protected ?Loss $lossFunction;
+    protected mixed $lossFunction;
     protected bool $built = false;
     protected bool $shapeInspection = true;
     protected bool $backupShapeInspection;
@@ -49,7 +50,11 @@ abstract class AbstractModel implements Model
     /** @var array<string,bool> $callOptions */
     protected ?array $callOptions;
 
-    public function __construct(Builder $builder, HDAFactory $hdaFactory=null)
+    public function __construct(
+        Builder $builder,
+        ?HDAFactory $hdaFactory=null,
+        ?string $name=null,
+    )
     {
         $this->builder = $builder;
         $this->backend = $builder->backend();
@@ -64,6 +69,7 @@ abstract class AbstractModel implements Model
         foreach($refParams as $param) {
             $this->callOptions[$param->name] = true;
         }
+        $this->name = $name;
     }
 
     protected function console(string $message) : void
@@ -218,10 +224,10 @@ abstract class AbstractModel implements Model
     }
 
     public function compile(
-        string|object $optimizer=null,
-        string|object $loss=null,
-        array $metrics=null,
-        int $numInputs=null,
+        string|object|null $optimizer=null,
+        string|object|null $loss=null,
+        ?array $metrics=null,
+        ?int $numInputs=null,
     ) : void
     {
         $optimizer = $optimizer ?? 'SGD';
@@ -242,14 +248,14 @@ abstract class AbstractModel implements Model
 
     public function fit(
         mixed $inputs,
-        NDArray $tests=null,
-        int $batch_size=null,
-        int $epochs=null,
-        int $verbose=null,
-        array|Dataset $validation_data=null,
-        array $callbacks=null,
-        bool $shuffle=null,
-        object $filter=null,
+        ?NDArray $tests=null,
+        ?int $batch_size=null,
+        ?int $epochs=null,
+        ?int $verbose=null,
+        array|Dataset|null $validation_data=null,
+        ?array $callbacks=null,
+        ?bool $shuffle=null,
+        ?object $filter=null,
     ) : array
     {
         if($this->optimizer==null || $this->lossFunction==null) {
@@ -488,10 +494,10 @@ abstract class AbstractModel implements Model
 
     public function evaluate(
         mixed $inputs,
-        NDArray $trues=null,
-        int $batch_size=null,
-        int $verbose=null,
-        array|object $callbacks=null,
+        ?NDArray $trues=null,
+        ?int $batch_size=null,
+        ?int $verbose=null,
+        array|object|null $callbacks=null,
     ) : array
     {
         // defaults
@@ -565,7 +571,7 @@ abstract class AbstractModel implements Model
 
     public function predict(
         mixed $inputs,
-        array|Broadcaster $callbacks=null,
+        array|Broadcaster|null $callbacks=null,
         mixed ...$options
     ) : NDArray
     {
@@ -623,18 +629,20 @@ abstract class AbstractModel implements Model
         if(isset($this->graph['model'])) {
             return $this->graph['model'];
         }
-        $model = $this;
-        $func = function($x,...$options) use ($model) {
-            return $model->forward($x,...$options);
-        };
-        //$options = ['alternateCreator'=>$this];
-        //[$weights,$grads] = $this->initWeights();
-        //if(count($weights)) {
-        //    $options['weights'] = $weights;
-        //    $options['grads'] = $grads;
-        //}
+        //$model = $this;
+        //$func = function($x,...$options) use ($model) {
+        //    return $model->forward($x,...$options);
+        //};
+        ////$options = ['alternateCreator'=>$this];
+        ////[$weights,$grads] = $this->initWeights();
+        ////if(count($weights)) {
+        ////    $options['weights'] = $weights;
+        ////    $options['grads'] = $grads;
+        ////}
+        //$this->graph['model'] = $this->builder->gradient->Function(
+        //    $func,alternateCreator:$this);
         $this->graph['model'] = $this->builder->gradient->Function(
-            $func,alternateCreator:$this);
+            $this,alternateCreator:$this);
         return $this->graph['model'];
     }
 
@@ -690,7 +698,6 @@ abstract class AbstractModel implements Model
                 $variables[] = $var;
             }
         }
-
         return $variables;
     }
 
@@ -715,7 +722,8 @@ abstract class AbstractModel implements Model
 
     public function trainableVariables() : array
     {
-        return array_filter($this->variables(),fn($v)=>$v->isTrainable());
+        $variables = $this->variables();
+        return array_filter($variables,fn($v)=>$v->isTrainable());
     }
 
     public function reverseSyncWeightVariables() : void
@@ -760,7 +768,7 @@ abstract class AbstractModel implements Model
      * @return array<NDArray>
      */
     public function backward(
-        array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+        array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array
     {
         return $this->graph['model']->backward($dOutputs, $grads, $oidsToCollect);
     }
@@ -781,10 +789,10 @@ abstract class AbstractModel implements Model
         }
         $inputs = array_map(fn($x)=>$g->Variable($x),$inputs);
         if($this->isAwareOf('training')) {
-            $inputs['training'] = $g->Variable(true);
+            $inputs['training'] = $g->Variable(true,name:'training');
         }
         if($this->isAwareOf('trues')) {
-            $inputs['trues'] = $g->Variable($trues);
+            $inputs['trues'] = $g->Variable($trues,name:'trues');
         }
         $trues = $this->trueValuesFilter($trues);
         $trues = $g->Variable($trues);
@@ -875,7 +883,7 @@ abstract class AbstractModel implements Model
         return $predicts->value();
     }
 
-    public function build(array|NDArray|Variable ...$inputShapes) : void
+    public function build(array|NDArray|Variable|ArraySpec ...$inputShapes) : void
     {
         if($this->built) {
             return;
@@ -884,7 +892,12 @@ abstract class AbstractModel implements Model
         $nn = $this->builder;
         $inputs = [];
         foreach($inputShapes as $idx => $inputShape) {
-            if(is_array($inputShape)) {
+            if($inputShape instanceof ArraySpec) {
+                $inputs[$idx] = $nn->gradient()->Variable($K->zeros(
+                    $inputShape->shape()->toArray(),
+                    dtype:$inputShape->dtype()
+                ));
+            } elseif(is_array($inputShape)) {
                 $inputs[$idx] = $nn->gradient()->Variable($K->zeros($inputShape));
             } else {
                 $inputs[$idx] = $inputShape;
@@ -956,7 +969,7 @@ abstract class AbstractModel implements Model
         $this->display('Total params: '.$totalParams."\n");
     }
 
-    public function saveWeights(iterable &$modelWeights,bool $portable=null) : void
+    public function saveWeights(iterable &$modelWeights,?bool $portable=null) : void
     {
         $K = $this->backend;
         $mo = $K->localMatrixOperator();
@@ -964,8 +977,9 @@ abstract class AbstractModel implements Model
         foreach($this->variables() as $idx => $weights) {
             $param = $weights->value();
             $param=$K->ndarray($param);
-            if($portable)
+            if($portable) {
                 $param = $this->converPortableSaveMode($param);
+            }
             $modelWeights['weights'][$idx] = $mo->serializeArray($param);
         }
         $optimizerWeights = $this->optimizer()->getWeights();
@@ -973,8 +987,9 @@ abstract class AbstractModel implements Model
         $modelWeights['optimizer'] = $modelWeights['optimizer'] ?? [];
         foreach ($optimizerWeights as $idx => $weights) {
             $weights=$K->ndarray($weights);
-            if($portable)
+            if($portable) {
                 $weights = $this->converPortableSaveMode($weights);
+            }
             $modelWeights['optimizer'][$idx] = $mo->serializeArray($weights);
         }
     }
@@ -1017,7 +1032,7 @@ abstract class AbstractModel implements Model
         return $ndarray;
     }
 
-    public function saveWeightsToFile(string|object $filepath,bool $portable=null) : void
+    public function saveWeightsToFile(string|object $filepath,?bool $portable=null) : void
     {
         $f = $this->hdaFactory->open($filepath);
         $f['modelWeights'] = [];

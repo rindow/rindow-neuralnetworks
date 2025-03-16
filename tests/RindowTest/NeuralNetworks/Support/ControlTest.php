@@ -28,7 +28,7 @@ class TestContext implements Context
         $this->session = 'opened';
     }
 
-    public function exit(Throwable $e=null) : bool
+    public function exit(?Throwable $e=null) : bool
     {
         $this->session = 'closed';
         if($e) {

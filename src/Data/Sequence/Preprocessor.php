@@ -18,11 +18,11 @@ class Preprocessor
      */
     public function padSequences(
         iterable $sequences,
-        int $maxlen=null,
-        int $dtype=null,
-        string $padding=null,
-        string $truncating=null,
-        float|int|bool $value=null,
+        ?int $maxlen=null,
+        ?int $dtype=null,
+        ?string $padding=null,
+        ?string $truncating=null,
+        float|int|bool|null $value=null,
     ) : NDArray
     {
         // defaults
@@ -32,9 +32,6 @@ class Preprocessor
         $truncating = $truncating ?? "pre";
         $value = $value ?? 0;
         
-        if(!is_iterable($sequences)) {
-            throw new InvalidArgumentException('sequences must be iterable.');
-        }
         $max = 0;
         $size = 0;
         foreach ($sequences as $sequence) {

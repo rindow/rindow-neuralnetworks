@@ -12,15 +12,23 @@ abstract class AbstractRNNCell extends AbstractLayerBase implements RNNCell
 {
     /**
      * @param array<NDArray> $states
-     * @return array{NDArray,array<NDArray>}
+     * @return array<NDArray>
      */
-    abstract protected function call(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array;
+    abstract protected function call(
+        NDArray $inputs,
+        array $states,
+        ?bool $training=null,
+        ?object $calcState=null
+    ) : array;
 
     /**
      * @param array<NDArray> $dStates
      * @return array{NDArray,array<NDArray>}
      */
-    abstract protected function differentiate(NDArray $dOutputs, array $dStates, object $calcState) : array;
+    abstract protected function differentiate(
+        array $dStates,
+        object $calcState
+    ) : array;
 
     protected bool $useBias;
     protected ?NDArray $kernel=null;
@@ -91,21 +99,29 @@ abstract class AbstractRNNCell extends AbstractLayerBase implements RNNCell
         }
     }
 
-    final public function forward(NDArray $inputs, array $states, bool $training=null, object $calcState=null) : array
+    final public function forward(
+        NDArray $inputs,
+        array $states,
+        ?bool $training=null,
+        ?object $calcState=null,
+        ) : array
     {
         $this->assertInputShape($inputs,'forward');
 
-        [$outputs,$states] = $this->call($inputs,$states,$training,$calcState);
+        $states = $this->call($inputs,$states,$training,$calcState);
 
-        $this->assertOutputShape($outputs,'forward');
-        return [$outputs,$states];
+        $this->assertOutputShape($states[0],'forward');
+        return $states;
     }
 
-    final public function backward(NDArray $dOutputs, array $dStates, object $calcState) : array
+    final public function backward(
+        array $dStates,
+        object $calcState,
+        ) : array
     {
-        $this->assertOutputShape($dOutputs,'backward');
+        $this->assertOutputShape($dStates[0],'backward');
 
-        [$dInputs,$dStates] = $this->differentiate($dOutputs,$dStates,$calcState);
+        [$dInputs,$dStates] = $this->differentiate($dStates,$calcState);
 
         $this->assertInputShape($dInputs,'backward');
         return [$dInputs,$dStates];

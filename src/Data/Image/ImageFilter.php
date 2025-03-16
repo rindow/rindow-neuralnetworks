@@ -25,11 +25,11 @@ class ImageFilter implements DatasetFilter
 
     public function __construct(
         object $mo,
-        string $data_format=null,
-        float $height_shift=null,
-        float $width_shift=null,
-        bool $vertical_flip=null,
-        bool $horizontal_flip=null,
+        ?string $data_format=null,
+        ?float $height_shift=null,
+        ?float $width_shift=null,
+        ?bool $vertical_flip=null,
+        ?bool $horizontal_flip=null,
         )
     {
         // defaults
@@ -92,8 +92,8 @@ class ImageFilter implements DatasetFilter
 
     public function translate(
         iterable $inputs,
-        iterable $tests=null,
-        array $options=null) : array
+        ?iterable $tests=null,
+        ?array $options=null) : array
     {
         $la = $this->mo->la();
         if($this->heightShiftInteger===null) {

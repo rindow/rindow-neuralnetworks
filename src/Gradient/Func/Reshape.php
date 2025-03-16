@@ -46,12 +46,12 @@ class Reshape extends AbstractFunction
         $countFlatten = 0;
         foreach($shape as $dim) {
             if($dim==0) {
-                $dim = $inpShape[0];
+                $dim = $inpShape[0]; // default
             }
             if($dim!=-1) {
-                $fixedSize *= $dim;
+                $fixedSize *= $dim;  // normal
             } else {
-                $countFlatten++;
+                $countFlatten++;     // free dim
             }
             $tmpShape[] = $dim;
         }
@@ -66,9 +66,9 @@ class Reshape extends AbstractFunction
         $flatten = (int)($inpSize/$fixedSize);
         foreach($tmpShape as $dim) {
             if($dim==-1) {
-                $targetShape[] = $flatten;
+                $targetShape[] = $flatten; // free dim
             } else {
-                $targetShape[] = $dim;
+                $targetShape[] = $dim;     // known dim
             }
         }
         $out = $inp->reshape($targetShape);

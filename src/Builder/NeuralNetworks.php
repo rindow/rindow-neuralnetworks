@@ -28,7 +28,7 @@ class NeuralNetworks implements Builder
     protected ?object $utils=null;
     protected ?object $gradient=null;
 
-    public function __construct(object $matrixOperator=null, object $backend=null)
+    public function __construct(?object $matrixOperator=null, ?object $backend=null)
     {
         if($backend==null) {
             if($matrixOperator==null) {

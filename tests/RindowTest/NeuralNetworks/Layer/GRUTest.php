@@ -9,6 +9,7 @@ use Rindow\NeuralNetworks\Layer\GRU;
 use InvalidArgumentException;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Activation\Tanh;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 
 class GRUTest extends TestCase
 {
@@ -143,7 +144,7 @@ class GRUTest extends TestCase
 
         $inputs = [$g->Variable($K->zeros([1,5,4]))];
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [5,3] but [5,4] given in GRU');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (5,3) but (5,4) given in GRU');
         $layer->build($inputs);
     }
 
@@ -319,7 +320,7 @@ class GRUTest extends TestCase
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
     }
 
-    public function testForwardAndBackwardWithReturnSeqquence()
+    public function testForwardAndBackwardWithReturnSequence()
     {
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
@@ -399,7 +400,7 @@ class GRUTest extends TestCase
         $this->assertEquals($copydStates[0]->toArray(),$dStates[0]->toArray());
     }
 
-    public function testForwardAndBackwardWithReturnSeqquenceWithoutInitialStates()
+    public function testForwardAndBackwardWithReturnSequenceWithoutInitialStates()
     {
         $mo = $this->newMatrixOperator();
         $nn = $this->newNeuralNetworks($mo);
@@ -660,6 +661,102 @@ class GRUTest extends TestCase
             [$orig,$dest] = $data;
             $this->assertNotEquals(spl_object_id($orig),spl_object_id($dest));
         }
+    }
+
+    public function testMaskedArrayForwardAndBackwardWithReturnSequence()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $fn = $K;
+
+        $embedding = $nn->layers->Embedding(
+            6, // inputDim
+            3, // outputDim
+            input_length:5,
+            mask_zero:True,
+        );
+        $layer = new GRU(
+            $K,
+            $units=4,
+            input_shape:[5,3],
+            return_sequences:true,
+            return_state:true,
+            );
+
+        //$layer->build();
+        //$grads = $layer->getGrads();
+
+
+        //
+        // forward
+        //
+        //  2 batch
+        $seq = $K->array([
+            [1,0,0,0,0],
+            [1,2,0,0,0],
+            [1,2,3,0,0],
+            [1,2,3,4,0],
+            [1,2,3,4,5],
+            [1,2,3,4,5],
+        ], dtype:NDArray::int32);
+        $initialStates = [
+            $K->ones([6,4])];
+        $copyStates = [
+            $K->copy($initialStates[0])];
+        [$outputsVariable,$nextStateVariables] = $nn->with($tape=$g->GradientTape(),
+            function() use ($embedding,$layer,$seq,$initialStates) {
+                $inputs = $embedding($seq);
+                [$outputsVariable,$nextStateVariables] = $layer->forward($inputs,initialStates:$initialStates);
+                return [$outputsVariable,$nextStateVariables];
+            }
+        );
+        $outputs = $K->ndarray($outputsVariable);
+        $nextStates = array_map(fn($x)=>$K->ndarray($x),$nextStateVariables);
+        $grads = $layer->getGrads();
+        //echo "outputs:".$mo->toString($outputs,'%8.5f',indent:true)."\n";
+        //echo "next_h:".$mo->toString($nextStates[0],'%8.5f',indent:true)."\n";
+        //
+        $this->assertInstanceOf(MaskedNDArray::class,$outputsVariable->value());
+        $this->assertEquals([6,5,4],$outputs->shape());
+        $this->assertCount(1,$nextStates);
+        $this->assertEquals([6,4],$nextStates[0]->shape());
+        $this->assertEquals($copyStates[0]->toArray(),$initialStates[0]->toArray());
+
+        //
+        // backward
+        //
+        // 2 batch
+        $dOutputs =
+            $K->ones([6,5,4]);
+        $dStates = [
+            $K->ones([6,4])];
+
+        $copydOutputs = $K->copy(
+            $dOutputs);
+        $copydStates = [
+            $K->copy($dStates[0])];
+        //[$dInputs,$dPrevStates] = $layer->backward($dOutputs,$dStates);
+        $dPrevStates = $outputsVariable->creator()->backward(array_merge([$dOutputs],$dStates));
+        $dInputs = array_shift($dPrevStates);
+        //echo "dInputs:".$mo->toString($dInputs,'%8.5f',indent:true)."\n";
+        // 2 batch
+        $this->assertEquals([6,5,3],$dInputs->shape());
+        $this->assertCount(1,$dPrevStates);
+        $this->assertEquals([6,4],$dPrevStates[0]->shape());
+        $this->assertNotEquals(
+            $mo->zerosLike($grads[0])->toArray(),
+            $grads[0]->toArray());
+        $this->assertNotEquals(
+            $mo->zerosLike($grads[1])->toArray(),
+            $grads[1]->toArray());
+        $this->assertNotEquals(
+            $mo->zerosLike($grads[2])->toArray(),
+            $grads[2]->toArray());
+
+        $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
+        $this->assertEquals($copydStates[0]->toArray(),$dStates[0]->toArray());
     }
 
 /*

@@ -24,7 +24,7 @@ class Metrics
         return new ScalarMetric($this->backend, $name);
     }
 
-    public function GenericMetric(callable $func, string $name=null) : object
+    public function GenericMetric(callable $func, ?string $name=null) : object
     {
         return new GenericMetric($this->backend, $func, $name);
     }

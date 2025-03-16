@@ -4,6 +4,7 @@ require __DIR__.'/../vendor/autoload.php';
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Rindow\NeuralNetworks\Data\Dataset\DatasetFilter;
 use Interop\Polite\Math\Matrix\NDArray;
 use function Rindow\Math\Matrix\R;
 
@@ -12,13 +13,14 @@ $nn = new NeuralNetworks($mo);
 $plt = new Plot(null,$mo);
 
 
-$dataset='mnist';
+$dsname='mnist';
 $epochs = 5;
+$batch_size = 256;
 $shrink = false;
 
 
 if(isset($argv[1])&&$argv[1]) {
-    $dataset=$argv[1];
+    $dsname=$argv[1];
 }
 if(isset($argv[2])&&$argv[2]) {
     $epochs = $argv[3];
@@ -27,7 +29,8 @@ if(isset($argv[3])&&$argv[3]) {
     $shrink = true;
 }
 
-switch($dataset) {
+echo "dataset={$dsname}\n";
+switch($dsname) {
     case 'mnist': {
         [[$train_img,$train_label],[$test_img,$test_label]] =
             $nn->datasets()->mnist()->loadData();
@@ -44,63 +47,116 @@ switch($dataset) {
         break;
     }
     case 'cifar10': {
-        [[$train_img,$train_label],[$test_img,$test_label]] =
-            $nn->datasets()->cifar10()->loadData();
+        [$train_data,$test_data] = $nn->datasets()->cifar10()->loadData();
         $inputShape = [32,32,3];
         $class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck'];
         break;
     }
     default: {
-        echo "Unknown dataset $dataset\n";
+        echo "Unknown dataset $dsname\n";
         exit(1);
     }
 }
-echo "dataset={$dataset}\n";
-echo "train=[".implode(',',$train_img->shape())."]\n";
-echo "test=[".implode(',',$test_img->shape())."]\n";
 
-if($shrink||!$mo->isAdvanced()) {
-    // Shrink data
-    $trainSize = 2000;
-    $testSize  = 200;
-    echo "Shrink data ...\n";
-    $train_img = $train_img[R(0,$trainSize)];
-    $train_label = $train_label[R(0,$trainSize)];
-    $test_img = $test_img[R(0,$testSize)];
-    $test_label = $test_label[R(0,$testSize)];
-    echo "Shrink train=[".implode(',',$train_img->shape())."]\n";
-    echo "Shrink test=[".implode(',',$test_img->shape())."]\n";
+$inputsFilter = new class ($mo) implements DatasetFilter
+{
+    protected object $mo;
+    public function __construct(object $mo) {
+        $this->mo = $mo;
+    }
+    public function translate(
+        iterable $img,
+        ?iterable $label=null,
+        ?array $options=null) : array
+    {
+        $la = $this->mo->la();
+        $dataSize = $img->shape()[0];
+        $imageSize = $img[0]->size();
+        $img = $img->reshape([$dataSize,$imageSize]);
+        return [
+            $this->mo->scale(1.0/255.0,$this->mo->astype($img,NDArray::float32)),
+            $this->mo->la()->astype($label,NDArray::int32),
+        ];
+    }
+};
+
+
+switch($dsname) {
+    case 'mnist': 
+    case 'fashion': {
+        if($shrink||!$mo->isAdvanced()) {
+            // Shrink data
+            $trainSize = 2000;
+            $testSize  = 200;
+            echo "Shrink data ...\n";
+            $train_img = $train_img[R(0,$trainSize)];
+            $train_label = $train_label[R(0,$trainSize)];
+            $test_img = $test_img[R(0,$testSize)];
+            $test_label = $test_label[R(0,$testSize)];
+            echo "Shrink train=[".implode(',',$train_img->shape())."]\n";
+            echo "Shrink test=[".implode(',',$test_img->shape())."]\n";
+        }
+        
+        echo "formating train images and labels ...\n";
+        [$train_img,$train_label] = $inputsFilter->translate($train_img,$train_label);
+        [$test_img,$test_label] = $inputsFilter->translate($test_img,$test_label);
+
+        echo "train=[".$mo->shapeToString($train_img->shape()).",".
+                        $mo->shapeToString($train_label->shape())."]\n";
+        echo "val=[".$mo->shapeToString($test_img->shape()).",".
+                        $mo->shapeToString($test_label->shape())."]\n";
+        $dataset = $nn->data->NDArrayDataset(
+            $train_img,
+            tests:$train_label,
+            batch_size:$batch_size,
+        );
+        $val_dataset = $nn->data->NDArrayDataset(
+            $test_img,
+            tests:$test_label,
+            batch_size:$batch_size,
+        );
+
+        break;
+    }
+    case 'cifar10': {
+        $trainSize = 50000;
+        $testSize = 10000;
+        if($shrink||!$mo->isAdvanced()) {
+            // Shrink data
+            $trainSize = 2000;
+            $testSize  = 200;
+            echo "Shrink data ...\n";
+            echo "Shrink train=$trainSize\n";
+            echo "Shrink test=$testSize\n";
+        }
+        echo "train_size=$trainSize\n";
+        echo "val_size=$testSize\n";
+        echo "formating train images and labels ...\n";
+        $dataset = $nn->data->SequentialDataset(
+            $train_data,
+            batch_size:$batch_size,
+            inputs_filter:$inputsFilter,
+            total_size:$trainSize,
+        );
+        $val_dataset = $nn->data->SequentialDataset(
+            $test_data,
+            batch_size:$batch_size,
+            inputs_filter:$inputsFilter,
+            total_size:$testSize,
+        );
+        break;
+    }
+    default: {
+        echo "Unknown dataset $dsname\n";
+        exit(1);
+    }
 }
 
-// flatten images and normalize
-function formatingImage($mo,$train_img) {
-    $dataSize = $train_img->shape()[0];
-    $imageSize = $train_img[0]->size();
-    $train_img = $train_img->reshape([$dataSize,$imageSize]);
-    return $mo->scale(1.0/255.0,$mo->astype($train_img,NDArray::float32));
-}
 
-//echo "slice images ...\n";
-//$samples = 1000;
-//$testSamples = (int)min(ceil($samples/10),count($test_img));
-//$train_img = $train_img[R(0,$samples)];
-//$train_label = $train_label[R(0,$samples)];
-//$test_img = $test_img[R(0,$testSamples)];
-//$test_label = $test_label[R(0,$testSamples)];
-//echo "Truncated train=[".implode(',',$train_img->shape())."]\n";
-//echo "Truncated test=[".implode(',',$test_img->shape())."]\n";
-
-
-echo "formating train images ...\n";
-$train_img = formatingImage($mo,$train_img);
-$train_label = $mo->la()->astype($train_label,NDArray::int32);
-echo "formating test images ...\n";
-$test_img  = formatingImage($mo,$test_img);
-$test_label = $mo->la()->astype($test_label,NDArray::int32);
 
 echo "device type: ".$nn->deviceType()."\n";
-$modelFilePath = __DIR__."/basic-image-classification-{$dataset}.model";
+$modelFilePath = __DIR__."/basic-image-classification-{$dsname}.model";
 
 if(file_exists($modelFilePath)) {
     echo "loading model ...\n";
@@ -124,19 +180,25 @@ if(file_exists($modelFilePath)) {
     );
     $model->summary();
     echo "training model ...\n";
-    $history = $model->fit($train_img,$train_label,
-        epochs:5,batch_size:256,validation_data:[$test_img,$test_label]);
+    $history = $model->fit(
+        $dataset,
+        epochs:5,
+        validation_data:$val_dataset);
     $model->save($modelFilePath,$portable=true);
     $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
     $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');
     $plt->plot($mo->array($history['loss']),null,null,'loss');
     $plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
     $plt->legend();
-    $plt->title($dataset);
+    $plt->title($dsname);
 }
 
-$images = $test_img[R(0,8)];
-$labels = $test_label[R(0,8)];
+foreach($val_dataset as $idx => [$img,$lbl]) {
+    $images = $img;
+    $labels = $lbl;
+}
+$images = $images[R(0,8)];
+$labels = $labels[R(0,8)];
 $predicts = $model->predict($images);
 // for from_logits
 $K = $nn->backend();

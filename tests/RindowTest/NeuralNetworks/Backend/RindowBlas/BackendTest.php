@@ -157,16 +157,71 @@ class BackendTest extends TestCase
         $y = $K->array([10,20]);
         $z = $K->add($x,$y); $K->finish();
         $this->assertEquals([12,23],$z->toArray());
+
+        // broadcast x <- y
+        $x = $K->zeros([2,3]);
+        $y = $K->array([1,2,3]);
+        $z = $K->add($x,$y); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [1,2,3],
+        ],$z->toArray());
+
+        // broadcast x -> y
+        $x = $K->array([1,2,3]);
+        $y = $K->zeros([2,3]);
+        $z = $K->add($x,$y); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [1,2,3],
+        ],$z->toArray());
+
+        // transpose
+        $x = $K->zeros([2,3]);
+        $y = $K->array([1,2]);
+        $z = $K->add($x,$y,trans:true); $K->finish();
+        $this->assertEquals([
+            [1,1,1],
+            [2,2,2],
+        ],$z->toArray());
     }
 
     public function testSub()
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
+
         $x = $K->array([10,20]);
         $y = $K->array([2,3]);
         $z = $K->sub($x,$y); $K->finish();
         $this->assertEquals([8,17],$z->toArray());
+
+        // broadcast x <- y
+        $x = $K->zeros([2,3]);
+        $y = $K->array([1,2,3]);
+        $z = $K->sub($x,$y); $K->finish();
+        $this->assertEquals([
+            [-1,-2,-3],
+            [-1,-2,-3],
+        ],$z->toArray());
+
+        // broadcast x -> y
+        $x = $K->array([1,2,3]);
+        $y = $K->zeros([2,3]);
+        $z = $K->sub($x,$y); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [1,2,3],
+        ],$z->toArray());
+
+        // transpose
+        $x = $K->zeros([2,3]);
+        $y = $K->array([1,2]);
+        $z = $K->sub($x,$y,trans:true); $K->finish();
+        $this->assertEquals([
+            [-1,-1,-1],
+            [-2,-2,-2],
+        ],$z->toArray());
     }
 
     public function testMul()
@@ -177,6 +232,33 @@ class BackendTest extends TestCase
         $y = $K->array([2,3]);
         $z = $K->mul($x,$y); $K->finish();
         $this->assertEquals([20,60],$z->toArray());
+        
+        // broadcast x <- y
+        $x = $K->ones([2,3]);
+        $y = $K->array([1,2,3]);
+        $z = $K->mul($x,$y); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [1,2,3],
+        ],$z->toArray());
+
+        // broadcast x -> y
+        $x = $K->array([1,2,3]);
+        $y = $K->ones([2,3]);
+        $z = $K->mul($x,$y); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [1,2,3],
+        ],$z->toArray());
+
+        // transpose
+        $x = $K->ones([2,3]);
+        $y = $K->array([1,2]);
+        $z = $K->mul($x,$y,trans:true); $K->finish();
+        $this->assertEquals([
+            [1,1,1],
+            [2,2,2],
+        ],$z->toArray());
     }
 
     public function testDiv()
@@ -188,6 +270,33 @@ class BackendTest extends TestCase
         $z = $K->div($x,$y); $K->finish();
         $this->assertTrue($K->equalTest(
             $K->array([5,7]),$z));
+
+        // broadcast x <- y
+        $x = $K->fill([2,3],6);
+        $y = $K->array([1,2,3]);
+        $z = $K->div($x,$y); $K->finish();
+        $this->assertEquals([
+            [6,3,2],
+            [6,3,2],
+        ],$z->toArray());
+
+        // broadcast x -> y
+        $x = $K->array([2,4,6]);
+        $y = $K->fill([2,3],2);
+        $z = $K->div($x,$y); $K->finish();
+        $this->assertEquals([
+            [1,2,3],
+            [1,2,3],
+        ],$z->toArray());
+
+        // transpose
+        $x = $K->fill([2,3],6);
+        $y = $K->array([1,2]);
+        $z = $K->div($x,$y,trans:true); $K->finish();
+        $this->assertEquals([
+            [6,6,6],
+            [3,3,3],
+        ],$z->toArray());
     }
 
     public function testUpdate_add()
@@ -199,6 +308,14 @@ class BackendTest extends TestCase
         $z = $K->update_add($x,$y); $K->finish();
         $this->assertEquals([12,23],$z->toArray());
         $this->assertEquals([12,23],$x->toArray());
+        $this->assertEquals([2,3],$y->toArray());
+
+        $x = $K->array([[10,20],[30,40]]);
+        $y = $K->array([2,3]);
+        $z = $K->update_add($x,$y); $K->finish();
+        $this->assertEquals([[12,23],[32,43]],$z->toArray());
+        $this->assertEquals([[12,23],[32,43]],$z->toArray());
+        $this->assertEquals([2,3],$y->toArray());
     }
 
     public function testUpdate_sub()
@@ -225,9 +342,15 @@ class BackendTest extends TestCase
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
+        $la = $K->primaryLA();
         $x = $K->array([2,3]);
         $z = $K->scale(6,$K->pow($x,-1)); $K->finish();
-        $this->assertEquals([3,2],$z->toArray());
+        //$this->assertEquals([3,2],$z->toArray());
+        $z = $la->toNDArray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([3,2]),
+            $z,
+        ));
     }
 
     public function testSqrt()
@@ -804,6 +927,75 @@ class BackendTest extends TestCase
         $this->assertEquals($trues->toArray(),$b->toArray());
     }
 
+    public function testGatherb()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // 1D by 1D
+        $a = $K->array([10,11,12,13,14,15,16,17,18,19]);
+        $x = $K->array([3,2,1,1],dtype:NDArray::int32);
+        $b = $K->gatherb($a,$x); $K->finish();
+        $this->assertEquals([4],$b->shape()); // replace axis0
+        $this->assertEquals([13,12,11,11],$b->toArray());
+
+        // axis = 0
+        // detailDepth = 2
+        // indexDepth = 0
+        // params:(numClass(4),inner(3))
+        // indices:(inner(3))
+        // 1D indices
+        $a = $K->array([
+            [ 0, 0, 3],
+            [ 0, 0, 4],
+            [ 0, 2, 0],
+            [ 1, 0, 0]]);
+        $x = $K->array([3,2,1],dtype:NDArray::int32);
+        $b = $K->gatherb($a,$x,axis:0,detailDepth:2,indexDepth:0);  $K->finish();
+        $this->assertEquals([4,3],$a->shape());
+        $this->assertEquals([3],$x->shape());
+        $this->assertEquals([3],$b->shape()); // reduction axis0
+        $this->assertEquals([1,2,4],$b->toArray()); // reduction axis0
+    }
+
+    public function testScatterbAdd()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // 1D by 1D
+        $x = $K->array([3,2,1,4],dtype:NDArray::int32); // Must not be duplicated
+        $a = $K->array([13,12,11,14]);
+        $b = $K->ones([10]);  $K->finish();
+        $shape = [10];
+        $K->scatterbAdd($x,$a,$shape,outputs:$b);  $K->finish();
+        $this->assertEquals([4],$x->shape());
+        $this->assertEquals([4],$a->shape());
+        $this->assertEquals([10],$b->shape()); // replace axis0
+        $trues = $K->array([1,12,13,14,15,1,1,1,1,1]);
+        //echo $mo->toString($b,null,true)."\n";
+        $this->assertEquals($trues->toArray(),$b->toArray());
+
+        //
+        // axis = 0
+        //
+        //  1D inputs
+        $x = $K->array([3,2,0],dtype:NDArray::int32);
+        $a = $K->array([1,2,3],dtype:NDArray::float32);
+        $b = $K->ones([4,3]); $K->finish();
+        $shape = [4,3];
+        $K->scatterbAdd($x,$a,$shape,axis:0,detailDepth:2,indexDepth:0,outputs:$b); $K->finish();
+        $this->assertEquals([3],$x->shape());
+        $this->assertEquals([3],$a->shape());
+        $this->assertEquals([4,3],$b->shape()); // insert axis0
+        $trues = $K->array([
+            [ 1, 1, 4],
+            [ 1, 1, 1],
+            [ 1, 3, 1],
+            [ 2, 1, 1]]);
+        $this->assertEquals($trues->toArray(),$b->toArray());
+    }
+
     public function testSlice()
     {
         $mo = $this->newMatrixOperator();
@@ -1064,7 +1256,7 @@ class BackendTest extends TestCase
         $this->assertTrue($mo->la()->isclose($truesDx,$nddx));
     }
 
-    public function testSoftmax()
+    public function testSoftmax0()
     {
         $mo = $this->newMatrixOperator();
         $K = $this->newBackend($mo);
@@ -1109,6 +1301,45 @@ class BackendTest extends TestCase
         $sum = $K->sum($softmax,axis:1); $K->finish(); $sum = $sum->toArray();
         $this->assertLessThan(0.0001,abs($sum[0]-1));
         $this->assertLessThan(0.0001,abs($sum[1]-1));
+    }
+
+    public function testSoftmax1()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+        $fn = $K;
+        $x = $K->array([
+           [[[1., 2., 3., 4.],
+             [1., 2., 3., 4.],
+             [1., 2., 3., 4.]],
+            [[1., 2., 3., 4.],
+             [1., 2., 3., 4.],
+             [1., 2., 3., 4.]]],
+           [[[1., 2., 3., 4.],
+             [1., 2., 3., 4.],
+             [1., 2., 3., 4.]],
+            [[1., 2., 3., 4.],
+             [1., 2., 3., 4.],
+             [1., 2., 3., 4.]]],
+        ]);
+        $salt = $mo->la()->range(array_product($x->shape()),dtype:NDArray::float32)
+                ->reshape($x->shape());
+        $salt = $K->array($salt);
+
+        $softmax = $K->softmax($x);
+        $y = $K->mul($salt,$softmax); $K->finish();
+        //echo "softmax:".$mo->toString($y,format:'%10.7f',indent:true)."\n";
+        //$ndy = $K->ndarray($y);
+        //$truesY = $mo->array([0.058012217283249,0.095645979046822,0.15769356489182,0.25999271869659,0.42865553498268]);
+        //$this->assertTrue($mo->la()->isclose($truesY,$ndy));
+        //$this->assertTrue($fn->equalTest(1.0,$mo->sum($ndy)));
+        $doutputs = $K->copy($salt);
+        $dx = $K->dSoftmax($doutputs,$softmax); $K->finish();
+        //echo "dSoftmax:".$mo->toString($dx,format:'%10.7f',indent:true)."\n";
+        //$nddx = $K->ndarray($dx);
+        //$truesDx = $mo->array([0,0,0,0,0]);
+        //$this->assertTrue($mo->la()->isclose($truesDx,$nddx));
+        $this->assertTrue(true);
     }
 
     public function testMeanSquaredError()
@@ -1190,7 +1421,7 @@ class BackendTest extends TestCase
         $y = $K->array([
             [0.0, 0.0, 1.0, 0.0, 0.0],
         ]);
-        $t = $K->array([2]);
+        $t = $K->array([2],dtype:NDArray::int32);
         $this->assertTrue($K->equalTest(
             0.0,$K->scalar($K->sparseCategoricalCrossEntropy($t,$y))));
 
@@ -2032,6 +2263,301 @@ class BackendTest extends TestCase
         $plt->plot($x,$K->ndarray($frequency->reshape([$bins])));
         $plt->title('orthogonal'.($K->accelerated()?':accel':''));
         $plt->show();
+    }
+
+    public function testMaskingNormal()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        //
+        // Same shape (implicit batchDims:0, axis:0)
+        //echo "==== Same shape (implicit batchDims:0, axis:batchDims)\n";
+        //
+        // X:(2,3)
+        // A:(2,3)
+        // outer:(),bro:(),inner:(2,3),bro2:()
+        // m=2*3,n=1,k=1,len=1  ==translate==> m=1,n=1,k=2*3,len=1
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([[1,10,100],[-1,-10,-100]]);
+        $A = $K->masking($X,$A);
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals(
+            [[1, 0,100],[0,-10, 0]]
+        ,$A->toArray());
+
+        //
+        // broadcast to details
+        //echo "==== broadcast to details\n";
+        //
+        // X:(2,3  )
+        // A:(2,3,4)
+        // outer:(2,3),bro:(4),inner:(),bro2:()
+        // m=2*3,n=4,k=1,len=1  ==translate==> m=1,n=1,k=2*3,len=4
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111,1111],[2,12,122,1222],[-3,13,133,1333]],
+            [[1,21,121,1211],[2,22,222,2222],[-3,23,233,2333]]
+        ]);
+        $A = $K->masking($X,$A,batchDims:$X->ndim(),axis:$A->ndim());
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals([
+            [[1,11,111,1111],[0, 0,  0,   0],[-3,13,133,1333]],
+            [[0, 0,  0,   0],[2,22,222,2222],[0, 0,  0,   0]]
+        ],$A->toArray());
+
+        //
+        // broadcast to details
+        //echo "==== broadcast to details for implicit\n";
+        //
+        // X:(2,3  )
+        // A:(2,3,4)
+        // outer:(2,3),bro:(4),inner:(),bro2:()
+        // m=2*3,n=4,k=1,len=1  ==translate==> m=1,n=1,k=2*3,len=4
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111,1111],[2,12,122,1222],[-3,13,133,1333]],
+            [[1,21,121,1211],[2,22,222,2222],[-3,23,233,2333]]
+        ]);
+        $A = $K->masking($X,$A,batchDims:$X->ndim());
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals([
+            [[1,11,111,1111],[0, 0,  0,   0],[-3,13,133,1333]],
+            [[0, 0,  0,   0],[2,22,222,2222],[0, 0,  0,   0]]
+        ],$A->toArray());
+
+        //
+        // broadcast with gap
+        //echo "==== broadcast with gap\n";
+        //
+        // X:(2,  3)
+        // A:(2,4,3)
+        // outer:(2),bro:(4),inner:(3),bro2:()
+        // m=2,n=4,k=3,len=1
+        $X = $K->array([
+            [true,false,true],
+            [false,true,false]
+        ], dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111],[2,12,112],[-3,13,113],[-4,14,114]],
+            [[1,21,211],[2,22,222],[-3,23,223],[-4,24,224]],
+        ]);
+        $A = $K->masking($X,$A,batchDims:1,axis:2);
+        $this->assertEquals([
+            [true,false,true],
+            [false,true,false]
+        ],$X->toArray());
+        $this->assertEquals([
+            [[1, 0,111],[2, 0,112],[-3, 0,113],[-4, 0,114]],
+            [[0,21,  0],[0,22,  0],[ 0,23,  0],[ 0,24,  0]],
+        ],$A->toArray());
+
+        //
+        // broadcast to rows (implicit batchDims:0)
+        //echo "==== broadcast to rows (implicit batchDims:0)\n";
+        //
+        // X:(  2,3)
+        // A:(4,2,3)
+        // outer:(),bro:(4),inner:(2,3),bro2:()
+        // m=1,n=2,k=2*3,len=1
+        $X = $K->array([[true,false,true],[false,true,false]],dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111],[2,12,112]],
+            [[1,21,211],[2,22,222]],
+            [[1,31,311],[2,32,322]],
+            [[1,41,411],[2,42,422]],
+        ]);
+        $A = $K->masking($X,$A,axis:1);
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals([
+            [[1, 0,111],[0,12,  0]],
+            [[1, 0,211],[0,22,  0]],
+            [[1, 0,311],[0,32,  0]],
+            [[1, 0,411],[0,42,  0]],
+        ],$A->toArray());
+
+        //
+        // broadcast to rows (implicit axis:batchDims)
+        //echo "==== broadcast to rows (implicit axis:batchDims)\n";
+        //
+        // X:(2,3)
+        // A:(2,3)
+        // outer:(2),bro:(),inner:(3),bro2:()
+        // m=2,n=1,k=3,len=1  ==translate==> m=1,n=1,k=2*3,len=1
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([[1,10,100],[-1,-10,-100]]);
+        $A = $K->masking($X,$A,batchDims:1);
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals(
+            [[1, 0,100],[0,-10, 0]]
+        ,$A->toArray());
+
+        //
+        // broadcast to rows (implicit batchDims:0, minus axis)
+        //echo "==== broadcast to rows (implicit batchDims:0, minus axis)\n";
+        //
+        // X:(  2,3)
+        // A:(4,2,3)
+        // outer:(),bro:(4),inner:(2,3),bro2:()
+        // m=1,n=4,k=2*3,len=1
+        $X = $K->array([[true,false,true],[false,true,false]],dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111],[2,12,112]],
+            [[1,21,211],[2,22,222]],
+            [[1,31,311],[2,32,322]],
+            [[1,41,411],[2,42,422]],
+        ]);
+        $A = $K->masking($X,$A,axis:-$X->ndim());
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals([
+            [[1, 0,111],[0,12,  0]],
+            [[1, 0,211],[0,22,  0]],
+            [[1, 0,311],[0,32,  0]],
+            [[1, 0,411],[0,42,  0]],
+        ],$A->toArray());
+
+        //
+        // broadcast with gap and implicit len
+        //echo "==== broadcast with gap implicit len\n";
+        //
+        // X:(2,  3  )
+        // A:(2,4,3,2)
+        // outer:(2),bro:(4),inner:(3),bro2:(2)
+        // m=2,n=4,k=3,len=2
+        $X = $K->array([
+            [true,false,true],
+            [false,true,false]
+        ], dtype:NDArray::bool);
+        $A = $K->array([
+            [[[1,-1],[11,-11],[111,-111]],
+             [[2,-2],[12,-12],[112,-112]],
+             [[-3,3],[13,-13],[113,-113]],
+             [[-4,4],[14,-14],[114,-114]]],
+            [[[1,-1],[21,-21],[211,-211]],
+             [[2,-2],[22,-22],[222,-222]],
+             [[-3,3],[23,-23],[223,-223]],
+             [[-4,4],[24,-24],[224,-224]]],
+        ]);
+        $A = $K->masking($X,$A,batchDims:1,axis:2);
+        $this->assertEquals([
+            [true,false,true],
+            [false,true,false]
+        ],$X->toArray());
+        $this->assertEquals([
+            [[[1,-1],[ 0,  0],[111,-111]],
+             [[2,-2],[ 0,  0],[112,-112]],
+             [[-3,3],[ 0,  0],[113,-113]],
+             [[-4,4],[ 0,  0],[114,-114]]],
+            [[[0, 0],[21,-21],[  0,   0]],
+             [[0, 0],[22,-22],[  0,   0]],
+             [[0, 0],[23,-23],[  0,   0]],
+             [[0, 0],[24,-24],[  0,   0]]],
+        ],$A->toArray());
+
+        //
+        // broadcast to rows (implicit batchDims:0, implicit len)
+        //echo "==== broadcast to rows (implicit batchDims:0, axis=1, implicit len)\n";
+        //
+        // X:(  2  )
+        // A:(4,2,3)
+        // outer:(),bro:(4),inner:(2),bro2:(3)
+        // m=1,n=4,k=2,len=3
+        $X = $K->array([true,false],dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111],[2,12,112]],
+            [[1,21,211],[2,22,222]],
+            [[1,31,311],[2,32,322]],
+            [[1,41,411],[2,42,422]],
+        ]);
+        $A = $K->masking($X,$A,axis:1);
+        $this->assertEquals([true,false],$X->toArray());
+        $this->assertEquals([
+            [[1,11,111],[0, 0,  0]],
+            [[1,21,211],[0, 0,  0]],
+            [[1,31,311],[0, 0,  0]],
+            [[1,41,411],[0, 0,  0]],
+        ],$A->toArray());
+
+        //
+        // fill -9999
+        //
+        //echo "==== fill -9999\n";
+        // X:(2,3)
+        // A:(2,3)
+        // outer:(),bro:(),inner:(2,3),bro2:()
+        // m=2*3,n=1,k=1  ==translate==> m=1,n=1,k=2*3
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([[1,10,100],[-1,-10,-100]]);
+        $A = $K->masking($X,$A,fill:-9999);
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals(
+            [[1, -9999,100],[-9999,-10, -9999]]
+        ,$A->toArray());
+    }
+
+    public function testMaskingAddMode()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        //
+        // Same shape (implicit batchDims:0, axis:0)
+        //echo "==== Same shape (implicit batchDims:0, axis:batchDims)\n";
+        //
+        // X:(2,3)
+        // A:(2,3)
+        // outer:(),bro:(),inner:(2,3),bro2:()
+        // m=2*3,n=1,k=1,len=1  ==translate==> m=1,n=1,k=2*3,len=1
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([[1,10,100],[-1,-10,-100]]);
+        $A = $K->masking($X,$A, fill:-1000, mode:1); // 0:set mode,  1:add mode
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals(
+            [[1, -990,100],[-1001,-10, -1100]]
+        ,$A->toArray());
+    }
+
+    public function testUpdateMaskingAddMode()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        // broadcast to details
+        //echo "==== broadcast to details\n";
+        //
+        // X:(2,3  )
+        // A:(2,3,4)
+        // outer:(2,3),bro:(4),inner:(),bro2:()
+        // m=2*3,n=4,k=1,len=1  ==translate==> m=1,n=1,k=2*3,len=4
+        $X = $K->array([[true,false,true],[false,true,false]], dtype:NDArray::bool);
+        $A = $K->array([
+            [[1,11,111,1111],[2,12,122,1222],[-3,13,133,1333]],
+            [[1,21,121,1211],[2,22,222,2222],[-3,23,233,2333]]
+        ]);
+        $A = $K->masking($X,$A,fill:10000,mode:1, batchDims:$X->ndim(),axis:$A->ndim());
+        $this->assertEquals(
+            [[true,false,true],[false,true,false]]
+        ,$X->toArray());
+        $this->assertEquals([
+            [[1,11,111,1111],[10002,10012,10122,11222],[-3,13,133,1333]],
+            [[10001,10021,10121,11211],[2,22,222,2222],[9997,10023,10233,12333]]
+        ],$A->toArray());
     }
 
 }

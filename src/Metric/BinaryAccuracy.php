@@ -11,7 +11,7 @@ class BinaryAccuracy extends AbstractMetric
 
     public function __construct(
         object $backend,
-        float $threshold=null,
+        ?float $threshold=null,
         )
     {
         parent::__construct($backend);

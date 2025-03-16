@@ -10,7 +10,7 @@ class MeanSquaredError extends AbstractLoss
 {
     public function __construct(
         object $backend,
-        string $reduction=null,
+        ?string $reduction=null,
     )
     {
         parent::__construct($backend,from_logits:null,reduction:$reduction);
@@ -32,7 +32,7 @@ class MeanSquaredError extends AbstractLoss
         return $outputs;
     }
 
-    protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    protected function differentiate(array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array
     {
         $K = $this->backend;
         $dLoss = $this->flattenLoss($dOutputs[0]);

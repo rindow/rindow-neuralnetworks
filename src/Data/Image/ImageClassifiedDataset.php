@@ -29,14 +29,14 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
     public function __construct(
         object $mo,
         string $path,
-        int $height=null,
-        int $width=null,
-        int $channels=null,
-        bool $fit=null,
-        int $dtype=null,
-        int $dtype_class_id=null,
-        array $classnames=null,
-        int $verbose=null,
+        ?int $height=null,
+        ?int $width=null,
+        ?int $channels=null,
+        ?bool $fit=null,
+        ?int $dtype=null,
+        ?int $dtype_class_id=null,
+        ?array $classnames=null,
+        ?int $verbose=null,
         mixed ...$options
         )
     {

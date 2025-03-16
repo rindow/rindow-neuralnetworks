@@ -4,6 +4,7 @@ require __DIR__.'/../vendor/autoload.php';
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
@@ -33,10 +34,20 @@ class EngFraDataset
         $this->preprocessor = new Preprocessor($mo);
     }
 
-    protected function getDatasetDir()
+    protected function getRindowDatesetDir() : string
     {
-        return sys_get_temp_dir().'/rindow/nn/datasets/fra-eng';
+        $dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
+        if(!$dataDir) {
+            $dataDir = sys_get_temp_dir().'/rindow/nn/datasets';
+        }
+        return $dataDir;
     }
+
+    protected function getDatasetDir() : string
+    {
+        return $this->getRindowDatesetDir().'/fra-eng';
+    }
+
 
     protected function download($filename)
     {
@@ -182,7 +193,8 @@ class Encoder extends AbstractModel
         $this->units = $units;
         $this->embedding = $builder->layers()->Embedding(
             $vocabSize,$wordVectSize,
-            input_length:$inputLength
+            input_length:$inputLength,
+            mask_zero:true,
         );
         $this->rnn = $builder->layers()->GRU(
             $units,
@@ -203,13 +215,6 @@ class Encoder extends AbstractModel
             $wordVect,initialStates:$initialStates);
         
         return [$outputs, $states];
-    }
-
-    public function computeMask($inputs)
-    {
-        $g = $this->builder->gradient();
-        $mask = $g->notEqual($inputs,$g->zerosLike($inputs));
-        return $mask;
     }
 }
 
@@ -244,7 +249,8 @@ class Decoder extends AbstractModel
         $this->targetLength = $targetLength;
         $this->embedding = $builder->layers()->Embedding(
             $vocabSize, $wordVectSize,
-            input_length:$targetLength
+            input_length:$targetLength,
+            mask_zero:true,
         );
         $this->rnn = $builder->layers()->GRU($units,
             return_state:true,return_sequences:true,
@@ -259,7 +265,6 @@ class Decoder extends AbstractModel
         object $inputs,
         array $initialStates=null,
         Variable $encOutputs=null,
-        Variable $inputMask=null,
         bool $returnAttentionScores=null,
         ) : array
     {
@@ -271,7 +276,6 @@ class Decoder extends AbstractModel
 
         $contextVector = $this->attention->forward(
             [$rnnSequence,$encOutputs],
-            mask:[null,$inputMask],
             returnAttentionScores:$returnAttentionScores,
         );
         if(is_array($contextVector)) {
@@ -335,7 +339,7 @@ class Seq2seq extends AbstractModel
             $inputLength,
             $outputLength
         );
-        $this->out = $builder->layers()->Activation('softmax');
+        //$this->out = $builder->layers()->Activation('softmax');
         $this->mo = $mo;
         $this->startVocId = $startVocId;
         $this->endVocId = $endVocId;
@@ -349,10 +353,9 @@ class Seq2seq extends AbstractModel
     {
         $K = $this->backend;
         [$encOutputs,$states] = $this->encoder->forward($inputs);
-        $inputMask = $this->encoder->computeMask($inputs);
         [$outputs,$dmyStatus] = $this->decoder->forward(
-            $trues,initialStates:$states, encOutputs:$encOutputs, inputMask:$inputMask);
-        $outputs = $this->out->forward($outputs);
+            $trues,initialStates:$states, encOutputs:$encOutputs);
+        //$outputs = $this->out->forward($outputs);
         return $outputs;
     }
 
@@ -449,7 +452,84 @@ class Seq2seq extends AbstractModel
     }
 }
 
-$numExamples=20000;#30000
+class CustomLossFunction
+{
+    protected $loss_object;
+    protected $gradient;
+    protected $nn;
+
+    public function __construct($nn)
+    {
+        $this->nn = $nn;
+        $this->gradient = $nn->gradient();
+        $this->loss_object = $nn->losses->SparseCategoricalCrossentropy(
+            from_logits:true, reduction:'none'
+        );
+        //$this->loss_object = $nn->losses->SparseCategoricalCrossentropy(from_logits:true);
+    }
+
+    public function __invoke(NDArray $label, NDArray $pred) : NDArray
+    {
+        $mo = $this->nn->backend()->localMatrixOperator();
+        $g = $this->gradient;
+        $loss = $this->loss_object->forward($label, $pred);
+        //echo "label=".$mo->shapeToString($label->shape())."\n";
+        //echo "pred=".$mo->shapeToString($pred->shape())."\n";
+        //echo "loss=".$mo->shapeToString($loss->shape())."\n";
+        //return $loss;
+
+        $mask = $g->cast($g->cast($label,dtype:NDArray::bool),dtype:NDArray::float32);
+        //echo "mask=".$mo->shapeToString($loss->shape())."\n";
+        //echo "".$mo->toString($mask,indent:true)."\n";
+        
+        $loss = $g->mul($loss,$mask);
+        $n = $g->reduceSum($mask);      // scalar in NDArray
+        $loss = $g->reduceSum($loss);   // scalar in NDArray
+        $loss = $g->div($loss,$n);
+        return $loss;
+    }
+}
+
+class CustomAccuracy
+{
+    protected $backend;
+    protected $nn;
+    protected $gradient;
+
+    public function __construct($nn)
+    {
+        $this->backend = $nn->backend();
+        $this->nn = $nn;
+    }
+
+    public function __invoke($label, $pred)
+    {
+        $mo = $this->nn->backend()->localMatrixOperator();
+        $K = $this->backend;
+        $pred = $K->argMax($pred, axis:-1);  // convert to token id from predicts
+
+        $match = $K->equal($label, $pred);   // compare to trues (int32 == int32) 
+        $mask = $K->cast($label,dtype:NDArray::bool); // make mask
+        $match = $K->cast($match,dtype:NDArray::float32);
+        $match = $K->masking($mask,$match); // masking matching results
+
+        //echo "match=".$mo->shapeToString($match->shape())."\n";
+        //echo "mask=".$mo->shapeToString($mask->shape())."\n";
+        //echo "match=".$mo->toString($match,indent:true)."\n";
+        //echo "mask=".$mo->toString($mask,indent:true)."\n";
+        $sumMatch = $K->scalar($K->sum($match));
+        $n = $K->scalar($K->sum($mask));
+        if($n==0) {
+            $accuracy = 0;
+        } else {
+            $accuracy = $sumMatch/$n;
+        }
+        return $accuracy;
+    }
+}
+
+
+$numExamples=20000;#30000#50000;
 $numWords=1024;#null;
 $epochs = 10;
 $batchSize = 64;
@@ -459,6 +539,7 @@ $units=1024;
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
+$g = $nn->gradient();
 $pltConfig = [];
 $plt = new Plot($pltConfig,$mo);
 
@@ -507,14 +588,22 @@ $seq2seq = new Seq2seq(
     $targLang->wordToIndex('<end>'),
     $plt
 );
+$lossFunc = new CustomLossFunction($nn);
+$accuracyFunc = new CustomAccuracy($nn);
 
 echo "Compile model...\n";
 $seq2seq->compile(
-    loss:'sparse_categorical_crossentropy',
+    loss:$lossFunc,
+//    loss:'sparse_categorical_crossentropy',
     optimizer:'adam',
-    metrics:['loss','accuracy'],
+    metrics:['loss'=>'loss','accuracy'=>$accuracyFunc],
+//    metrics:['loss'=>'loss','accuracy'=>'accuracy'],
 );
-$seq2seq->build([1,$inputLength], trues:[1,$outputLength]); // just for summary
+
+$seq2seq->build(
+    $g->ArraySpec([1,$inputLength],dtype:NDArray::int32),
+    trues:$g->ArraySpec([1,$outputLength],dtype:NDArray::int32)
+); // just for summary
 $seq2seq->summary();
 
 $modelFilePath = __DIR__."/neural-machine-translation-with-attention.model";

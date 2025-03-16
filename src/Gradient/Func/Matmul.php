@@ -11,8 +11,8 @@ class Matmul extends AbstractFunction
 
     public function __construct(
         object $backend,
-        bool $transpose_a=null,
-        bool $transpose_b=null,
+        ?bool $transpose_a=null,
+        ?bool $transpose_b=null,
     )
     {
         $transpose_a = $transpose_a ?? false;

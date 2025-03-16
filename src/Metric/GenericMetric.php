@@ -12,7 +12,7 @@ class GenericMetric extends AbstractMetric
     public function __construct(
         object $backend,
         callable $func,
-        string $name=null,
+        ?string $name=null,
         )
     {
         parent::__construct($backend);

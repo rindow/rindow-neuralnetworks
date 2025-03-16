@@ -14,8 +14,8 @@ class Flatten extends AbstractLayer
      */
     public function __construct(
         object $backend,
-        array $input_shape=null,
-        string $name=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         $input_shape = $input_shape ?? null;
@@ -26,7 +26,7 @@ class Flatten extends AbstractLayer
         $this->initName($name,'flatten');
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -54,7 +54,7 @@ class Flatten extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $shape = $inputs->shape();

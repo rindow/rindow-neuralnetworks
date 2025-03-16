@@ -29,15 +29,15 @@ class Tokenizer
 
     public function __construct(
         object $mo,
-        callable $analyzer=null,
-        int $num_words=null,
-        string $filters=null,
-        string $specials=null,
-        bool $lower=null,
-        string $split=null,
-        bool $char_level=null,
-        string $oov_token=null,
-        int $document_count=null,
+        ?callable $analyzer=null,
+        ?int $num_words=null,
+        ?string $filters=null,
+        ?string $specials=null,
+        ?bool $lower=null,
+        ?string $split=null,
+        ?bool $char_level=null,
+        ?string $oov_token=null,
+        ?int $document_count=null,
     )
     {
         $this->mo = $mo;
@@ -217,9 +217,6 @@ class Tokenizer
      */
     public function sequencesToTextsGenerator(iterable $sequences) : iterable
     {
-        if(!is_iterable($sequences)) {
-            throw new InvalidArgumentException('sequences must be list of sequence.');
-        }
         $numWords = $this->numWords;
         $oovTokenIndex = ($this->oovToken) ?
             $this->wordToIndex[$this->oovToken] : null;
@@ -273,7 +270,7 @@ class Tokenizer
         return $this->indexToWord;
     }
 
-    public function numWords(bool $internal=null) : int
+    public function numWords(?bool $internal=null) : int
     {
         if($internal||$this->numWords===null) {
             return count($this->indexToWord)+1;

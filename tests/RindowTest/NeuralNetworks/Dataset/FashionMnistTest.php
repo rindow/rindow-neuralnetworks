@@ -16,7 +16,11 @@ use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 class FashionMnistTest extends ORGTest
 {
     protected $plot = false;
-    protected $pickleFilename = '/rindow/nn/datasets/fashion-mnist/mnist.pkl';
+
+    protected function getDatasetDir() : string
+    {
+        return $this->getRindowDatesetDir().'/fashion-mnist';
+    }
 
     public function dataset($nn)
     {

@@ -31,10 +31,10 @@ class NDArrayDataset implements IteratorAggregate,Dataset
     public function __construct(
         object $mo,
         array|NDArray $inputs,
-        NDArray $tests=null,
-        int $batch_size=null,
-        bool $shuffle=null,
-        DatasetFilter $filter=null,
+        ?NDArray $tests=null,
+        ?int $batch_size=null,
+        ?bool $shuffle=null,
+        ?DatasetFilter $filter=null,
     )
     {
         // defaults
@@ -67,9 +67,6 @@ class NDArrayDataset implements IteratorAggregate,Dataset
         }
         $this->inputs = $inputs;
         if($tests!==null) {
-            if(!($tests instanceof NDArray)) {
-                throw new InvalidArgumentException('tests must be NDArray');
-            }
             if($inputCount!=count($tests)) {
                 throw new InvalidArgumentException(
                     "Unmatch data size of inputs and tests:".$inputCount.",".count($tests));
@@ -153,11 +150,11 @@ class NDArrayDataset implements IteratorAggregate,Dataset
                 $orgInputs = $inputs;
                 $inputs = [];
                 foreach ($orgInputs as $key => $value) {
-                    $inputs[] = $la->gather($value,$choiceItem);
+                    $inputs[] = $la->gatherb($value,$choiceItem);
                 }
                 unset($orgInputs);
                 if($tests!==null) {
-                    $tests  = $la->gather($tests,$choiceItem);
+                    $tests  = $la->gatherb($tests,$choiceItem);
                 }
             }
             if(!$this->multiInputs) {

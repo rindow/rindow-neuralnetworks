@@ -5,7 +5,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 
 class Tanh extends AbstractActivation
 {
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $outputs = $K->tanh($inputs);

@@ -28,23 +28,23 @@ class TextFilter implements DatasetFilter
      */
     public function __construct(
         object $mo,
-        object $tokenizer=null,
-        array $classnames=null,
-        callable $analyzer=null,
-        int $num_words=null,
-        string $tokenizer_filters=null,
-        string $specials=null,
-        bool $lower=null,
-        string $split=null,
-        bool $char_level=null,
-        string $oov_token=null,
-        int $document_count=null,
-        object $preprocessor=null,
-        int $maxlen=null,
-        int $dtype=null,
-        string $padding=null,
-        string $truncating=null,
-        float|int|bool $value=null,
+        ?object $tokenizer=null,
+        ?array $classnames=null,
+        ?callable $analyzer=null,
+        ?int $num_words=null,
+        ?string $tokenizer_filters=null,
+        ?string $specials=null,
+        ?bool $lower=null,
+        ?string $split=null,
+        ?bool $char_level=null,
+        ?string $oov_token=null,
+        ?int $document_count=null,
+        ?object $preprocessor=null,
+        ?int $maxlen=null,
+        ?int $dtype=null,
+        ?string $padding=null,
+        ?string $truncating=null,
+        float|int|bool|null $value=null,
     )
     {
         $tokenizer = $tokenizer ?? null;
@@ -147,8 +147,8 @@ class TextFilter implements DatasetFilter
 
     public function translate(
         iterable $inputs,
-        iterable $tests=null,
-        array $options=null) : array
+        ?iterable $tests=null,
+        ?array $options=null) : array
     {
         //$this->tokenizer->fitOnTexts($inputs);
         $sequences = $this->tokenizer->textsToSequences($inputs);

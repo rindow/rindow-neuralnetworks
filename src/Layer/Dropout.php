@@ -14,7 +14,7 @@ class Dropout extends AbstractLayer
     public function __construct(
         object $backend,
         float $rate,
-        string $name=null,
+        ?string $name=null,
         )
     {
         parent::__construct($backend);
@@ -30,7 +30,7 @@ class Dropout extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         if($training===null) {
@@ -51,7 +51,11 @@ class Dropout extends AbstractLayer
     {
         $K = $this->backend;
         $container = $this->container();
-        $dInputs = $K->mul($dOutputs, $container->mask);
+        if(isset($container->mask)) {
+            $dInputs = $K->mul($dOutputs, $container->mask);
+        } else {
+            $dInputs = $dOutputs;
+        }
         return $dInputs;
     }
 

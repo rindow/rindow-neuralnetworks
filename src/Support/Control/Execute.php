@@ -10,9 +10,9 @@ class Execute
      */
     static public function with(
         Context $context,
-        callable $func=null,
-        array $args=null,
-        bool $without_ctx=null,
+        ?callable $func=null,
+        ?array $args=null,
+        ?bool $without_ctx=null,
         ) : mixed
     {
         if($args===null) {

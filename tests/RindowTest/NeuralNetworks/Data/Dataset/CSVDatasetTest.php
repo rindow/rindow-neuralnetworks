@@ -18,7 +18,7 @@ class TestFilter implements DatasetFilter
     }
 
     public function translate(
-        iterable $inputs, iterable $tests=null, $options=null) : array
+        iterable $inputs, ?iterable $tests=null, $options=null) : array
     {
         $batchSize= count($inputs);
         $cols = count($inputs[0])-1;

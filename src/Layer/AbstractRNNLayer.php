@@ -7,6 +7,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Core\GradientTape;
 use Rindow\NeuralNetworks\Gradient\Core\GradientUtils;
 use Rindow\NeuralNetworks\Gradient\Variable;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 
 /**
  *
@@ -51,10 +52,10 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     }
 
     protected function setFlags(
-        bool $returnSequences=null,
-        bool $returnState=null,
-        bool $goBackwards=null,
-        bool $stateful=null,
+        ?bool $returnSequences=null,
+        ?bool $returnState=null,
+        ?bool $goBackwards=null,
+        ?bool $stateful=null,
         ) : void
     {
         $this->returnSequences = $returnSequences;
@@ -76,7 +77,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     /**
      * @param array<NDArray> $states
      */
-    protected function assertStatesShape(array $states=null,string $direction) : void
+    protected function assertStatesShape(?array $states,string $direction) : void
     {
         if(!$this->shapeInspection)
             return;
@@ -137,8 +138,8 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
      */
     final public function backward(
         array $dOutputs,
-        ArrayAccess $grads=null,
-        array $oidsToCollect=null
+        ?ArrayAccess $grads=null,
+        ?array $oidsToCollect=null
         ) : array
     {
         if(!$this->shapeInspection) {
@@ -172,7 +173,11 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
      * @param array<NDArray> $inputs
      * @return array<NDArray>
      */
-    protected function call(array $inputs,bool $training=null) : array
+    protected function call(
+        array $inputs,
+        ?bool $training=null,
+        ?NDArray $mask=null,
+        ) : array
     {
         $K = $this->backend;
         $container = $this->container();
@@ -211,10 +216,12 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             $initialStates,
             training:$training,
             outputs:$outputs,
-            goBackwards:$this->goBackwards
+            goBackwards:$this->goBackwards,
+            mask:$mask,
         );
         $container->calcStates = $calcStates;
         $container->origInputsShape = $inputs->shape();
+        $container->mask = $mask;
         if($this->stateful) {
             $this->initialStates = $states; // the statefull variable is not in container
         }
@@ -254,7 +261,8 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             $dNextStates,
             $container->calcStates,
             $dInputs,
-            $this->goBackwards
+            $this->goBackwards,
+            $container->mask,
         );
         $container->calcStates = null;
         if($container->enableInitialStates) {
@@ -265,7 +273,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     }
 
     /**
-     * @return NDArray|array<Variable>
+     * @return NDArray|array{Variable,array<Variable>}
      */
     public function __invoke(mixed ...$args) : NDArray|array
     {
@@ -276,13 +284,14 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
      * param Variable  $inputs
      * param bool      $training
      * param array<Variable> $initialStates
-     * return NDArray|array<Variable> outputs
+     * return Variable|array<Variable> outputs
      */
     final public function forward(
         object $inputs,
-        Variable|bool $training=null,
-        array $initialStates=null
-        ) : NDArray|array
+        Variable|bool|null $training=null,
+        ?array $initialStates=null,
+        ?NDArray $mask=null,
+        ) : Variable|array
     {
         $inputs = [$inputs];
         if($initialStates!==null) {
@@ -313,7 +322,11 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
             }
             unset($tmpRawInputs);
             unset($rawInitialStates);
-            $rawOutputs = $this->call($rawInputs,training:$rawTraining);
+            if($mask===null) {
+                $mask = $this->retrieveSingleMask($rawInputs[0]);
+            }
+            $rawOutputs = $this->call($rawInputs,training:$rawTraining,mask:$mask);
+            $rawOutputs[0] = $this->makeSingleMaskedValue($rawInputs[0], $rawOutputs[0]);
             $rawStates = $rawOutputs;
             $tmpRawOutputs = array_shift($rawStates);
             if(count($rawStates)>0) {
@@ -347,8 +360,24 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
     public function _rawCall(array $inputs,array $options) : array
     {
         $training = $options['training'] ?? false;
-        $results = $this->call($inputs,training:$training);
+        $mask = $options['mask'] ?? null;
+        if($mask===null) {
+            $mask = $this->retrieveSingleMask($inputs[0]);
+        }
+        $results = $this->call($inputs,training:$training,mask:$mask);
+        $results[0] = $this->makeSingleMaskedValue($inputs[0], $results[0]);
         return $results;
+    }
+
+    public function computeMask(
+        array|NDArray $inputs,
+        array|NDArray|null $previousMask
+        ) : array|NDArray|null
+    {
+        if(!$this->returnSequences) {
+            return null;
+        }
+        return $previousMask;
     }
 
     public function __clone()
@@ -356,7 +385,7 @@ abstract class AbstractRNNLayer extends AbstractLayerBase implements RNNLayer
         if(isset($this->cell)) {
             $this->cell = clone $this->cell;
         }
-        $this->allocateWeights(count($this->weights));
+        $this->allocateWeights(array_map(fn($weight)=>$weight->name(),$this->weights));
         if($this->assignedWeights) {
             $this->syncWeightVariables();
         }

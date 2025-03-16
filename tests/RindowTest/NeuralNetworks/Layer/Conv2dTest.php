@@ -88,7 +88,7 @@ class Conv2DTest extends TestCase
 
         $inputs = $g->Variable($K->zeros([1,4,4,2]));
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [4,4,1] but [4,4,2] given in Conv2D');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (4,4,1) but (4,4,2) given in Conv2D');
         $layer->build($inputs);
     }
 

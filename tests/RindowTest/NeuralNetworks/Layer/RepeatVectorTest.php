@@ -58,7 +58,7 @@ class RepeatVectorTest extends TestCase
 
         $inputs = $g->Variable($K->zeros([1,5]));
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Input shape is inconsistent: defined as [3] but [5] given in RepeatVector');
+        $this->expectExceptionMessage('Input shape is inconsistent: defined as (3) but (5) given in RepeatVector');
         $layer->build($inputs);
     }
 

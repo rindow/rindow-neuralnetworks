@@ -14,8 +14,8 @@ class Input extends AbstractLayer
      */
     public function __construct(
         object $backend,
-        array $shape=null,
-        string $name=null,
+        ?array $shape=null,
+        ?string $name=null,
     )
     {
         $shape = $shape ?? null;
@@ -26,7 +26,7 @@ class Input extends AbstractLayer
         $this->initName($name,'input');
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -54,7 +54,7 @@ class Input extends AbstractLayer
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         return $inputs;

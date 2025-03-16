@@ -3,6 +3,7 @@ namespace Rindow\NeuralNetworks\Layer;
 
 use ArrayAccess;
 use Interop\Polite\Math\Matrix\NDArray;
+use Rindow\NeuralNetworks\Gradient\Variable;
 
 /**
  *
@@ -10,14 +11,15 @@ use Interop\Polite\Math\Matrix\NDArray;
 interface RNNLayer extends Layer
 {
     /**
-     * @param array<NDArray> $initialStates
-     * @return NDArray|array<NDArray>
+     * @param array<Variable> $initialStates
+     * @return Variable|array{Variable,array<Variable>}
      */
     public function forward(
         object $inputs,
-        bool $training=null,
-        array $initialStates=null
-    ) : NDArray|array;
+        ?bool $training=null,
+        ?array $initialStates=null,
+        ?NDArray $mask=null,
+    ) : Variable|array;
 
     /**
      * @param array<NDArray> $dOutputs
@@ -27,7 +29,7 @@ interface RNNLayer extends Layer
      */
     public function backward(
         array $dOutputs,
-        ArrayAccess $grads=null,
-        array $oidsToCollect=null
+        ?ArrayAccess $grads=null,
+        ?array $oidsToCollect=null
     ) : array;
 }

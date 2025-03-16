@@ -11,7 +11,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 interface Variable extends NDArray, Countable, IteratorAggregate
 {
     public function assign(
-        mixed $value, bool $reference=null, NDArray $mask=null) : void;
+        mixed $value, ?bool $reference=null, ?NDArray $mask=null) : void;
     public function name() : ?string;
     public function isTrainable() : bool;
     public function isbackpropagatable() : bool;

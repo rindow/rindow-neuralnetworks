@@ -16,7 +16,7 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
     public function __construct(
         object $mo,
         string $path,
-        int $verbose=null,
+        ?int $verbose=null,
         mixed ...$options
         )
     {
@@ -69,7 +69,7 @@ class TextClassifiedDataset extends ClassifiedDirectoryDataset
      * @return array{iterable<string>,iterable<string>}
      */
     public function fitOnTexts(
-        bool $loadAll=null, bool $noFit=null) : ?array
+        ?bool $loadAll=null, ?bool $noFit=null) : ?array
     {
         $filter = $this->filter;
         $this->filter = null;

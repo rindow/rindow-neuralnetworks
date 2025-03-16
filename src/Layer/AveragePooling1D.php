@@ -9,7 +9,7 @@ class AveragePooling1D extends AbstractPooling
     protected string $pool_mode = 'avg';
     protected string $defaultLayerName = 'averagepooling1d';
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();

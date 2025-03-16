@@ -16,7 +16,7 @@ class CallbackList implements Broadcaster
     /**
      * @param array<mixed> $callbacks
      */
-    public function __construct(Model $model, array $callbacks=null)
+    public function __construct(Model $model, ?array $callbacks=null)
     {
         $this->model = $model;
         if($callbacks) {
@@ -29,7 +29,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTrainBegin(array $metrics=null) : void
+    public function onTrainBegin(?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -38,7 +38,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTestBegin(array $metrics=null) : void
+    public function onTestBegin(?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -47,7 +47,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onPredictBegin(array $metrics=null) : void
+    public function onPredictBegin(?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -56,7 +56,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTrainEnd(array $metrics=null) : void
+    public function onTrainEnd(?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -65,7 +65,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTestEnd(array $metrics=null) : void
+    public function onTestEnd(?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -74,7 +74,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onPredictEnd(array $metrics=null) : void
+    public function onPredictEnd(?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -83,7 +83,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTrainBatchBegin(int $batch, array $metrics=null) : void
+    public function onTrainBatchBegin(int $batch, ?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -92,7 +92,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTestBatchBegin(int $batch, array $metrics=null) : void
+    public function onTestBatchBegin(int $batch, ?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -101,7 +101,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTrainBatchEnd(int $batch, array $metrics=null) : void
+    public function onTrainBatchEnd(int $batch, ?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -110,7 +110,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onTestBatchEnd(int $batch, array $metrics=null) : void
+    public function onTestBatchEnd(int $batch, ?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -119,7 +119,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onEpochBegin(int $epoch, array $metrics=null) : void
+    public function onEpochBegin(int $epoch, ?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;
@@ -128,7 +128,7 @@ class CallbackList implements Broadcaster
         }
     }
 
-    public function onEpochEnd(int $epoch, array $metrics=null) : void
+    public function onEpochEnd(int $epoch, ?array $metrics=null) : void
     {
         if($this->callbacks==null)
             return;

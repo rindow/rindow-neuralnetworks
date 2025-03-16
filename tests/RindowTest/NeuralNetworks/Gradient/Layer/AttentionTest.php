@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 
 class AttentionTest extends TestCase
@@ -34,11 +35,11 @@ class AttentionTest extends TestCase
         $query = $g->Variable($K->array([
             [0,1],
             [0,1],
-        ]));
+        ],dtype:NDArray::int32));
         $value = $g->Variable($K->array([
             [0,1,2,3],
             [0,1,2,3],
-        ]));
+        ],dtype:NDArray::int32));
 
         $embed1 = $nn->layers->Embedding($inputDim=2, $outputDim=3, input_length:2);
         $embed2 = $nn->layers->Embedding($inputDim=4, $outputDim=3, input_length:4);
@@ -71,11 +72,11 @@ class AttentionTest extends TestCase
         $query = $g->Variable($K->array([
             [0,1],
             [0,1],
-        ]));
+        ],dtype:NDArray::int32));
         $value = $g->Variable($K->array([
             [0,1,2,3],
             [0,1,2,3],
-        ]));
+        ],dtype:NDArray::int32));
 
         $embed1 = $nn->layers->Embedding($inputDim=2, $outputDim=3, input_length:2);
         $embed2 = $nn->layers->Embedding($inputDim=4, $outputDim=3, input_length:4);

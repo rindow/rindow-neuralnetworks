@@ -7,7 +7,7 @@ class Sigmoid extends AbstractActivation
 {
     protected bool $incorporatedLoss = false;
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $outputs = $K->sigmoid($inputs);

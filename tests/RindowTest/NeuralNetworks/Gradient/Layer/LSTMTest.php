@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Interop\Polite\Math\Matrix\NDArray;
 use InvalidArgumentException;
 
 class LSTMTest extends TestCase
@@ -34,7 +35,7 @@ class LSTMTest extends TestCase
         $x = $K->array([
             [0,1,2],
             [0,1,2],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $g->Variable($x);
         $embedding = $nn->layers->Embedding($inputDim=3, $outputDim=4, input_length:3);
         $layer = $nn->layers->LSTM($units=3);
@@ -66,7 +67,7 @@ class LSTMTest extends TestCase
         $x = $K->array([
             [0,1,2],
             [0,1,2],
-        ]);
+        ],dtype:NDArray::int32);
         $s = [
             $K->array([[0,1,2],[0,1,2],]),
             $K->array([[0,1,2],[0,1,2],]),
@@ -121,7 +122,7 @@ class LSTMTest extends TestCase
         $x = $K->array([
             [0,1,2],
             [0,1,2],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $g->Variable($x,name:'raw-x');
         $embed1 = $nn->layers->Embedding($inputDim=3, $outputDim=4, input_length:3);
         $layer = $nn->layers->LSTM($units=3,
@@ -160,7 +161,7 @@ class LSTMTest extends TestCase
         $x = $K->array([
             [0,1,2],
             [0,1,2],
-        ]);
+        ],dtype:NDArray::int32);
         $x = $g->Variable($x,name:'raw-x');
         $embed1 = $nn->layers->Embedding($inputDim=3, $outputDim=4, input_length:3);
         $layer = $nn->layers->LSTM($units=3,

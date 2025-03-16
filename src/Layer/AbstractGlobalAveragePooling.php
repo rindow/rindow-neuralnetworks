@@ -18,9 +18,9 @@ class AbstractGlobalAveragePooling extends AbstractImage
      */
     public function __construct(
         object $backend,
-        string $data_format=null,
-        array $input_shape=null,
-        string $name=null,
+        ?string $data_format=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         // defaults
@@ -34,7 +34,7 @@ class AbstractGlobalAveragePooling extends AbstractImage
         $this->initName($name,$this->defaultLayerName);
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
 
@@ -81,7 +81,7 @@ class AbstractGlobalAveragePooling extends AbstractImage
         ];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         $container = $this->container();

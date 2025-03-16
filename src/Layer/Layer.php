@@ -14,7 +14,7 @@ interface Layer extends Module
     /**
      * @param array<NDArray> $sampleWeights
      */
-    public function build(mixed $variable=null,array $sampleWeights=null) : void;
+    public function build(mixed $variable=null,?array $sampleWeights=null) : void;
 
     public function isBuilt() : bool;
 

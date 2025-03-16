@@ -18,16 +18,16 @@ class BatchNormalization extends AbstractNormalization
 
     public function __construct(
         object $backend,
-        int $axis=null,
-        float $momentum=null,
-        float $epsilon=null,
-        bool $center=null,
-        bool $scale=null,
-        string|callable $beta_initializer=null,
-        string|callable $gamma_initializer=null,
-        string|callable $moving_mean_initializer=null,
-        string|callable $moving_variance_initializer=null,
-        string $name=null,
+        ?int $axis=null,
+        ?float $momentum=null,
+        ?float $epsilon=null,
+        ?bool $center=null,
+        ?bool $scale=null,
+        string|callable|null $beta_initializer=null,
+        string|callable|null $gamma_initializer=null,
+        string|callable|null $moving_mean_initializer=null,
+        string|callable|null $moving_variance_initializer=null,
+        ?string $name=null,
     )
     {
         parent::__construct(
@@ -52,7 +52,7 @@ class BatchNormalization extends AbstractNormalization
         $this->movingMeanInitializer  = $K->getInitializer($moving_mean_initializer);
         $this->movingVarianceInitializer = $K->getInitializer($moving_variance_initializer);
         $this->initName($name,'batchnormalization');
-        $this->allocateWeights(2,$nonTrainables=2);
+        $this->allocateWeights(['beta','gamma'],$nonTrainables=2);
         $this->callOptions['training'] = true;
     }
 
@@ -100,7 +100,7 @@ class BatchNormalization extends AbstractNormalization
         return [$this->dBeta,$this->dGamma];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
         if($training===null) {
@@ -211,7 +211,10 @@ class BatchNormalization extends AbstractNormalization
             $this->dBeta = clone $this->dBeta;
         }
 
-        $this->allocateWeights(2,$nonTrainables=2);
+        $this->allocateWeights(
+            array_map(fn($weight)=>$weight->name(),$this->trainableVariables()),
+            nonTrainables:2
+        );
         if($this->assignedWeights) {
             $this->syncWeightVariables();
         }

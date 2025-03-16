@@ -10,7 +10,7 @@ class ModelLoader
     protected Builder $builder;
     protected ?HDAFactory $hdaFactory;
 
-    public function __construct(Builder $builder,HDAFactory $hdaFactory=null)
+    public function __construct(Builder $builder,?HDAFactory $hdaFactory=null)
     {
         $this->builder = $builder;
         $this->backend = $builder->backend();

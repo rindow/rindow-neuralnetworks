@@ -17,7 +17,7 @@ interface Loss
      * @param array<NDArray> $oidsToCollect
      * @return array<NDArray>
      */
-    public function backward(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array;
+    public function backward(array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array;
 
     public function accuracyMetric() : string;
 

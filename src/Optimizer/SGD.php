@@ -13,7 +13,7 @@ class SGD implements Optimizer
 
     public function __construct(
         object $backend,
-        float|LearningRateSchedule $lr=null,
+        float|LearningRateSchedule|null $lr=null,
         )
     {
         // defaults

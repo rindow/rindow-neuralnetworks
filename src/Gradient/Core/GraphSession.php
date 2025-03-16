@@ -166,8 +166,8 @@ class GraphSession
      */
     public function backward(
         array $dOutputs,
-        ArrayAccess $grads=null,
-        array $oidsToCollect=null
+        ?ArrayAccess $grads=null,
+        ?array $oidsToCollect=null
         ) : array
     {
         $this->begin();

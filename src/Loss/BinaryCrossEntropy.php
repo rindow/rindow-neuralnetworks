@@ -25,7 +25,7 @@ class BinaryCrossEntropy extends AbstractLoss
         return $outputs;
     }
 
-    protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    protected function differentiate(array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array
     {
         $K = $this->backend;
         $dLoss = $this->flattenLoss($dOutputs[0]);

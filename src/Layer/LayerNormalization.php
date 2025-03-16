@@ -10,13 +10,13 @@ class LayerNormalization extends AbstractNormalization
 {
     public function __construct(
         object $backend,
-        int $axis=null,
-        float $epsilon=null,
-        bool $center=null,
-        bool $scale=null,
-        string|callable $beta_initializer=null,
-        string|callable $gamma_initializer=null,
-        string $name=null,
+        ?int $axis=null,
+        ?float $epsilon=null,
+        ?bool $center=null,
+        ?bool $scale=null,
+        string|callable|null $beta_initializer=null,
+        string|callable|null $gamma_initializer=null,
+        ?string $name=null,
     )
     {
         parent::__construct(
@@ -32,7 +32,7 @@ class LayerNormalization extends AbstractNormalization
         $name = $name ?? null;
 
         $this->initName($name,'layernormalization');
-        $this->allocateWeights(2);
+        $this->allocateWeights(['beta','gamma']);
     }
 
     protected function buildNoTrainingMode(array $kernelShape) : void
@@ -67,42 +67,40 @@ class LayerNormalization extends AbstractNormalization
         return [$this->dBeta,$this->dGamma];
     }
 
-    protected function call(NDArray $inputs, bool $training=null) : NDArray
+    protected function call(NDArray $inputs, ?bool $training=null) : NDArray
     {
         $K = $this->backend;
-        if($training===null) {
-            throw new InvalidArgumentException("training option must be true or false.");
-        }
+        //if($training===null) {
+        //    throw new InvalidArgumentException("training option must be true or false.");
+        //}
         $container = $this->container();
         // (batch,heads...,feature) => (batch*heads,feature)
         $inputs = $this->transformShape($inputs);
 
         // normalization
         // xn = (x - mean(x)) / sqrt(mean( (x - mean(x))**2 ) + eps)
-        $shape = $inputs->shape();
-        $size = array_pop($shape);
-        $mu = $K->mean($inputs,axis:-1);
-        $muEx = $K->expandDims($mu,axis:-1);
-        $muEx = $K->repeat($muEx,$size,axis:-1);
-        $muEx = $K->squeeze($muEx,axis:-1);
-        $xc = $K->sub($inputs, $muEx);
+        //
 
-        $v = $K->mean($K->square($xc), axis:-1);
-        $vEx = $K->expandDims($v,axis:-1);
-        $vEx = $K->repeat($vEx,$size,axis:-1);
-        $vEx = $K->squeeze($vEx,axis:-1);
+        // mean = mean(x)
+        // center = x - mean(x)
+        $mean = $K->mean($inputs,axis:-1);                          // (batch*heads)
+        $center_x = $K->sub($inputs, $mean, trans:true);            // (batch*heads,feature)
 
-        $std = $K->sqrt($K->increment($vEx, $this->epsilon));
-        $xn = $K->div($xc, $std);
+        // variance = mean(square(x - mean), axis=-1)
+        $variance = $K->mean($K->square($center_x), axis:-1);       // (batch*heads)
 
-        $container->xc = $xc;
-        $container->xn = $xn;
-        $container->std = $std;
+        // std = sqrt(variance+eps)
+        // normalized_x = x-mean(x) / std
+        $std = $K->sqrt($K->increment($variance, $this->epsilon));  // (batch*heads)
+        $norm_x = $K->div($center_x, $std, trans:true);             // (batch*heads,feature)
+
+        $container->norm_x = $norm_x;   // (batch*head,feature)
+        $container->std = $std;         // (batch*heads)
 
         if($this->gamma) {
-            $outputs = $K->mul($this->gamma, $xn);
+            $outputs = $K->mul($this->gamma, $norm_x);
         } else {
-            $outputs = $xn;
+            $outputs = $norm_x;
         }
         if($this->beta) {
             $outputs = $K->add($outputs, $this->beta);
@@ -115,43 +113,49 @@ class LayerNormalization extends AbstractNormalization
     protected function differentiate(NDArray $dOutputs) : NDArray
     {
         $K = $this->backend;
-        $container = $this->container();
         $dOutputs = $this->transformShape($dOutputs);
-        $numItems = $dOutputs->shape()[0];
+        $container = $this->container();
+        $norm_x = $container->norm_x;           // (batch*head,feature)
+        $std = $container->std;                 // (batch*heads)
 
+        $tmp = $dOutputs->shape();
+        $feature_dim = array_pop($tmp);
+
+        // d_scaled_x = dOutputs                // (batch*head,feature)
+        // d_norm_x = d_scaled_x * gamma        // (batch*head,feature)
         if($this->dBeta) {
             $dbeta = $K->sum($dOutputs,axis:0,output:$this->dBeta);
-            //$K->copy($dbeta,$this->dBeta);
         }
         if($this->dGamma) {
-            $dgamma = $K->sum($K->mul($container->xn, $dOutputs), axis:0, output:$this->dGamma);
-            //$K->copy($dgamma,$this->dGamma);
-            $dxn = $K->mul($this->gamma, $dOutputs);
+            $dgamma = $K->sum($K->mul($norm_x, $dOutputs), axis:0, output:$this->dGamma);
+            $d_norm_x = $K->mul($this->gamma, $dOutputs);    // (batch*head,feature)
         } else {
-            $dxn = $dOutputs;
+            $d_norm_x = $dOutputs;                           // (batch*head,feature)
         }
-        if($container->std===null) {
+        if($std===null) {
             throw new LogicException('not initialized for training');
         }
-        $dxc = $K->div($dxn, $container->std);
-        $shape = $dxn->shape();
-        $size = array_pop($shape);
-        $dstd = $K->scale(-1.0, $K->sum(
-            $K->div($K->mul($dxn, $container->xc), $K->mul($container->std, $container->std)),
-            axis:-1));
-        $dstd = $K->expandDims($dstd,$axis=-1);
-        $dstd = $K->repeat($dstd,$size,axis:-1);
-        $dstd = $K->squeeze($dstd,axis:-1);
-
-        $dvar = $K->div($K->scale(0.5, $dstd), $container->std);
-        $K->update_add($dxc,
-            $K->scale(2.0/$numItems, $K->mul($container->xc, $dvar)));
-        $dmu = $K->sum($dxc, axis:-1);
-        $dmu = $K->expandDims($dmu,$axis=-1);
-        $dmu = $K->repeat($dmu,$size,axis:-1);
-        $dmu = $K->squeeze($dmu,axis:-1);
-
-        $dInputs = $K->sub($dxc, $K->scale(1/$numItems,$dmu));
+        // d_center_x = d_normalized_x / std
+        $d_center_x = $K->div($d_norm_x, $std, trans:true);             // (batch*head,feature)
+        // d_mean = sum(d_center_x)
+        $d_mean = $K->sum($d_center_x, axis:-1);                        // (batch*head)
+        // d_std = sum(normalized_x*d_center_x)
+        $d_std = $K->sum($K->mul($norm_x,$d_center_x), axis:-1);        // (batch*head)
+        // d_x = d_center_x - (d_mean + normalized_x*d_std) / feature_dim_f
+        $dInputs = $K->sub(                 // (batch*head,feature)
+            $d_center_x,                    // (batch*head,feature)
+            $K->scale(1/$feature_dim,       // (batch*head,feature)
+                $K->add(                    // (batch*head,feature)
+                    $K->mul(                // (batch*head,feature)
+                        $norm_x,            // (batch*head,feature)
+                        $d_std,             // (batch*head)
+                        trans:true,
+                    ),
+                    $d_mean,                // (batch*head)
+                    trans:true,
+                )
+            )
+        );
 
         $dInputs = $this->untransformShape($dInputs);
         return $dInputs;
@@ -172,7 +176,7 @@ class LayerNormalization extends AbstractNormalization
             $this->dBeta = clone $this->dBeta;
         }
 
-        $this->allocateWeights(2);
+        $this->allocateWeights(array_map(fn($weight)=>$weight->name(),$this->weights));
         if($this->assignedWeights) {
             $this->syncWeightVariables();
         }

@@ -12,8 +12,8 @@ class Huber extends AbstractLoss
 
     public function __construct(
         object $backend,
-        float $delta=null,
-        string $reduction=null,
+        ?float $delta=null,
+        ?string $reduction=null,
     )
     {
         parent::__construct($backend,from_logits:null,reduction:$reduction);
@@ -68,7 +68,7 @@ class Huber extends AbstractLoss
         return $loss;
     }
 
-    protected function differentiate(array $dOutputs, ArrayAccess $grads=null, array $oidsToCollect=null) : array
+    protected function differentiate(array $dOutputs, ?ArrayAccess $grads=null, ?array $oidsToCollect=null) : array
     {
         $K = $this->backend;
         $dLoss = $this->flattenLoss($dOutputs[0]);

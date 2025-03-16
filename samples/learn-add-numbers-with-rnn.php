@@ -154,6 +154,7 @@ class NumAdditionDataset
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
 $plt = new Plot(null,$mo);
+//$nn->backend()->primaryLA()->setProfiling(true);
 
 $input_length  = $DIGITS*2 + 1;
 $output_length = $DIGITS + 1;
@@ -226,6 +227,7 @@ if(file_exists($modelFilePath)) {
     );
 
     $model->save($modelFilePath);
+    //$nn->backend()->primaryLA()->profilingReport();
 
     $plt->plot($mo->array($history['accuracy']),null,null,'accuracy');
     $plt->plot($mo->array($history['val_accuracy']),null,null,'val_accuracy');

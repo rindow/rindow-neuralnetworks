@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 namespace Rindow\NeuralNetworks\Gradient\Core;
 
 use InvalidArgumentException;
@@ -11,6 +10,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
 use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
 use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
+use Rindow\NeuralNetworks\Gradient\MaskedNDArray as MaskedNDArrayInterface;
 
 
 class Variable implements VariableInterface
@@ -18,7 +18,7 @@ class Variable implements VariableInterface
     protected object $backend;
     protected bool $trainable;
     protected bool $undetermined;
-    protected ?string $name;
+    protected ?string $name=null;
     protected mixed $value;
     protected ?object $creator=null;
     protected int $generation=0;
@@ -28,12 +28,12 @@ class Variable implements VariableInterface
     public function __construct(
         object $backend,
         mixed $value,
-        string $name=null,
-        bool $reference=null,
-        bool $trainable=null,
-        bool $undetermined=null,
-        bool $unbackpropagatable=null,
-        NDArray $mask=null,
+        ?string $name=null,
+        ?bool $reference=null,
+        ?bool $trainable=null,
+        ?bool $undetermined=null,
+        ?bool $unbackpropagatable=null,
+        ?NDArray $mask=null,
     )
     {
         $this->backend = $backend;
@@ -47,7 +47,7 @@ class Variable implements VariableInterface
     }
 
     public function assign(
-        mixed $value, bool $reference=null, NDArray $mask=null) : void
+        mixed $value, ?bool $reference=null, ?NDArray $mask=null) : void
     {
         $K = $this->backend;
         $reference = $reference ?? false;
@@ -57,9 +57,12 @@ class Variable implements VariableInterface
         if($value instanceof NDArray) {
             if($reference) {
                 $this->value = $value;
-            } else {                                        // Copying NDArray before
-                $this->value = $K->copy($K->array($value)); // translate from NDArray to NDArrayCL
-            }                                               // if Backend is OpenCL.
+            } else {                                            // Copying NDArray before
+                $this->value = $K->copy($K->array($value));     // translate from NDArray to NDArrayCL
+                if($value instanceof MaskedNDArrayInterface) {  // if Backend is OpenCL.
+                    $this->value = new MaskedNDArray($this->value,$value->mask());
+                }
+            }
         } elseif(is_bool($value)) {
             $this->value = $value;
         } elseif(is_array($value)||is_numeric($value)) {
@@ -73,16 +76,6 @@ class Variable implements VariableInterface
         }
         $this->mask = $mask;
         $this->undetermined = false;
-    }
-
-    public function mask() : NDArray
-    {
-        return $this->mask;
-    }
-
-    public function setMask(NDArray $mask) : void
-    {
-        $this->mask = $mask;
     }
 
     public function isTrainable() : bool
@@ -103,7 +96,7 @@ class Variable implements VariableInterface
     public function value() : mixed
     {
         if($this->undetermined) {
-            throw new LogicException("Undetermined variable");
+            throw new LogicException("Undetermined variable:".$this->name??'');
         }
         return $this->value;
     }

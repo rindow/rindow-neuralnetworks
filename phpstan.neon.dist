@@ -10,8 +10,6 @@ parameters:
 		-
 			message: "#Call to an undefined method Rindow\\\\NeuralNetworks\\\\Gradient\\\\Variable::value\\(\\)#"
 		-
-			message: "#^Call to an undefined method .*Rindow\\\\NeuralNetworks\\\\Model\\\\Model::forward\\(\\)#"
-		-
 			message: "#^Method Rindow\\\\NeuralNetworks\\\\Model\\\\Sequential::call\\(\\)#"
 			path: src/Model/Sequential.php
 		-
@@ -23,3 +21,31 @@ parameters:
 			message: "#^Function Rindow\\\\Math\\\\Matrix\\\\R not found#"
 		-
 			message: "#^Used function Rindow\\\\Math\\\\Matrix\\\\R not found#"
+		-
+			message: "#^Call to an undefined method .*Rindow\\\\NeuralNetworks\\\\Layer\\\\Layer::forward\\(\\)#"
+		-
+			message: "#^Call to an undefined method .*Rindow\\\\NeuralNetworks\\\\Layer\\\\Layer::inputDtype\\(\\)#"
+		-
+			message: "#^Call to an undefined method Rindow\\\\NeuralNetworks\\\\Layer\\\\Layer::_rawCall\\(\\)#"
+			count: 5
+			path: src/Layer/MultiHeadAttention.php
+		-
+			message: "#^Call to an undefined method Rindow\\\\NeuralNetworks\\\\Layer\\\\Layer::_rawDifferentiate\\(\\)#"
+			count: 5
+			path: src/Layer/MultiHeadAttention.php
+		-
+			message: "#^Call to an undefined method Rindow\\\\NeuralNetworks\\\\Layer\\\\AbstractAttentionLayer::forward\\(\\)#"
+			count: 1
+			path: src/Layer/AbstractAttentionLayer.php
+		-
+			message: "#^Expression on left side of \\?\\? is not nullable#"
+			count: 1
+			path: src/Gradient/Core/Variable.php
+		-
+			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray::#"
+			count: 3
+			path: src/Gradient/Core/MaskedNDArray.php
+
+
+#		-
+#			message: "#^Call to an undefined method .*Rindow\\\\NeuralNetworks\\\\Model\\\\Model::forward\\(\\)#"

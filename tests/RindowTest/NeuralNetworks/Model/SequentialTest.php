@@ -27,7 +27,7 @@ class WeightLog extends AbstractCallback
         $this->prev_w = null;
     }
 
-    public function onEpochEnd(int $epoch, array $metrics=null) : void
+    public function onEpochEnd(int $epoch, ?array $metrics=null) : void
     {
         $model = $this->getModel();
         $K = $model->backend();
@@ -79,7 +79,7 @@ class TestFilter implements DatasetFilter
         $this->mo = $mo;
     }
     public function translate(
-        iterable $inputs, iterable $tests=null, $options=null) : array
+        iterable $inputs, ?iterable $tests=null, $options=null) : array
     {
         $batchSize= count($inputs);
         $cols = count($inputs[0])-1;
@@ -1267,7 +1267,7 @@ class SequentialTest extends TestCase
             [9,8,7,6],
             [1,3,3,4],
             [5,4,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $t = $mo->array([
             [0,1,2,9],
             [9,8,7,6],
@@ -1279,7 +1279,7 @@ class SequentialTest extends TestCase
             [1,1,1,4],
             [4,3,3,1],
             [9,3,3,2],
-        ]);
+        ],dtype:NDArray::int32);
         $v_t = $mo->array([
             [2,3,3,4],
             [1,1,1,4],

@@ -24,7 +24,7 @@ abstract class AbstractFunction
 
     /**
     *  @param array<NDArray>  $dOutputs
-    *  @return array<NDArray>
+    *  @return array<NDArray|ScalarInterface>
     */
     abstract protected function differentiate(array $dOutputs) : array;
 

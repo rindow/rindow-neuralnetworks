@@ -7,7 +7,7 @@ use Rindow\NeuralNetworks\Support\GenericUtils;
 
 abstract class AbstractConv extends AbstractImage
 {
-    abstract protected function call(NDArray $inputs, bool $training=null) : NDArray;
+    abstract protected function call(NDArray $inputs, ?bool $training=null) : NDArray;
     abstract protected function differentiate(NDArray $dOutputs) : NDArray;
 
     use GenericUtils;
@@ -44,22 +44,22 @@ abstract class AbstractConv extends AbstractImage
         object $backend,
         int $filters,
         int|array $kernel_size,
-        int|array $strides=null,
-        string $padding=null,
-        string $data_format=null,
-        int|array $dilation_rate=null,
-        int $groups=null,
-        string|object $activation=null,
-        bool $use_bias=null,
-        string|callable $kernel_initializer=null,
-        string|callable $bias_initializer=null,
-        string $kernel_regularizer=null,
-        string $bias_regularizer=null,
-        string $activity_regularizer=null,
-        string $kernel_constraint=null,
-        string $bias_constraint=null,
-        array $input_shape=null,
-        string $name=null,
+        int|array|null $strides=null,
+        ?string $padding=null,
+        ?string $data_format=null,
+        int|array|null $dilation_rate=null,
+        ?int $groups=null,
+        string|object|null $activation=null,
+        ?bool $use_bias=null,
+        string|callable|null $kernel_initializer=null,
+        string|callable|null $bias_initializer=null,
+        ?string $kernel_regularizer=null,
+        ?string $bias_regularizer=null,
+        ?string $activity_regularizer=null,
+        ?string $kernel_constraint=null,
+        ?string $bias_constraint=null,
+        ?array $input_shape=null,
+        ?string $name=null,
     )
     {
         // defaults 
@@ -99,11 +99,11 @@ abstract class AbstractConv extends AbstractImage
         $this->kernelInitializerName = $kernel_initializer;
         $this->biasInitializerName = $bias_initializer;
         $this->useBias = $use_bias;
-        $this->allocateWeights($this->useBias?2:1);
+        $this->allocateWeights($this->useBias?['kernel','bias']:['kernel']);
         $this->setActivation($activation);
     }
 
-    public function build(mixed $variable=null, array $sampleWeights=null) : void
+    public function build(mixed $variable=null, ?array $sampleWeights=null) : void
     {
         $K = $this->backend;
         $kernelInitializer = $this->kernelInitializer;
