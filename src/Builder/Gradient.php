@@ -43,6 +43,7 @@ use Rindow\NeuralNetworks\Gradient\Func\Increment;
 use Rindow\NeuralNetworks\Gradient\Func\Greater;
 use Rindow\NeuralNetworks\Gradient\Func\Less;
 use Rindow\NeuralNetworks\Gradient\Func\Repeat;
+use Rindow\NeuralNetworks\Gradient\Func\Split;
 
 class Gradient
 {
@@ -391,5 +392,19 @@ class Gradient
     {
         $func = new Repeat($this->backend,axis:$axis,keepdims:$keepdims);
         return $func($x,$repeats);
+    }
+
+    /**
+     * @param array<int> $sizeSplits
+     * @return array<NDArray>
+     */
+    public function split(
+        NDArray $x,
+        array $sizeSplits,
+        ?int $axis=null,
+    ) : array
+    {
+        $func = new Split($this->backend,$sizeSplits,axis:$axis);
+        return $func($x);
     }
 }

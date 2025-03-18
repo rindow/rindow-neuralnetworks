@@ -132,7 +132,7 @@ class EngFraDataset
     }
 
     public function loadData(
-        string $path=null, int $numExamples=null, int $numWords=null)
+        ?string $path=null, ?int $numExamples=null, ?int $numWords=null)
     {
         if($path==null) {
             $path = $this->download($this->downloadFile);

@@ -181,7 +181,7 @@ abstract class AbstractFunction
     public function __invoke(mixed ...$inputs) : mixed
     {
         if(count($inputs)!=$this->numOfInputs) {
-            throw new InvalidArgumentException($this->numOfInputs.' arguments are required.');
+            throw new InvalidArgumentException($this->numOfInputs.' arguments are required.'.count($inputs).' given.'); 
         }
         $inputs = $this->preprocess($inputs);
         [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);

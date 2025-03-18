@@ -73,6 +73,12 @@ parameters:
 			path: src/Gradient/Func/Get.php
 
 		-
+			message: '#^Call to function is_int\(\) with int will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Gradient/Func/Split.php
+
+		-
 			message: '#^Instanceof between Interop\\Polite\\Math\\Matrix\\NDArray and Interop\\Polite\\Math\\Matrix\\NDArray will always evaluate to true\.$#'
 			identifier: instanceof.alwaysTrue
 			count: 1

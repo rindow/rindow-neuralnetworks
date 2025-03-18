@@ -37,10 +37,20 @@ class EngFraDataset
         $this->preprocessor = new Preprocessor($mo);
     }
 
-    protected function getDatasetDir()
+    protected function getRindowDatesetDir() : string
     {
-        return sys_get_temp_dir().'/rindow/nn/datasets/fra-eng';
+        $dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
+        if(!$dataDir) {
+            $dataDir = sys_get_temp_dir().'/rindow/nn/datasets';
+        }
+        return $dataDir;
     }
+
+    protected function getDatasetDir() : string
+    {
+        return $this->getRindowDatesetDir().'/fra-eng';
+    }
+
 
     protected function download($filename)
     {
@@ -60,7 +70,7 @@ class EngFraDataset
         $this->console("Extract to:".$this->datasetDir.'/..'."\n");
         $files = [$memberfile];
         if(!class_exists("ZipArchive")) {
-            throw new \Exception("Please configure the zip php-extension.");
+            throw new RuntimeException("Please configure the zip php-extension.");
         }
         $zip = new ZipArchive();
         $zip->open($filePath);
@@ -692,6 +702,7 @@ class Translator
     protected int $end_voc_id;
     protected object $inpLang;
     protected object $targLang;
+    protected object $plt;
 
 
     public function __construct(
@@ -702,6 +713,7 @@ class Translator
         ?int $end_voc_id=null,
         ?object $inpLang=null,
         ?object $targLang=null,
+        ?object $plt=null,
     )
     {
         $this->builder = $nn;
@@ -711,6 +723,7 @@ class Translator
         $this->end_voc_id = $end_voc_id;
         $this->inpLang = $inpLang;
         $this->targLang = $targLang;
+        $this->plt = $plt;
     }
 
     public function predict(NDArray $sentence) : array
@@ -803,26 +816,39 @@ class Translator
     public function plotAttention(
         $attention, $sentence, $predictedSentence)
     {
+        $la = $this->builder->backend()->localLA();
+        $mo = $this->builder->backend()->localMatrixOperator();
         $plt = $this->plt;
         $config = [
             'frame.xTickPosition'=>'up',
             'frame.xTickLabelAngle'=>90,
-            'figure.topMargin'=>100,
+            'figure.topMargin'=>110,
+            'figure.bottomMargin'=>70,
+            'xlabel.margin'=>-7,
         ];
-        $plt->figure(null,null,$config);
         $sentenceLen = count($sentence);
         $predictLen = count($predictedSentence);
-        $image = $this->mo->zeros([$predictLen,$sentenceLen],$attention->dtype());
-        for($y=0;$y<$predictLen;$y++) {
-            for($x=0;$x<$sentenceLen;$x++) {
-                $image[$y][$x] = $attention[$y][$x];
+        $num_heads = count($attention);
+        $images = $la->slice($attention,[0,0,0],[$num_heads,$predictLen,$sentenceLen]);
+        $rows = intdiv($num_heads,2);
+        [$fig,$axes] = $plt->subplots(2,$rows,null,$config);
+        foreach($images as $i => $image) {
+            $axes[$i]->imshow($image, $cmap='viridis',null,null,$origin='upper');
+            $axes[$i]->setXLabel("Head ".($i+1));
+            if(intdiv($i,$rows)==0) {
+                $axes[$i]->setXticks($la->range(count($sentence)));
+                $axes[$i]->setXtickLabels($sentence);
+            } else {
+                $axes[$i]->hideXTicks(true);
+            }
+            if($i%$rows == 0) {
+                $axes[$i]->setYticks($la->range(count($predictedSentence)));
+                $axes[$i]->setYtickLabels(array_reverse($predictedSentence));
+            } else {
+                $axes[$i]->hideYTicks(true);
             }
         }
-        $plt->imshow($image, $cmap='viridis',null,null,$origin='upper');
 
-        $plt->xticks($this->mo->arange(count($sentence)),$sentence);
-        $predictedSentence = array_reverse($predictedSentence);
-        $plt->yticks($this->mo->arange(count($predictedSentence)),$predictedSentence);
     }
 }
 
@@ -873,15 +899,7 @@ class CustomLossFunction
         $loss = $this->loss_object->forward($label, $pred);
         //$mo = $this->nn->backend()->localMatrixOperator();
         //$K = $this->nn->backend();
-        //echo $mo->shapeToString($label->shape())."\n";
-        //echo $mo->shapeToString($pred->shape())."\n";
-        //echo $mo->shapeToString($K->argMax($pred,axis:-1)->shape())."\n";
-        //echo "P:".$this->targLang->sequencesToTexts([$K->ndarray($K->argMax($pred,axis:-1))[0]])[0]."\n";
-        //echo "T:".$this->targLang->sequencesToTexts([$K->ndarray($label)[0]])[0]."\n";
         $mask = $g->greater($g->cast($label,dtype:NDArray::float32),0.0);
-        //echo $mo->toString($K->ndarray($mask),indent:true)."\n";
-        //echo $mo->shapeToString($loss->shape())."\n";
-        //echo $mo->shapeToString($mask->shape())."\n";
         $loss = $g->mul($loss,$mask);
         $loss = $g->div($g->reduceSum($loss),$g->reduceSum($mask));
         //echo "loss=".$loss->toArray()."\n";
@@ -903,7 +921,7 @@ class CustomAccuracy
 
     public function __invoke($label, $pred)
     {
-        $mo = $this->nn->backend()->localMatrixOperator();
+        //$mo = $this->nn->backend()->localMatrixOperator();
         $K = $this->backend;
         $pred = $K->argMax($pred, axis:-1);  // convert to token id from predicts
 
@@ -945,13 +963,13 @@ function make_labels($la,$label_tensor) {
     return $label_tensor;
 }
 
-$numExamples=20000;#30000;#128;
-$numWords=1024;#null;
+$numExamples=20000;#20000;#30000;#50000;
+$numWords=1024;#1024;#null;
 $epochs = 10;#20;
 $batchSize = 64;#8;
 $d_model=128;#64;#128;#256;#512  // d_model embedding_dim
 $dff=512;#64;  // units 
-$num_layers=4;#6;
+$num_layers=4;#4;#6;
 $num_heads =8;
 $dropout_rate = 0.1;#0.1
 
@@ -996,6 +1014,7 @@ echo "batchSize: $batchSize\n";
 echo "embedding_dim: $d_model\n";
 echo "num_heads: $num_heads\n";
 echo "dff: $dff\n";
+echo "num_layers: $num_layers\n";
 echo "Total questions: $corpusSize\n";
 echo "Input  word dictionary: $inputVocabSize(".$inpLang->numWords(true).")\n";
 echo "Target word dictionary: $targetVocabSize(".$targLang->numWords(true).")\n";
@@ -1074,6 +1093,7 @@ if(file_exists($modelFilePath)) {
     //$plt->plot($mo->array($history['val_loss']),null,null,'val_loss');
     $plt->legend();
     $plt->title('seq2seq-transformer-translation');
+    $plt->show();
 }
 
 $translator = new Translator(
@@ -1084,16 +1104,18 @@ $translator = new Translator(
     end_voc_id:$targLang->wordToIndex('<end>'),
     inpLang:$inpLang,
     targLang:$targLang,
+    plt:$plt,
 );
 
 //$choice = $mo->random()->choice($corpusSize,10,false);
-$choice = $mo->random()->choice($trainSize,10,false);
+$skip = intdiv($trainSize,2);
+$choice = $mo->random()->choice($trainSize-$skip,10,false);
 try {
 foreach($choice as $idx)
 {
-    $question = $inputTensor[$idx];
+    $question = $inputTensor[$idx+$skip];
     [$predict,$attentionPlot] = $translator->predict($question);
-    $answer = $targetTensor[$idx];
+    $answer = $targetTensor[$idx+$skip];
         
     $sentence = $inpLang->sequencesToTexts([$question])[0];
     $predictedSentence = $targLang->sequencesToTexts($predict)[0];
@@ -1102,12 +1124,29 @@ foreach($choice as $idx)
     echo "Predict: $predictedSentence\n";
     echo "Target:  $targetSentence\n";
     echo "\n";
+
+    $seqs = [$question,$predict[0][[1,count($predict[0])]]];
+    $dicts = [$inpLang,$targLang];
+    $texts = [];
+    foreach(array_map(null,$seqs,$dicts) as [$seq,$dict]) {
+        $words = [];
+        foreach($seq as $id) {
+            if($id==0) break;
+            $words[] = $dict->indexToWord($id);
+        }
+        $texts[] = $words;
+    }
+    [$inputText,$predictText] = $texts;
+    $translator->plotAttention($attentionPlot[0], $inputText,$predictText);
+    $plt->show();
 }
 } catch(\Exception $e) {
-    echo get_class($e).": ".$e->getMessage()."\n";
-    echo "File: ".$e->getFile()."(".$e->getLine().")\n";
-    echo $e->getTraceAsString()."\n";
-    echo "Exception!!!\n";
+    while($e) {
+        echo get_class($e).": ".$e->getMessage()."\n";
+        echo "File: ".$e->getFile()."(".$e->getLine().")\n";
+        echo $e->getTraceAsString()."\n";
+        echo "Exception!!!\n";
+        $e = $e->getPrevious();
+    }
 }
-$plt->show();
 #$nn->backend()->primaryLA()->profilingReport();
