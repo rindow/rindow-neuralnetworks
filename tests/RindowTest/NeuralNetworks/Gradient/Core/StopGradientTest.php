@@ -23,18 +23,18 @@ class TestNDArrayCL extends NDArrayCL
 
 class AbstractTestFunction extends AbstractFunction
 {
-    protected $inTraining;
-    protected $logger;
-    protected $name;
+    protected bool $inTraining = false;
+    protected ?object $logger;
+    protected ?string $name;
 
-    public function __construct($backend,$logger=null,$name=null)
+    public function __construct(object $backend, ?object $logger=null, ?string $name=null)
     {
         parent::__construct($backend);
         $this->logger = $logger;
         $this->name = $name;
     }
 
-    public function name()
+    public function name() : ?string
     {
         return $this->name;
     }
@@ -115,7 +115,7 @@ class AbstractTestFunction extends AbstractFunction
             $v->_debug_name = 'dIn'.$key.'@'.$this->name;
             $dInputs[] = $v;
         }
-        $this->inTraining = null;
+        $this->inTraining = false;
         return $dInputs;
     }
 

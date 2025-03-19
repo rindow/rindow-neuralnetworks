@@ -47,17 +47,29 @@ class GraphFunction implements GraphFunctionInterface
     /** @var array<VariableInterface> $constants for input oid in the graph */
     protected array $constants = [];
     protected ?object $alternateCreator;
+    protected ?string $name;
 
-    public function __construct(object $backend, callable $func, ?object $alternateCreator=null)
+    public function __construct(
+        object $backend,
+        callable $func,
+        ?object $alternateCreator=null,
+        ?string $name=null,
+    )
     {
         $this->backend = $backend;
         $this->func = $func;
         $this->alternateCreator = $alternateCreator;
+        $this->name = $name;
     }
 
     public function backend() : object
     {
         return $this->backend;
+    }
+
+    public function name() : ?string
+    {
+        return $this->name;
     }
 
     /**
@@ -284,6 +296,7 @@ class GraphFunction implements GraphFunctionInterface
                 continue;
             }
             $dInputs[] = $grads[$oid];
+            unset($grads[$oid]);
         }
         // Like WeakMap
         //$unsets = [];

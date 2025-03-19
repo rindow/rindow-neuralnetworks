@@ -43,10 +43,22 @@ parameters:
 			path: src/Gradient/Core/ArrayShape.php
 
 		-
+			message: '#^Instanceof between Rindow\\NeuralNetworks\\Gradient\\Variable and Rindow\\NeuralNetworks\\Gradient\\Variable will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Gradient/Core/GradientTape.php
+
+		-
 			message: '#^Strict comparison using \!\=\= between Rindow\\NeuralNetworks\\Gradient\\Variable and null will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: src/Gradient/Core/GradientTape.php
+
+		-
+			message: '#^Instanceof between Rindow\\NeuralNetworks\\Gradient\\Variable and Rindow\\NeuralNetworks\\Gradient\\Variable will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Gradient/Core/GraphFunction.php
 
 		-
 			message: '#^Strict comparison using \!\=\= between Rindow\\NeuralNetworks\\Gradient\\Variable and null will always evaluate to true\.$#'

@@ -37,7 +37,7 @@ class SplitTest extends TestCase
 
 
         //
-        // dx/dy[0] = 1
+        // dy[0]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){
@@ -57,7 +57,7 @@ class SplitTest extends TestCase
 
 
         //
-        // dx/dy[1] = 1
+        // dy[1]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){
@@ -92,7 +92,7 @@ class SplitTest extends TestCase
 
 
         //
-        // dx/dy[0] = 1
+        // dy[0]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){
@@ -113,7 +113,7 @@ class SplitTest extends TestCase
 
 
         //
-        // dx/dy[1] = 1
+        // dy[1]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){
@@ -133,7 +133,7 @@ class SplitTest extends TestCase
         ],$dx->toArray());
 
         //
-        // dx/dy[2] = 1
+        // dy[2]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){
@@ -169,7 +169,7 @@ class SplitTest extends TestCase
 
 
         //
-        // dx/dy[0] = 1
+        // dy[0]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){
@@ -190,7 +190,7 @@ class SplitTest extends TestCase
 
 
         //
-        // dx/dy[1] = 1
+        // dy[1]/dx = 1
         //
         $y = $nn->with($tape=$g->GradientTape(),
             function() use ($g,$x){

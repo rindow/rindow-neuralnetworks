@@ -23,9 +23,10 @@ class Split extends AbstractFunction
         object $backend,
         array $sizeSplits,
         ?int $axis=null,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         foreach($sizeSplits as $size) {
             if(!is_int($size)) {
                 throw new InvalidArgumentException('sizeSplits must be array of integer.');

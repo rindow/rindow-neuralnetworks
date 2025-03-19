@@ -16,9 +16,10 @@ class Transpose extends AbstractFunction
     public function __construct(
         object $backend,
         ?array $perm=null,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->perm = $perm;
         if($perm===null) {
             return;

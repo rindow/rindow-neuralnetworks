@@ -12,9 +12,10 @@ class Cast extends AbstractFunction
     public function __construct(
         object $backend,
         int $dtype,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->dtype = $dtype;
     }
 

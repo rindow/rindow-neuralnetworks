@@ -25,11 +25,17 @@ class GradientTape implements Context
     protected ?object $backup;
     /** @var array<int,ArrayAccess<object,object>> $persistentGrads */
     protected array $persistentGrads = [];
+    protected ?string $name;
 
-    public function __construct(object $backend,?bool $persistent=null)
+    public function __construct(
+        object $backend,
+        ?bool $persistent=null,
+        ?string $name=null,
+        )
     {
         $this->backend = $backend;
         $this->persistent = $persistent;
+        $this->name = $name;
     }
 
     public function enter() : void

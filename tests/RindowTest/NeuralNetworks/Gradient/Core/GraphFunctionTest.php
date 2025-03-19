@@ -685,4 +685,247 @@ class GraphFunctionTest extends TestCase
         $this->assertEquals([2,2],$gradients[0]->shape()); // dx
         $this->assertEquals([2,2],$gradients[1]->shape()); // dx
     }
+
+    public function testMultiOutputConfluenceNormal()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $x = $K->array([
+            [1,2,3,4],
+            [5,6,7,8],
+        ]);
+        $x = $g->Variable($x);
+
+
+        //
+        // dz/dx
+        //
+        $z = $nn->with($tape=$g->GradientTape(),
+            function() use ($g,$x){
+                $y = $g->split($x,[2,2]);
+                $z = $g->add($y[0],$y[1]);
+                return $z;
+            }
+        );
+
+        $this->assertTrue($z->value()->toArray()==[[4,6],[12,14]]);
+
+        $dx = $tape->gradient($z,$x);
+        $this->assertEquals([
+            [1,1,1,1],
+            [1,1,1,1],
+        ],$dx->toArray());
+    }
+
+    public function testMultiOutputInFuncNormal()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $x = $K->array([
+            [1,2,3],
+            [4,5,6],
+        ]);
+        $x = $g->Variable($x);
+
+        $func = $g->Function(
+            function($x) use ($g){
+                $y = $g->split($x,[1,2]);
+                return $y;
+            }
+        );
+
+        //
+        // dy[0]/dx = 1
+        //
+        $y = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$x){
+                $y = $func($x);
+                return $y;
+            }
+        );
+
+        $this->assertTrue($y[0]->value()->toArray()==[[1],[4]]);
+        $this->assertTrue($y[1]->value()->toArray()==[[2,3],[5,6]]);
+
+        $dx = $tape->gradient($y[0],$x);
+        $this->assertEquals([
+            [1,0,0],
+            [1,0,0],
+        ],$dx->toArray());
+
+
+        //
+        // dy[1]/dx = 1
+        //
+        $y = $nn->with($tape=$g->GradientTape(),
+            function() use ($func,$x){
+                $y = $func($x);
+                return $y;
+            }
+        );
+
+        $this->assertTrue($y[0]->value()->toArray()==[[1],[4]]);
+        $this->assertTrue($y[1]->value()->toArray()==[[2,3],[5,6]]);
+
+        $dx = $tape->gradient($y[1],$x);
+        $this->assertEquals([
+            [0,1,1],
+            [0,1,1],
+        ],$dx->toArray());
+    }
+
+    public function testMultiOutputInFuncWithConfluence()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $x = $K->array([
+            [1,2,3,4],
+            [5,6,7,8],
+        ]);
+        $x = $g->Variable($x);
+
+        $func = $g->Function(
+            function($x) use ($g){
+                $y = $g->split($x,[2,2]);
+                return $y;
+            }
+        );
+
+        //
+        // dz/dx
+        //
+        $z = $nn->with($tape=$g->GradientTape(),
+            function() use ($g,$func,$x){
+                $y = $func($x);
+                $z = $g->add($y[0],$y[1]);
+                return $z;
+            }
+        );
+
+        $this->assertTrue($z->value()->toArray()==[[4,6],[12,14]]);
+
+        $dx = $tape->gradient($z,$x);
+        $this->assertEquals([
+            [1,1,1,1],
+            [1,1,1,1],
+        ],$dx->toArray());
+    }
+
+    public function testMultiOutputConfluenceInFunc()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $x = $K->array([
+            [1,2,3,4],
+            [5,6,7,8],
+        ]);
+        $x = $g->Variable($x);
+
+        $func = $g->Function(
+            function($x) use ($g){
+                $y = $g->split($x,[2,2]);
+                $z = $g->add($y[0],$y[1]);
+                return $z;
+            }
+        );
+
+        //
+        // dz/dx
+        //
+        $z = $nn->with($tape=$g->GradientTape(),
+            function() use ($g,$func,$x){
+                $z = $func($x);
+                return $z;
+            }
+        );
+
+        $this->assertTrue($z->value()->toArray()==[[4,6],[12,14]]);
+
+        $dx = $tape->gradient($z,$x);
+        $this->assertEquals([
+            [1,1,1,1],
+            [1,1,1,1],
+        ],$dx->toArray());
+    }
+
+    public function testMultiUseMultiOutFunc()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $x = $K->array([
+            [1,2],
+            [3,4],
+        ]);
+        $x = $g->Variable($x,name:'x');
+
+        $funcInside = $g->Function(
+            function($x) use ($g){
+                $y = $g->nop($x,name:'insideNop');
+                $y->setName('y-inside');
+                return $y;
+            },
+            name:'funcInside',
+        );
+
+        //$funcOutside = $g->Function(
+        //    function($x) use ($g,$zero,$funcInside){
+        //        $y0 = $funcInside($x,$zero);
+        //        $y1 = $funcInside($x,$zero);
+        //        return [$y0,$y1];
+        //    }
+        //);
+
+        //
+        // dz/dx
+        //
+        //$z = $nn->with($tape=$g->GradientTape(),
+        //    function() use ($g,$funcOutside,$x){
+        //        $y = $funcOutside($x);
+        //        $z = $g->add($y[0],$y[1]);
+        //        return $z;
+        //    }
+        //);
+        $z = $nn->with($tape=$g->GradientTape(name:'root'),
+            function() use ($g,$funcInside,$x){
+                $y0 = $funcInside($x);
+                $y0->setName('y0');
+                $y1 = $funcInside($x);
+                $y1->setName('y1');
+                $z = $g->add($y0,$y1,name:'outsideAdd');
+                $z->setName('z');
+                return $z;
+            }
+        );
+        //$z = $nn->with($tape=$g->GradientTape(),
+        //    function() use ($g,$x,$zero){
+        //        $y0 = $g->add($x,$zero);
+        //        $y1 = $g->add($x,$zero);
+        //        $z = $g->add($y0,$y1);
+        //        return $z;
+        //    }
+        //);
+
+        $this->assertTrue($z->value()->toArray()==[[2,4],[6,8]]);
+
+        $dx = $tape->gradient($z,$x);
+        $this->assertEquals([
+            [2,2],
+            [2,2],
+        ],$dx->toArray());
+    }
 }

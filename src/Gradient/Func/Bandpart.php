@@ -15,9 +15,10 @@ class Bandpart extends AbstractFunction
         object $backend,
         int $lower,
         int $upper,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->lower = $lower;
         $this->upper = $upper;
     }

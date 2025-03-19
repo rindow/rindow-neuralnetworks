@@ -18,9 +18,10 @@ class Zeros extends AbstractFunction
     public function __construct(
         object $backend,
         ?int $dtype=null,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->dtype = $dtype;
     }
 

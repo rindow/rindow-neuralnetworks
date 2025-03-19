@@ -16,15 +16,23 @@ trait GraphUtils
     protected function buildPipeline(array $graphOutputs) : array
     {
         // compile forward
-        $funcs = array_map(function($o){return $o->creator();},$graphOutputs);
+        $used = new WeakMap();
+        $funcs = [];
+        foreach($graphOutputs as $o) {
+            $creator = $o->creator();
+            if($creator===null) {
+                continue;
+            }
+            if(isset($used[$creator])) {
+                continue;
+            }
+            $used[$creator] = true;
+            $funcs[] = $creator;
+        }
         usort($funcs,function($a,$b){return $a->generation()-$b->generation();});
         $pipeline = [];
         $constants = [];
         $backprop = [];
-        $used = new WeakMap();
-        foreach($funcs as $func) {
-            $used[$func] = true;
-        }
         while(count($funcs)>0) {
             $func = array_pop($funcs);
             $pipeline[] = $func;
@@ -204,9 +212,18 @@ trait GraphUtils
      */
     protected function repackVariables(object $backend,array $variables) : array
     {
-        return array_map(function($variable) use ($backend) {
-            return new Variable($backend,$variable);
-        },$variables);
+        //return array_map(function($variable) use ($backend) {
+        //    return new Variable($backend,$variable);
+        //},$variables);
+        $newVariables = [];
+        foreach ($variables as $variable) {
+            $name = null;
+            if($variable instanceof VariableInterface) {
+                $name = $variable->name().'@';
+            }
+            $newVariables[] = new Variable($backend,$variable,name:$name);
+        }
+        return $newVariables;
     }
 
     /**

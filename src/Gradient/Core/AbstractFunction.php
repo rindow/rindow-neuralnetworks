@@ -34,6 +34,7 @@ abstract class AbstractFunction
     protected array $inputsVariables;
     /** @var array<null|VariableReference> $outputsVariables */
     protected array $outputsVariables;
+    protected ?string $name;
 
     protected int $generation;
 
@@ -43,9 +44,10 @@ abstract class AbstractFunction
 
     protected ?stdClass $container;
 
-    public function __construct(object $backend)
+    public function __construct(object $backend, ?string $name=null)
     {
         $this->backend = $backend;
+        $this->name = $name;
         $this->container = new stdClass();
     }
 
@@ -80,6 +82,11 @@ abstract class AbstractFunction
     public function generation() : int
     {
         return $this->generation;
+    }
+
+    public function name() : ?string
+    {
+        return $this->name;
     }
 
     /**

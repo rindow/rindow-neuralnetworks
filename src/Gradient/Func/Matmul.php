@@ -13,12 +13,13 @@ class Matmul extends AbstractFunction
         object $backend,
         ?bool $transpose_a=null,
         ?bool $transpose_b=null,
+        ?string $name=null,
     )
     {
         $transpose_a = $transpose_a ?? false;
         $transpose_b = $transpose_b ?? false;
 
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->transA = $transpose_a;
         $this->transB = $transpose_b;
     }

@@ -14,9 +14,10 @@ class ReduceSum extends AbstractFunction
         object $backend,
         ?int $axis=null,
         ?bool $keepdims=null,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->axis = $axis;
         $this->keepdims = $keepdims;
     }

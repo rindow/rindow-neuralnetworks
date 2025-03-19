@@ -14,9 +14,10 @@ class ClipByValue extends AbstractFunction
         object $backend,
         float $min,
         float $max,
+        ?string $name=null,
     )
     {
-        parent::__construct($backend);
+        parent::__construct($backend,name:$name);
         $this->min = $min;
         $this->max = $max;
     }

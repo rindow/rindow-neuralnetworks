@@ -44,6 +44,7 @@ use Rindow\NeuralNetworks\Gradient\Func\Greater;
 use Rindow\NeuralNetworks\Gradient\Func\Less;
 use Rindow\NeuralNetworks\Gradient\Func\Repeat;
 use Rindow\NeuralNetworks\Gradient\Func\Split;
+use Rindow\NeuralNetworks\Gradient\Func\Nop;
 
 class Gradient
 {
@@ -103,7 +104,7 @@ class Gradient
         ?string $name=null,
     ) : ArraySpec
     {
-        return new ArraySpecImpl($shape,$dtype,$name);
+        return new ArraySpecImpl($shape, dtype:$dtype, name:$name);
     }
 
     /**
@@ -114,9 +115,9 @@ class Gradient
         return new Modules($modules);
     }
 
-    public function GradientTape(?bool $persistent=null) : object
+    public function GradientTape(?bool $persistent=null, ?string $name=null) : object
     {
-        return new GradientTape($this->backend,$persistent);
+        return new GradientTape($this->backend, persistent:$persistent, name:$name);
     }
 
     public function Function(callable $func, mixed ...$options) : object
@@ -135,57 +136,57 @@ class Gradient
         return false;
     }
 
-    public function stopGradient(NDArray $variable) : NDArray
+    public function stopGradient(NDArray $variable, ?string $name=null) : NDArray
     {
-        $func = new StopGradient($this->backend);
+        $func = new StopGradient($this->backend, name:$name);
         return $func($variable);
     }
 
-    public function square(NDArray $x) : NDArray
+    public function square(NDArray $x, ?string $name=null) : NDArray
     {
-        $func = new Square($this->backend);
+        $func = new Square($this->backend, name:$name);
         return $func($x);
     }
 
-    public function sqrt(NDArray $x) : NDArray
+    public function sqrt(NDArray $x, ?string $name=null) : NDArray
     {
-        $func = new Sqrt($this->backend);
+        $func = new Sqrt($this->backend, name:$name);
         return $func($x);
     }
 
-    public function exp(NDArray $x) : NDArray
+    public function exp(NDArray $x, ?string $name=null) : NDArray
     {
-        $func = new Exp($this->backend);
+        $func = new Exp($this->backend, name:$name);
         return $func($x);
     }
 
-    public function log(NDArray $x) : NDArray
+    public function log(NDArray $x, ?string $name=null) : NDArray
     {
-        $func = new Log($this->backend);
+        $func = new Log($this->backend, name:$name);
         return $func($x);
     }
 
-    public function add(NDArray $x, NDArray $y) : NDArray
+    public function add(NDArray $x, NDArray $y, ?string $name=null) : NDArray
     {
-        $func = new Add($this->backend);
+        $func = new Add($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function sub(NDArray $x, NDArray $y) : NDArray
+    public function sub(NDArray $x, NDArray $y, ?string $name=null) : NDArray
     {
-        $func = new Sub($this->backend);
+        $func = new Sub($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function mul(NDArray $x, NDArray $y) : NDArray
+    public function mul(NDArray $x, NDArray $y, ?string $name=null) : NDArray
     {
-        $func = new Mul($this->backend);
+        $func = new Mul($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function div(NDArray $x, NDArray $y) : NDArray
+    public function div(NDArray $x, NDArray $y, ?string $name=null) : NDArray
     {
-        $func = new Div($this->backend);
+        $func = new Div($this->backend, name:$name);
         return $func($x,$y);
     }
 
@@ -193,12 +194,14 @@ class Gradient
         NDArray $x, NDArray $y,
         ?bool $transpose_a=null,
         ?bool $transpose_b=null,
+        ?string $name=null,
     ) : NDArray
     {
         $func = new Matmul(
             $this->backend,
             transpose_a:$transpose_a,
             transpose_b:$transpose_b,
+            name:$name,
         );
         return $func($x,$y);
     }
@@ -207,12 +210,14 @@ class Gradient
         NDArray $x,
         ?int $axis=null,
         ?bool $keepdims=null,
+        ?string $name=null,
     ) : NDArray
     {
         $func = new ReduceMean(
             $this->backend,
             axis:$axis,
             keepdims:$keepdims,
+            name:$name,
         );
         return $func($x);
     }
@@ -221,12 +226,14 @@ class Gradient
         NDArray $x,
         ?int $axis=null,
         ?bool $keepdims=null,
+        ?string $name=null,
     ) : NDArray
     {
         $func = new ReduceSum(
             $this->backend,
             axis:$axis,
             keepdims:$keepdims,
+            name:$name,
         );
         return $func($x);
     }
@@ -235,49 +242,51 @@ class Gradient
         NDArray $x,
         float $min,
         float $max,
+        ?string $name=null,
     ) : NDArray
     {
         $func = new ClipByValue(
             $this->backend,
             $min,
             $max,
+            name:$name,
         );
         return $func($x);
     }
 
-    public function equal(NDArray $x, NDArray $y) : NDArray
+    public function equal(NDArray $x, NDArray $y, ?string $name=null) : NDArray
     {
-        $func = new Equal($this->backend);
+        $func = new Equal($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function notEqual(NDArray $x, NDArray $y) : NDArray
+    public function notEqual(NDArray $x, NDArray $y, ?string $name=null) : NDArray
     {
-        $func = new NotEqual($this->backend);
+        $func = new NotEqual($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function cast(NDArray $x, int $dtype) : NDArray
+    public function cast(NDArray $x, int $dtype, ?string $name=null) : NDArray
     {
-        $func = new Cast($this->backend,$dtype);
+        $func = new Cast($this->backend, dtype:$dtype, name:$name);
         return $func($x);
     }
 
-    public function zerosLike(NDArray $x) : NDArray 
+    public function zerosLike(NDArray $x, ?string $name=null) : NDArray 
     {
-        $func = new ZerosLike($this->backend);
+        $func = new ZerosLike($this->backend, name:$name);
         return $func($x);
     }
 
-    public function onesLike(NDArray $x) : NDArray 
+    public function onesLike(NDArray $x, ?string $name=null) : NDArray 
     {
-        $func = new OnesLike($this->backend);
+        $func = new OnesLike($this->backend, name:$name);
         return $func($x);
     }
 
-    public function reshape(NDArray $x, mixed $shape) : NDArray
+    public function reshape(NDArray $x, mixed $shape, ?string $name=null) : NDArray
     {
-        $func = new Reshape($this->backend);
+        $func = new Reshape($this->backend, name:$name);
         return $func($x,$shape);
     }
 
@@ -287,20 +296,23 @@ class Gradient
     public function transpose(
         NDArray $x,
         ?array $perm=null,
+        ?string $name=null,
     ) : NDArray
     {
         $func = new Transpose(
             $this->backend,
             $perm,
+            name:$name,
         );
         return $func($x);
     }
 
     public function shape(
         mixed $x,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Shape($this->backend);
+        $func = new Shape($this->backend, name:$name);
         return $func($x);
     }
 
@@ -308,39 +320,43 @@ class Gradient
         mixed $x,
         mixed $offset,
         mixed $count=null,
+        ?string $name=null,
     ) : mixed
     {
         if($count===null) {
             $count = 0;
         }
-        $func = new Get($this->backend);
+        $func = new Get($this->backend, name:$name);
         return $func($x,$offset,$count);
     }
 
     public function scale(
         mixed $alpha,
         NDArray $x,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Scale($this->backend);
+        $func = new Scale($this->backend, name:$name);
         return $func($alpha,$x);
     }
 
     public function zeros(
         mixed $shape,
         ?int $dtype=null,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Zeros($this->backend,$dtype);
+        $func = new Zeros($this->backend, dtype:$dtype, name:$name);
         return $func($shape);
     }
 
     public function ones(
         mixed $shape,
         ?int $dtype=null,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Ones($this->backend,$dtype);
+        $func = new Ones($this->backend, dtype:$dtype, name:$name);
         return $func($shape);
     }
 
@@ -348,9 +364,10 @@ class Gradient
         NDArray $x,
         int $lower,
         int $upper,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Bandpart($this->backend,$lower,$upper);
+        $func = new Bandpart($this->backend,$lower,$upper, name:$name);
         return $func($x);
     }
 
@@ -358,28 +375,31 @@ class Gradient
         NDArray $x,
         mixed $beta,
         mixed $alpha=null,
+        ?string $name=null,
     ) : NDArray
     {
         $alpha = $alpha ?? 1.0;
-        $func = new Increment($this->backend);
+        $func = new Increment($this->backend, name:$name);
         return $func($x,$beta,$alpha);
     }
 
     public function greater(
         NDArray $x,
         mixed $alpha,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Greater($this->backend);
+        $func = new Greater($this->backend, name:$name);
         return $func($x,$alpha);
     }
 
     public function less(
         NDArray $x,
         mixed $alpha,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Less($this->backend);
+        $func = new Less($this->backend, name:$name);
         return $func($x,$alpha);
     }
 
@@ -388,9 +408,10 @@ class Gradient
         mixed $repeats,
         ?int $axis=null,
         ?bool $keepdims=null,
+        ?string $name=null,
     ) : NDArray
     {
-        $func = new Repeat($this->backend,axis:$axis,keepdims:$keepdims);
+        $func = new Repeat($this->backend,axis:$axis,keepdims:$keepdims, name:$name);
         return $func($x,$repeats);
     }
 
@@ -402,9 +423,19 @@ class Gradient
         NDArray $x,
         array $sizeSplits,
         ?int $axis=null,
+        ?string $name=null,
     ) : array
     {
-        $func = new Split($this->backend,$sizeSplits,axis:$axis);
+        $func = new Split($this->backend,$sizeSplits,axis:$axis, name:$name);
+        return $func($x);
+    }
+    
+    public function nop(
+        NDArray $x,
+        mixed ...$options,
+    ) : NDArray
+    {
+        $func = new Nop($this->backend,...$options);
         return $func($x);
     }
 }
