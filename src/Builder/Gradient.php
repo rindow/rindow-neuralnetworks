@@ -45,6 +45,13 @@ use Rindow\NeuralNetworks\Gradient\Func\Less;
 use Rindow\NeuralNetworks\Gradient\Func\Repeat;
 use Rindow\NeuralNetworks\Gradient\Func\Split;
 use Rindow\NeuralNetworks\Gradient\Func\Nop;
+use Rindow\NeuralNetworks\Gradient\Func\Minimum;
+use Rindow\NeuralNetworks\Gradient\Func\Tanh;
+use Rindow\NeuralNetworks\Gradient\Func\Relu;
+use Rindow\NeuralNetworks\Gradient\Func\Abs;
+use Rindow\NeuralNetworks\Gradient\Func\Sigmoid;
+use Rindow\NeuralNetworks\Gradient\Func\Maximum;
+use Rindow\NeuralNetworks\Gradient\Func\Where;
 
 class Gradient
 {
@@ -429,7 +436,42 @@ class Gradient
         $func = new Split($this->backend,$sizeSplits,axis:$axis, name:$name);
         return $func($x);
     }
-    
+
+    public function minimum(NDArray $x, NDArray $y, ?string $name = null): NDArray
+    {
+        $func = new Minimum($this->backend, name: $name);
+        return $func($x, $y);
+    }
+    public function tanh(NDArray $x, ?string $name = null): NDArray
+    {
+        $func = new Tanh($this->backend, name: $name);
+        return $func($x);
+    }
+    public function relu(NDArray $x, ?string $name = null): NDArray
+    {
+        $func = new Relu($this->backend, name: $name);
+        return $func($x);
+    }
+    public function abs(NDArray $x, ?string $name = null): NDArray
+    {
+        $func = new Abs($this->backend, name: $name);
+        return $func($x);
+    }
+    public function sigmoid(NDArray $x, ?string $name = null): NDArray
+    {
+        $func = new Sigmoid($this->backend, name: $name);
+        return $func($x);
+    }
+    public function maximum(NDArray $x, NDArray $y, ?string $name = null): NDArray
+    {
+        $func = new Maximum($this->backend, name: $name);
+        return $func($x, $y);
+    }
+    public function where(NDArray $condition, NDArray $x, NDArray $y, ?string $name = null): NDArray
+    {
+        $func = new Where($this->backend, name: $name);
+        return $func($condition, $x, $y);
+    }
     public function nop(
         NDArray $x,
         mixed ...$options,
