@@ -242,7 +242,6 @@ class PositionalEmbedding extends AbstractModel
         if(is_numeric($x)) {
             $x = $K->fill($y->shape(),$x,dtype:$y->dtype());
         }
-        //return $K->exp($K->mul($y,$K->log($x)));
         return $K->pow($x,$y);
     }
 
@@ -350,7 +349,6 @@ class CausalSelfAttention  extends AbstractBaseAttention
             useCausalMask:True,
         );
         $x = $this->add->forward([$x, $attn_output]);
-        //echo 'layernorm IN=('.implode(',',$x->shape()).")\n";
         $x = $this->layernorm->forward($x);
         return $x;
     }
@@ -476,8 +474,6 @@ class Encoder extends AbstractModel
 
     protected function call(NDArray $x, Variable|bool|null $training=null)
     {
-        //$mo = $this->backend()->localMatrixOperator();
-        //$K = $this->backend();
         # `x` is token-IDs shape: (batch, seq_len)
         $x = $this->pos_embedding->forward($x);  # Shape `(batch_size, seq_len, d_model)`.
         # Add dropout.
@@ -486,7 +482,6 @@ class Encoder extends AbstractModel
         foreach($this->enc_layers as $enc_layer) {
             $x = $enc_layer->forward($x, training:$training);
         }
-        //echo $mo->toString($K->ndarray($x->value()->mask()),indent:true)."\n";
 
         return $x;  # Shape `(batch_size, seq_len, d_model)`.
     }
@@ -593,9 +588,6 @@ class Decoder extends AbstractModel
 
     protected function call(NDArray $x, NDArray $context, Variable|bool|null $training=null)
     {
-        //$mo = $this->backend()->localMatrixOperator();
-        //$K = $this->backend();
-        //echo $mo->toString($K->ndarray($context->value()->mask()),indent:true)."\n";
         # `x` is token-IDs shape (batch, target_seq_len)
         $x = $this->pos_embedding->forward($x);  # (batch_size, target_seq_len, d_model)
 
@@ -604,7 +596,6 @@ class Decoder extends AbstractModel
         foreach($this->dec_layers as $dec_layer) {
             $x = $dec_layer->forward($x, $context, training:$training);
         }
-        //echo $mo->toString($K->ndarray($x->value()->mask()),indent:true)."\n";
 
         $this->last_attn_scores = $dec_layer->last_attn_scores;
 
@@ -666,11 +657,8 @@ class Transformer extends AbstractModel
         NDArray $context, NDArray $x, Variable|bool|null $training=null
     ) : NDArray
     {
-        //$mo = $this->backend()->localMatrixOperator();
-        //$K = $this->backend();
         # To use a Keras model with `.fit` you must pass all your inputs in the
         # first argument.
-        # [$context, $x]  = $inputs;
         
         $context = $this->encoder->forward($context,training:$training);  # (batch_size, context_len, d_model)
         
@@ -678,14 +666,6 @@ class Transformer extends AbstractModel
         
         # Final linear layer output.
         $logits = $this->final_layer->forward($x);  # (batch_size, target_len, target_vocab_size)
-        //echo $mo->toString($K->ndarray($logits->value()->mask()),indent:true)."\n";
-        
-        #try:
-        #    # Drop the keras mask, so it doesn't scale the losses/metrics.
-        #    # b/250038731
-        #    del logits._keras_mask
-        #except AttributeError:
-        #    pass
         
         # Return the final output and the attention weights.
         return $logits;
@@ -728,59 +708,36 @@ class Translator
 
     public function predict(NDArray $sentence) : array
     {
-        //echo "(".implode(',',$sentence->shape()).")\n";
-        //echo $this->inpLang->sequencesToTexts([$sentence])[0]."\n";
         $g = $this->builder->gradient();
         $K = $this->builder->backend();
         $sentence = $K->array($sentence);
 
-        # The input sentence is Portuguese, hence adding the `[START]` and `[END]` tokens.
-        #if len(sentence.shape) == 0:
-        #  sentence = sentence[tf.newaxis]
-        #
-        #sentence = self.tokenizers.pt.tokenize(sentence).to_tensor()
-
+        # The input sentence is Portuguese, hence adding the `<START>` and `<END>` tokens.
         $encoder_input = $K->expandDims($sentence, axis:0);
 
         # As the output language is English, initialize the output with the
-        # English `[START]` token.
-        #start_end = self.tokenizers.en.tokenize([''])[0]
-        #start = start_end[0][tf.newaxis]
-        #end = start_end[1][tf.newaxis]
+        # English `<START>` token.
         $start = $K->array([[$this->start_voc_id]],dtype:NDArray::int32);
         $end   = $K->array([[$this->end_voc_id]],dtype:NDArray::int32);
 
-        # `tf.TensorArray` is required here (instead of a Python list), so that the
-        # dynamic-loop can be traced by `tf.function`.
+        # output_array is required here , so that the dynamic-loop can be traced.
         $output_array = $K->zeros([$this->max_out_length+2,1],dtype:NDArray::int32);
         $K->copy($start,$output_array[R(0,1)]);
         $output = $output_array[R(0,1)]->reshape([1,1]);
-        //echo $this->targLang->sequencesToTexts($K->ndarray($output))[0]."\n";
 
         $this->transformer->setShapeInspection(false);
         for($i=0;$i<$this->max_out_length;$i++) {
             $output = $g->Variable($output_array[R(0,$i+1)]->reshape([1,$i+1]));
             $predictions = $this->transformer->forward($encoder_input, $output, training:false);
-            //echo "B(".implode(',',$predictions->shape()).")\n";
 
             # Select the last token from the `seq_len` dimension.
-            #$predictions = predictions[:, -1:, :]  # Shape `(batch_size, 1, vocab_size)`.
-            #$predictions = $K->slice($predictions,[0, -1],[count($predictions), 1]);
-
-            //$output = $K->argmax($predictions, axis:-1);
-            //echo "O1(".implode(',',$output->shape()).")\n";
-            //echo $this->targLang->sequencesToTexts($K->ndarray($output))[0]."\n";
-
             $predictions = $K->squeeze($predictions,axis:0);
-            //echo "A1(".implode(',',$predictions->shape()).")\n";
             $predictions = $predictions[R($i,$i+1)];
-            //echo "A2(".implode(',',$predictions->shape()).")\n";
             $predicted_id = $K->argmax($predictions, axis:-1);
-            //echo "A3(".implode(',',$predicted_id->shape()).")\n";
 
             # Concatenate the `predicted_id` to the output which is given to the
             # decoder as its input.
-            $K->copy($predicted_id[0]->reshape([1,1]),$output_array[R($i+1,$i+2)]);
+            $K->copy($predicted_id->reshape([1,1]),$output_array[R($i+1,$i+2)]);
 
             if($predicted_id->toArray()[0] == $end->toArray()[0][0]) {
                 break;
@@ -790,11 +747,7 @@ class Translator
         $output = $output_array[R(0,$output_len)];
         
         # The output shape is `(1, tokens)`.
-        #text = tokenizers.en.detokenize(output)[0]  # Shape: `()`.
-
-        #tokens = tokenizers.en.lookup(output)[0]
-
-        # `tf.function` prevents us from using the attention_weights that were
+        # prevents us from using the attention_weights that were
         # calculated on the last iteration of the loop.
         # So, recalculate them outside the loop.
         $this->transformer->forward(
@@ -806,7 +759,6 @@ class Translator
         $attention_weights = $this->transformer->decoder->last_attn_scores;
 
         $output = $output->reshape([1,$output_len]);
-        #return text, tokens, attention_weights
         $output = $K->ndarray($output);
         $attention_weights = $K->ndarray($attention_weights);
         return [$output,$attention_weights];
@@ -897,12 +849,9 @@ class CustomLossFunction
     {
         $g = $this->gradient;
         $loss = $this->loss_object->forward($label, $pred);
-        //$mo = $this->nn->backend()->localMatrixOperator();
-        //$K = $this->nn->backend();
         $mask = $g->greater($g->cast($label,dtype:NDArray::float32),0.0);
         $loss = $g->mul($loss,$mask);
         $loss = $g->div($g->reduceSum($loss),$g->reduceSum($mask));
-        //echo "loss=".$loss->toArray()."\n";
         return $loss;
     }
 }
@@ -921,7 +870,6 @@ class CustomAccuracy
 
     public function __invoke($label, $pred)
     {
-        //$mo = $this->nn->backend()->localMatrixOperator();
         $K = $this->backend;
         $pred = $K->argMax($pred, axis:-1);  // convert to token id from predicts
 
@@ -930,10 +878,6 @@ class CustomAccuracy
         $match = $K->cast($match,dtype:NDArray::float32);
         $match = $K->masking($mask,$match); // masking matching results
 
-        //echo "match=".$mo->shapeToString($match->shape())."\n";
-        //echo "mask=".$mo->shapeToString($mask->shape())."\n";
-        //echo "match=".$mo->toString($match,indent:true)."\n";
-        //echo "mask=".$mo->toString($mask,indent:true)."\n";
         $sumMatch = $K->scalar($K->sum($match));
         $n = $K->scalar($K->sum($mask));
         if($n==0) {
@@ -964,10 +908,10 @@ function make_labels($la,$label_tensor) {
 }
 
 $numExamples=20000;#20000;#30000;#50000;
-$numWords=1024;#1024;#null;
+$numWords=null;#1024;#null;
 $epochs = 10;#20;
 $batchSize = 64;#8;
-$d_model=128;#64;#128;#256;#512  // d_model embedding_dim
+$d_model=256;#64;#128;#256;#512  // d_model embedding_dim
 $dff=512;#64;  // units 
 $num_layers=4;#4;#6;
 $num_heads =8;
@@ -1107,7 +1051,6 @@ $translator = new Translator(
     plt:$plt,
 );
 
-//$choice = $mo->random()->choice($corpusSize,10,false);
 $skip = intdiv($trainSize,2);
 $choice = $mo->random()->choice($trainSize-$skip,10,false);
 try {
