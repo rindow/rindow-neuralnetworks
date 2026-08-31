@@ -112,7 +112,7 @@ class Adam implements Optimizer
         }
         return $params2;
     }
-
+/*
     public function learningRate(int $step) : float
     {
         $lr = $this->lr;
@@ -146,6 +146,63 @@ class Adam implements Optimizer
             $K->update_add($m, $K->sub($g, $m), (1 - $this->beta1));
             $K->update_add($v, $K->sub($K->square($g),$v), (1 - $this->beta2));
             $K->update_sub($p, $K->mul($m, $K->rsqrt($v,$this->epsilon)), $lr_t);
+        }
+    }
+*/
+    public function learningRate(int $step) : float
+    {
+        if($this->lr instanceof LearningRateSchedule) {
+            return ($this->lr)($step);
+        }
+        return $this->lr;
+    }
+
+    public function update(array $params, array $grads) : void
+    {
+        $K = $this->backend;
+        $params = $this->extractVariable($params);
+        if($this->m === null) {
+            $this->build($params);
+        }
+
+        $K->update_increment($this->iter, 1.0);
+        $t = $this->iter->toArray(); // ステップ数 t
+        $t = (int)floor($t);
+
+        // 現在のステップでの学習率を取得
+        $lr = $this->learningRate($t);
+
+        // バイアス補正項を計算
+        $beta1_t = $this->beta1 ** $t;
+        $beta2_t = $this->beta2 ** $t;
+        $bias_correction1 = 1.0 - $beta1_t;
+        $bias_correction2 = 1.0 - $beta2_t;
+        
+        // Pytorchでは小さな値による除算を避けるための安全策があるが、
+        // まずは基本的な実装で試す
+        if ($bias_correction1 == 0.0) {
+            throw new \RuntimeException("bias_correction1 is zero.");
+        }
+        if ($bias_correction2 == 0.0) {
+            throw new \RuntimeException("bias_correction2 is zero.");
+        }
+
+        foreach(array_map(null, $params, $grads, $this->m, $this->v) as [$p, $g, $m, $v]) {
+            // 1. モーメントの更新
+            // m = beta1 * m + (1 - beta1) * g
+            // v = beta2 * v + (1 - beta2) * g^2
+            $K->update($m, $K->add($K->scale($this->beta1, $m), $K->scale(1.0 - $this->beta1, $g)));
+            $K->update($v, $K->add($K->scale($this->beta2, $v), $K->scale(1.0 - $this->beta2, $K->square($g))));
+
+            // 2. バイアス補正されたモーメントを計算 (m_hat, v_hat)
+            // m_hat = m / (1 - beta1^t)
+            $m_hat = $K->scale(1.0 / $bias_correction1, $m);
+            // v_hat = v / (1 - beta2^t)
+            $v_hat = $K->scale(1.0 / $bias_correction2, $v);
+            
+            // 3. パラメータの更新
+            // p -= lr * m_hat / (sqrt(v_hat) + epsilon)
+            $K->update_sub($p, $K->mul($m_hat, $K->rsqrt($v_hat, $this->epsilon)), $lr);
         }
     }
 
