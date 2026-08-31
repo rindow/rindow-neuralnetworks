@@ -161,15 +161,3 @@ parameters:
 			identifier: greaterOrEqual.alwaysTrue
 			count: 1
 			path: src/Support/HDA/HDASqlite.php
-
-		-
-			message: '#^Loose comparison using \=\= between \(PDOStatement\|false\) and false will always evaluate to true\.$#'
-			identifier: equal.alwaysTrue
-			count: 1
-			path: src/Support/HDA/HDASqliteIterator.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
-			path: src/Support/HDA/HDASqliteIterator.php

@@ -24,6 +24,15 @@ class ArrayShape implements ArrayShapeInterface
         return $this->shape;
     }
 
+    public function update(ArrayShapeInterface $value) : void
+    {
+        $shape = $value->toArray();
+        if(count($this->shape)!=count($shape)) {
+            throw new InvalidArgumentException('The dimensions do not match: original:'.count($this->shape).' new:'.count($shape));
+        }
+        $this->shape = $shape;
+    }
+
     public function offsetExists( $offset ) : bool
     {
         if(!is_int($offset)) {

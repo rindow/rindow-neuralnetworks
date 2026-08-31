@@ -10,11 +10,15 @@ use function Rindow\Math\Matrix\R;
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
-$plt = new Plot(null,$mo);
+$config = [
+    //'renderer.skipRunViewer'=>true,    
+];
+$plt = new Plot($config,$mo);
+//$nn->backend()->primaryLA()->setProfiling(true);
 
 
 $dsname='cifar10';
-$epochs = 10;
+$epochs = 5; #10;
 $batch_size = 64;
 $shrink = false;
 
@@ -23,7 +27,7 @@ if(isset($argv[1])&&$argv[1]) {
     $dsname=$argv[1];
 }
 if(isset($argv[2])&&$argv[2]) {
-    $epochs = $argv[3];
+    $epochs = $argv[2];
 }
 if(isset($argv[3])&&$argv[3]) {
     $shrink = true;
@@ -87,18 +91,20 @@ $inputsFilter = new class ($mo,$inputShape) implements DatasetFilter
 switch($dsname) {
     case 'mnist': 
     case 'fashion': {
+        $trainSize = count($train_img); # 5000;
+        $testSize  = count($test_img);  # 500;
         if($shrink||!$mo->isAdvanced()) {
             // Shrink data
             $trainSize = 2000;
             $testSize  = 200;
-            echo "Shrink data ...\n";
-            $train_img = $train_img[R(0,$trainSize)];
-            $train_label = $train_label[R(0,$trainSize)];
-            $test_img = $test_img[R(0,$testSize)];
-            $test_label = $test_label[R(0,$testSize)];
-            echo "Shrink train=[".implode(',',$train_img->shape())."]\n";
-            echo "Shrink test=[".implode(',',$test_img->shape())."]\n";
         }
+        echo "Shrink data ...\n";
+        $train_img = $train_img[R(0,$trainSize)];
+        $train_label = $train_label[R(0,$trainSize)];
+        $test_img = $test_img[R(0,$testSize)];
+        $test_label = $test_label[R(0,$testSize)];
+        echo "Shrink train=[".implode(',',$train_img->shape())."]\n";
+        echo "Shrink test=[".implode(',',$test_img->shape())."]\n";
         
         echo "formating train images and labels ...\n";
         [$train_img,$train_label] = $inputsFilter->translate($train_img,$train_label);
@@ -128,8 +134,8 @@ switch($dsname) {
         break;
     }
     case 'cifar10': {
-        $trainSize = 50000;
-        $testSize = 10000;
+        $trainSize = 5000; # 50000;
+        $testSize = 500; # 10000;
         if($shrink||!$mo->isAdvanced()) {
             // Shrink data
             $trainSize = 2000;
@@ -173,6 +179,11 @@ switch($dsname) {
 
 
 echo "device type: ".$nn->deviceType()."\n";
+if($nn->deviceType()==='CPU') {
+    echo "number of threads: ".$nn->backend()->primaryLA()->getMath()->getNumThreads()."\n";
+    //$nn->backend()->primaryLA()->getMath()->setProfiling(true);
+}
+echo "math library: ".$nn->backend()->primaryLA()->getMath()->getConfig()."\n";
 $modelFilePath = __DIR__."/image-classification-with-cnn-{$dsname}.model";
 
 if(file_exists($modelFilePath)) {
@@ -263,3 +274,6 @@ foreach ($predicts as $i => $predict) {
 }
 
 $plt->show();
+
+//$nn->backend()->primaryLA()->profilingReport();
+//$nn->backend()->primaryLA()->getMath()->profilingReport();

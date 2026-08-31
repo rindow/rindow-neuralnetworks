@@ -239,7 +239,7 @@ if(file_exists($modelFilePath)) {
 }
 
 for($i=0;$i<10;$i++) {
-    $idx = $mo->random()->randomInt($corpus_size);
+    $idx = $mo->random()->randomInt(0,$corpus_size-1);
     $question = $questions[$idx];
     $input = $question->reshape([1,$input_length]);
 

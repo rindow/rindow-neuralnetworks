@@ -5,6 +5,8 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Rindow\NeuralNetworks\Builder\Builder;
+use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\NeuralNetworks\Layer\Flatten;
 use Rindow\NeuralNetworks\Layer\Dense;
@@ -192,6 +194,29 @@ class TestMultiInputModel extends AbstractModel
     {
         $din = $this->fc->backward($dOutputs);
         return $din;
+    }
+}
+
+class TestVariableModel extends AbstractModel
+{
+    protected object $g;
+    protected Variable $kernel;
+    protected Variable $noTrainableVariable;
+
+    public function __construct(Builder $builder,int $inputDim, int $units)
+    {
+        parent::__construct($builder);
+        $this->g = $builder->gradient();
+        $K = $builder->backend();
+        $this->kernel = $this->g->Variable($K->ones([$inputDim,$units]),trainable:true);
+        $this->noTrainableVariable = $this->g->Variable($K->ones([$inputDim,$units]),trainable:false);
+    }
+
+    protected function call(NDArray $inputs) : NDArray
+    {
+        $g = $this->g;
+        $outputs = $g->matmul($inputs,$this->kernel);
+        return $outputs;
     }
 }
 
@@ -606,5 +631,36 @@ class CustomModelTest extends TestCase
         'Total params: 90'."\n";
 
         $this->assertEquals($display,$dump);
+    }
+
+    public function testVariableModel()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $batchSize = 4;
+        $inputDim = 2;
+        $units = 3;
+        $fullInputShape  = [$batchSize,$inputDim];
+        $fullOutputShape = [$batchSize,$units];
+
+        $model = new TestVariableModel($nn,$inputDim,$units);
+        $outputs = $model->forward($K->zeros($fullInputShape));
+        $this->assertEquals($fullOutputShape,$outputs->shape());
+
+        $trainables = $model->trainableVariables();
+        $this->assertCount(1,$trainables);
+        $this->assertEquals([$inputDim,$units],$trainables[0]->shape());
+
+        $inputs = $g->Variable($K->ones($fullInputShape));
+        $outputs = $nn->with($tape=$g->GradientTape(),function () use ($model,$inputs) {
+            $outputs = $model($inputs);
+            return $outputs;
+        });
+        $this->assertEquals($fullOutputShape,$outputs->shape());
+        $grads = $tape->gradient($outputs,$model->trainableVariables());
+        $this->assertEquals([$inputDim,$units],$grads[0]->shape());
     }
 }

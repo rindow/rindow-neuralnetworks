@@ -368,7 +368,7 @@ class EinsumDense extends AbstractLayer
                 array_unshift($output_shape,$input_shape[$i]);
             }
             array_unshift($output_shape,$top);
-        } elseif($elided > 0 && !$left_elided) {
+        } elseif($elided > 0) {
             $count = count($input_shape);
             for($i=count($input_shape) - $elided; $i<$count; $i++) {
                 array_push($output_shape,$input_shape[$i]);

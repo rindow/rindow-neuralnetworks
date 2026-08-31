@@ -132,7 +132,7 @@ class Attention extends AbstractAttentionLayer
         Variable|bool|null $training=null, 
         Variable|bool|null $returnAttentionScores=null,
         ?array $mask=null,
-        )
+        ) : Variable|array
     {
         //$outputs = null;
         [$inputs,$rawInputs]     = $this->packAndUnpackVariables($this->backend,$inputs);

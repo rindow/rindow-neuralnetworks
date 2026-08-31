@@ -58,12 +58,12 @@ class Gather extends AbstractMultiInputLayer
                 throw new InvalidArgumentException('input_shapes must be the list of shape: '.$type.' included in #'.$idx.'.');
             }
         }
-        [$sourceShape,$indexShape] = $inputShapes;
+        [$paramShape,$indexShape] = $inputShapes;
         //if($this->axis===null) {
         //    throw new InvalidArgumentException('Null axis is not supported.');
         //}
         //$mo = $this->backend->localMatrixOperator();
-        //echo "sourceShape:".$mo->shapeToString($sourceShape)."\n";
+        //echo "paramShape:".$mo->shapeToString($paramShape)."\n";
         //echo "indexShape:".$mo->shapeToString($indexShape)."\n";
 
         $axis = $this->axis;
@@ -75,37 +75,37 @@ class Gather extends AbstractMultiInputLayer
         // Calculate Dims Defaults
         //
         //if($axis < 0) {
-        //    $axis = count($sourceShape) + $axis;
+        //    $axis = count($paramShape) + $axis;
         //}
-        //if($axis<0||$axis>count($sourceShape)) {
+        //if($axis<0||$axis>count($paramShape)) {
         //    throw new InvalidArgumentException(
-        //        'Invalid axis. Dims of the sourceShape is '.count($sourceShape).'. axis='.$this->axis.' given');
+        //        'Invalid axis. Dims of the paramShape is '.count($paramShape).'. axis='.$this->axis.' given');
         //}
         $batchDims ??= 0;
         if($batchDims<0) {
-            $batchDims += count($sourceShape);
+            $batchDims += count($paramShape);
         }
-        if($batchDims<0 || $batchDims>=count($sourceShape)) {
+        if($batchDims<0 || $batchDims>=count($paramShape)) {
             throw new InvalidArgumentException(
-                "batchDims($batchDims) must be less than to ndims of params (".count($sourceShape).") in input_shapes"
+                "batchDims($batchDims) must be less than to ndims of params (".count($paramShape).") in input_shapes"
             );
         }
         $axis ??= $batchDims;
         if($axis<0) {
-            $axis += count($sourceShape);
+            $axis += count($paramShape);
         }
-        if($axis<0 || $axis>=count($sourceShape)) {
+        if($axis<0 || $axis>=count($paramShape)) {
             throw new InvalidArgumentException(
-                "axis ($axis) must be less than to ndims of params (".count($sourceShape).")"
+                "axis ($axis) must be less than to ndims of params (".count($paramShape).")"
             );
         }
         $detailDepth ??= $axis+1;
         if($detailDepth<0) {
-            $detailDepth += count($sourceShape);
+            $detailDepth += count($paramShape);
         }
-        if($detailDepth<0 || $detailDepth>count($sourceShape)) {
+        if($detailDepth<0 || $detailDepth>count($paramShape)) {
             throw new InvalidArgumentException(
-                "axis ($detailDepth) must be less than or equal to ndims of params (".count($sourceShape).")"
+                "axis ($detailDepth) must be less than or equal to ndims of params (".count($paramShape).")"
             );
         }
         $indexDepth ??= count($indexShape);
@@ -128,8 +128,8 @@ class Gather extends AbstractMultiInputLayer
         // 
         // Parsing shapes
         //
-        // sourceShape
-        $batchShape = $sourceShape;
+        // paramShape
+        $batchShape = $paramShape;
         $outerShape = array_splice($batchShape, $batchDims);
         $innerShape = array_splice($outerShape, $axis-$batchDims);
         $numClass = array_shift($innerShape);
@@ -160,7 +160,7 @@ class Gather extends AbstractMultiInputLayer
         // outputsShape
         $outputShape = array_merge($batchShape, $outerShape, $indexShape, $innerShape, $detailShape);
 
-        //$postfixShape = $sourceShape;
+        //$postfixShape = $paramShape;
         //$prefixShape = [];
         //for($i=0;$i<$axis;$i++) {
         //    $prefixShape[] = array_shift($postfixShape);
@@ -168,8 +168,8 @@ class Gather extends AbstractMultiInputLayer
         //$this->reduceNumClass = array_shift($postfixShape);
         //$outputShape = array_merge($prefixShape,$postfixShape);
         //if($indexShape!=$outputShape) {
-        //    throw new InvalidArgumentException('Unmatch source and index Shape and axis:'.
-        //            $this->shapeToString($sourceShape).','.
+        //    throw new InvalidArgumentException('Unmatch params and index Shape and axis:'.
+        //            $this->shapeToString($paramShape).','.
         //            $this->shapeToString($outputShape).','.$this->axis);
         //}
 
@@ -205,18 +205,18 @@ class Gather extends AbstractMultiInputLayer
     {
         $K = $this->backend;
         $container = $this->container();
-        [$source,$indexes] = $inputs;
-        //$outputs = $K->gather($source,$indexes,$this->realAxis);
+        [$params,$indices] = $inputs;
+        //$outputs = $K->gather($params,$indices,$this->realAxis);
         $outputs = $K->gatherb(
-            $source,
-            $indexes,
+            $params,
+            $indices,
             axis:$this->realAxis,
             batchDims:$this->realBatchDims,
             detailDepth:$this->realDetailDepth,
             indexDepth:$this->realIndexDepth,
         );
-        $container->indexes = $indexes;
-        $container->orignalsourceShape = $source->shape();
+        $container->indices = $indices;
+        $container->orignalParamShape = $params->shape();
         return $outputs;
     }
 
@@ -224,23 +224,23 @@ class Gather extends AbstractMultiInputLayer
     {
         $K = $this->backend;
         $container = $this->container();
-        //$dSource = $K->scatter(
-        //    $container->indexes,
+        //$dParams = $K->scatter(
+        //    $container->indices,
         //    $dOutputs,
         //    $this->reduceNumClass,
         //    $this->realAxis
         //);
-        $dSource = $K->scatterb(
-            $container->indexes,
+        $dParams = $K->scatterb(
+            $container->indices,
             $dOutputs,
-            $container->orignalsourceShape,
+            $container->orignalParamShape,
             axis:$this->realAxis,
             batchDims:$this->realBatchDims,
             detailDepth:$this->realDetailDepth,
             indexDepth:$this->realIndexDepth,
         );
-        $dIndex = $K->zerosLike($container->indexes);
-        return [$dSource,$dIndex];
+        $dIndices = $K->zerosLike($container->indices);
+        return [$dParams,$dIndices];
     }
 
 }

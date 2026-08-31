@@ -1236,6 +1236,29 @@ class BackendTest extends TestCase
         $this->assertEquals([0.0,0.0,0.0,0.5,1.0],$y->toArray());
     }
 
+
+    public function testRandomCategorical()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        //
+        // multiple samples
+        //
+        $probs = $K->softmax($K->log($K->array([[3.0,  2.0,  1.0 ]])));
+        $probs = $probs->reshape([$probs->size()]); // (actions)
+        $sumProbs = $K->sum($probs,axis:-1);
+        //echo $la->toString($sumProbs,indent:true)."\n";
+        $ones = $K->ones($sumProbs->shape());
+        $this->assertTrue($mo->la()->isclose($K->ndarray($ones),$K->ndarray($sumProbs)));
+
+        $actions = $K->randomCategorical($probs,numSamples:4);
+
+        $this->assertEquals([4],$actions->shape());
+        $this->assertEquals(NDArray::int32,$actions->dtype());
+        $this->assertLessThan(3,$K->scalar($K->max($actions)));
+    }
+
     public function testSigmoid()
     {
         $mo = $this->newMatrixOperator();
@@ -2558,6 +2581,195 @@ class BackendTest extends TestCase
             [[1,11,111,1111],[10002,10012,10122,11222],[-3,13,133,1333]],
             [[10001,10021,10121,11211],[2,22,222,2222],[9997,10023,10233,12333]]
         ],$A->toArray());
+    }
+
+    public function testlog1p()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->array(1.5e-8);
+        $z = $K->log1p($x);
+        $trues = $mo->array(1e-8);
+        $z = $K->ndarray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $z,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-6);
+        $z = $K->log1p($x);
+        $trues = $mo->array(1.4999989e-06);
+        $z = $K->ndarray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $z,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-4);
+        $z = $K->log1p($x);
+        $trues = $mo->array(0.00014999);
+        $z = $K->ndarray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $z,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-2);
+        $z = $K->log1p($x);
+        $trues = $mo->array(0.01488861);
+        $z = $K->ndarray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $z,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-1);
+        $z = $K->log1p($x);
+        $trues = $mo->array(0.13976195);
+        $z = $K->ndarray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $z,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-0);
+        $z = $K->log1p($x);
+        $trues = $mo->array(0.91629076);
+        $z = $K->ndarray($z);
+        $this->assertTrue($mo->la()->isclose(
+            $z,
+            $trues,
+        ));
+
+    }
+
+    public function testdlog1p()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->array(1.5e-8);
+        $z = $K->log1p($x);
+        $dOutputs = $K->onesLike($z);
+        $dx = $K->dLog1p($dOutputs,$x);
+        $dx = $K->ndarray($dx);
+        $trues = $mo->array(1.0);
+        $this->assertTrue($mo->la()->isclose(
+            $dx,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-4);
+        $z = $K->log1p($x);
+        $dOutputs = $K->onesLike($z);
+        $dx = $K->dLog1p($dOutputs,$x);
+        $dx = $K->ndarray($dx);
+        $trues = $mo->array(0.99985003);
+        $this->assertTrue($mo->la()->isclose(
+            $dx,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-3);
+        $z = $K->log1p($x);
+        $dOutputs = $K->onesLike($z);
+        $dx = $K->dLog1p($dOutputs,$x);
+        $dx = $K->ndarray($dx);
+        $trues = $mo->array(0.99850225);
+        $this->assertTrue($mo->la()->isclose(
+            $dx,
+            $trues,
+        ));
+
+        $x = $K->array(1.5e-2);
+        $z = $K->log1p($x);
+        $dOutputs = $K->onesLike($z);
+        $dx = $K->dLog1p($dOutputs,$x);
+        $dx = $K->ndarray($dx);
+        $trues = $mo->array(0.9852217);
+        $this->assertTrue($mo->la()->isclose(
+            $dx,
+            $trues,
+        ));
+ 
+        $x = $K->array(1.5e-0);
+        $z = $K->log1p($x);
+        $dOutputs = $K->onesLike($z);
+        $dx = $K->dLog1p($dOutputs,$x);
+        $dx = $K->ndarray($dx);
+        $trues = $mo->array(0.4);
+        $this->assertTrue($mo->la()->isclose(
+            $dx,
+            $trues,
+        ));
+ 
+    }
+
+    public function testL2norm()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $x = $K->array([1,2,3,4]);
+        $y = $K->l2norm($x);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array(5.47722578),
+            $K->ndarray($y),
+        ));
+
+        $x = $K->array([[1,2],[3,4]]);
+        $y = $K->l2norm($x, axis:0);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([3.1622777, 4.472136]),
+            $K->ndarray($y),
+        ));
+
+        $x = $K->array([[1,2],[3,4]]);
+        $y = $K->l2norm($x, axis:-1);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([2.236068, 5.0]),
+            $K->ndarray($y),
+        ));
+    }
+
+    public function testdL2norm()
+    {
+        $mo = $this->newMatrixOperator();
+        $K = $this->newBackend($mo);
+
+        $dOutput = $K->array(2);
+        $x = $K->array([1,2,3,4]);
+        $y = $K->array(5.47722578);
+        $dInputs = $K->dl2norm($dOutput,$x,$y);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([0.36514836,0.73029673,1.09544515,1.46059346]),
+            $K->ndarray($dInputs),
+        ));
+
+        $dOutput = $K->array([2,4]);
+        $x = $K->array([[1,2],[3,4]]);
+        $y = $K->array([3.1622777, 4.472136]);
+        $dInputs = $K->dl2norm($dOutput, $x, $y, axis:0);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([
+                [0.6324555, 1.7888544],
+                [1.8973665, 3.5777087],
+            ]),
+            $K->ndarray($dInputs),
+        ));
+
+        $dOutput = $K->array([2,4]);
+        $x = $K->array([[1,2],[3,4]]);
+        $y = $K->array([2.236068, 5.0]);
+        $dInputs = $K->dl2norm($dOutput, $x, $y, axis:-1);
+        $this->assertTrue($mo->la()->isclose(
+            $mo->array([
+                [0.8944272, 1.7888544],
+                [2.4      , 3.2      ],
+            ]),
+            $K->ndarray($dInputs),
+        ));
     }
 
 }

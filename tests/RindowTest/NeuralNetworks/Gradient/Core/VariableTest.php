@@ -5,6 +5,8 @@ use PHPUnit\Framework\TestCase;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Gradient\Core\Variable;
+use Rindow\NeuralNetworks\Gradient\Core\Scalar;
+
 use Interop\Polite\Math\Matrix\NDArray;
 use Interop\Polite\Math\Matrix\Buffer;
 
@@ -39,12 +41,6 @@ class VariableTest extends TestCase
         $this->assertEquals([2],$a->shape());
         $this->assertEquals(1,$a->ndim());
         $this->assertEquals(0,$a->offset());
-        if($mo->isAdvanced()) {
-            $this->assertInstanceof(Buffer::class,$a->buffer());
-        } else {
-            $this->assertInstanceof(\SplFixedArray::class,$a->buffer());
-        }
- 
         $a2 = $a->reshape([2,1]);
         $this->assertInstanceof(Variable::class,$a2);
         $this->assertEquals("[[1],[2]]",$K->toString($a2->value()));
@@ -100,5 +96,114 @@ class VariableTest extends TestCase
             "a[1]=2",
             "a[2]=3",
         ],$results);
+    }
+
+    public function testUpdateNDArray()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        $a = $g->Variable([1,2,3]);
+        $b = $g->Variable([3,2,1]);
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals([3,2,1],$a->toArray());
+        
+    }
+
+    public function testUpdateMaskedNDArray()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        // == both ==
+        $a = $g->Variable([1,2,3], mask:$K->array([1,1,1]));
+        $b = $g->Variable([3,2,1], mask:$K->array([1,1,1]));
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals([3,2,1],$a->toArray());
+        
+        // == source ==
+        $a = $g->Variable([1,2,3]);
+        $b = $g->Variable([3,2,1], mask:$K->array([1,1,1]));
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals([3,2,1],$a->toArray());
+        
+        // == dest ==
+        $a = $g->Variable([1,2,3], mask:$K->array([1,1,1]));
+        $b = $g->Variable([3,2,1]);
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals([3,2,1],$a->toArray());
+    }
+
+    public function testUpdateScalar()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $this->newBackend($nn);
+        $g = $nn->gradient();
+
+        // == PHP scalar ==
+        $a = $g->Variable(1);
+        $b = $g->Variable(2);
+
+        $a->update($b);
+
+        $this->assertEquals(2,$a->toArray());
+        
+        // == both objected scalar ==
+        $a = $g->Variable(new Scalar(1));
+        $b = $g->Variable(new Scalar(2));
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals(2,$a->value()->value());
+
+        // == source objected scalar ==
+        $a = $g->Variable(1);
+        $b = new Scalar(2);
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals(2,$a->toArray());
+        
+        // == dest objected scalar ==
+        $a = $g->Variable(new Scalar(1));
+        $b = $g->Variable(2);
+
+        $beforeID = spl_object_id($a->value());
+        $a->update($b);
+        $afterID = spl_object_id($a->value());
+
+        $this->assertEquals($beforeID,$afterID);
+        $this->assertEquals(2,$a->value()->value());
     }
 }

@@ -43,7 +43,7 @@ Linked library
 Required environment
 --------------------
 
-- PHP 8.1, 8.2, 8.3, 8.4
+- PHP 8.1 or later
 - For PHP 7.x, 8.0 environments, use Release 1.x.
 
 Install

@@ -19,14 +19,14 @@ use function Rindow\Math\Matrix\R;
 # Download the file
 class EngFraDataset
 {
-    protected $baseUrl = 'http://www.manythings.org/anki/';
-    protected $downloadFile = 'fra-eng.zip';
-    protected $mo;
-    protected $datasetDir;
-    protected $saveFile;
-    protected $preprocessor;
+    protected string $baseUrl = 'http://www.manythings.org/anki/';
+    protected string $downloadFile = 'fra-eng.zip';
+    protected object $mo;
+    protected string $datasetDir;
+    protected string $saveFile;
+    protected Preprocessor $preprocessor;
 
-    public function __construct($mo,$inputTokenizer=null,$targetTokenizer=null)
+    public function __construct(object $mo)
     {
         $this->mo = $mo;
         $this->datasetDir = $this->getDatasetDir();
@@ -52,7 +52,7 @@ class EngFraDataset
     }
 
 
-    protected function download($filename)
+    protected function download(string $filename) : string
     {
         $filePath = $this->datasetDir . "/" . $filename;
 
@@ -81,13 +81,13 @@ class EngFraDataset
         return $path;
     }
 
-    public function preprocessSentence($w)
+    public function preprocessSentence(string $w) : string
     {
         $w = '<start> '.$w.' <end>';
         return $w;
     }
 
-    public function createDataset($path, $numExamples)
+    public function createDataset(string $path, ?int $numExamples) : array
     {
         $contents = file_get_contents($path);
         if($contents==false) {
@@ -907,9 +907,9 @@ function make_labels($la,$label_tensor) {
     return $label_tensor;
 }
 
-$numExamples=20000;#20000;#30000;#50000;
+$numExamples=20000; # 2000; # 30000; # 50000;
 $numWords=null;#1024;#null;
-$epochs = 10;#20;
+$epochs = 10; # 5; #20;
 $batchSize = 64;#8;
 $d_model=256;#64;#128;#256;#512  // d_model embedding_dim
 $dff=512;#64;  // units 
@@ -922,11 +922,20 @@ $nn = new NeuralNetworks($mo);
 $K = $nn->backend();
 #$nn->backend()->primaryLA()->setProfiling(true);
 $g = $nn->gradient();
-$pltConfig = [];
+
+$pltConfig = [
+    //'renderer.skipRunViewer'=>true
+];
 $plt = new Plot($pltConfig,$mo);
 
 $dataset = new EngFraDataset($mo);
 
+echo "device type: ".$nn->deviceType()."\n";
+if($nn->deviceType()==='CPU') {
+    echo "number of threads: ".$nn->backend()->primaryLA()->getMath()->getNumThreads()."\n";
+    //$nn->backend()->primaryLA()->getMath()->setProfiling(true);
+}
+echo "math library: ".$nn->backend()->primaryLA()->getMath()->getConfig()."\n";
 
 echo "Generating data...\n";
 [$inputTensor, $targetTensor, $inpLang, $targLang]
@@ -1092,4 +1101,5 @@ foreach($choice as $idx)
         $e = $e->getPrevious();
     }
 }
-#$nn->backend()->primaryLA()->profilingReport();
+//$nn->backend()->primaryLA()->profilingReport();
+//$nn->backend()->primaryLA()->getMath()->profilingReport();

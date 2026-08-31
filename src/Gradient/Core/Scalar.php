@@ -27,4 +27,9 @@ class Scalar implements ScalarInterface
     {
         return $this->value;
     }
+
+    public function update(bool|int|float $value) : void
+    {
+        $this->value = $value;
+    }
 }

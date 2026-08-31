@@ -1,7 +1,7 @@
 <?php
-define('COMPOSER_LIBRARY_PATH', getenv('COMPOSER_LIBRARY_PATH'));
-if(COMPOSER_LIBRARY_PATH && file_exists(COMPOSER_LIBRARY_PATH.'/vendor/autoload.php')) {
-    $loader = include COMPOSER_LIBRARY_PATH.'/vendor/autoload.php';
+define('COMPOSER_HOME', getenv('COMPOSER_HOME'));
+if(COMPOSER_HOME && file_exists(COMPOSER_HOME.'/vendor/autoload.php')) {
+    $loader = include COMPOSER_HOME.'/vendor/autoload.php';
 } else {
     throw new \Exception("Loader is not found.");
 }

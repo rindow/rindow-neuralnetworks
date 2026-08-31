@@ -99,26 +99,25 @@ class ImageFilter implements DatasetFilter
         if($this->heightShiftInteger===null) {
             $this->adjustShiftSize($inputs->shape());
         }
-        mt_srand();
         $newInputs = $la->alloc($inputs->shape(),$inputs->dtype());
         foreach($inputs as $key => $image) {
             if($this->heightShiftInteger) {
-                $heightShiftInteger = mt_rand($this->heightShiftLow,$this->heightShiftHigh);
+                $heightShiftInteger = $this->mo->randInt($this->heightShiftLow,$this->heightShiftHigh);
             } else {
                 $heightShiftInteger = 0;
             }
             if($this->widthShiftInteger) {
-                $widthShiftInteger = mt_rand($this->widthShiftLow,$this->widthShiftHigh);
+                $widthShiftInteger = $this->mo->randInt($this->widthShiftLow,$this->widthShiftHigh);
             } else {
                 $widthShiftInteger = 0;
             }
             if($this->verticalFlip) {
-                $verticalFlip = mt_rand(0,1) ? true : false;
+                $verticalFlip = $this->mo->randInt(0,1) ? true : false;
             } else {
                 $verticalFlip = false;
             }
             if($this->horizontalFlip) {
-                $horizontalFlip = mt_rand(0,1) ? true : false;
+                $horizontalFlip = $this->mo->randInt(0,1) ? true : false;
             } else {
                 $horizontalFlip = false;
             }

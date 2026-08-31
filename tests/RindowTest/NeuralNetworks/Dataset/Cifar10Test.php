@@ -15,8 +15,8 @@ class Cifar10Test extends TestCase
 
     public function setUp() : void
     {
-        $mo = new MatrixOperator();
-        if(!$mo->isAdvanced()) {
+        parent::setUp();
+        if(getenv('BLOBDATA_TEST_SKIP')) {
             $this->markTestSkipped("The service is not Advanced.");
             return;
         }

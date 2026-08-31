@@ -7,6 +7,7 @@ use Rindow\NeuralNetworks\Gradient\Variable;
 use Rindow\NeuralNetworks\Gradient\MaskedNDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\Math\Plot\Plot;
+use Rindow\NeuralNetworks\Layer\Layer;
 use Rindow\NeuralNetworks\Backend\RindowBlas\Backend;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
 use Rindow\NeuralNetworks\Data\Sequence\Tokenizer;
@@ -16,14 +17,14 @@ use function Rindow\Math\Matrix\R;
 # Download the file
 class EngFraDataset
 {
-    protected $baseUrl = 'http://www.manythings.org/anki/';
-    protected $downloadFile = 'fra-eng.zip';
-    protected $mo;
-    protected $datasetDir;
-    protected $saveFile;
-    protected $preprocessor;
+    protected string $baseUrl = 'http://www.manythings.org/anki/';
+    protected string $downloadFile = 'fra-eng.zip';
+    protected object $mo;
+    protected string $datasetDir;
+    protected string $saveFile;
+    protected Preprocessor $preprocessor;
 
-    public function __construct($mo,$inputTokenizer=null,$targetTokenizer=null)
+    public function __construct(object $mo)
     {
         $this->mo = $mo;
         $this->datasetDir = $this->getDatasetDir();
@@ -49,7 +50,7 @@ class EngFraDataset
     }
 
 
-    protected function download($filename)
+    protected function download(string $filename) : string
     {
         $filePath = $this->datasetDir . "/" . $filename;
 
@@ -78,13 +79,13 @@ class EngFraDataset
         return $path;
     }
 
-    public function preprocessSentence($w)
+    public function preprocessSentence(string $w) : string
     {
         $w = '<start> '.$w.' <end>';
         return $w;
     }
 
-    public function createDataset($path, $numExamples)
+    public function createDataset(string $path, ?int $numExamples) : array
     {
         $contents = file_get_contents($path);
         if($contents==false) {
@@ -111,7 +112,7 @@ class EngFraDataset
         return [$enSentences,$spSentences];
     }
 
-    public function tokenize($lang,$numWords=null,$tokenizer=null)
+    public function tokenize(iterable $lang,?int $numWords=null,?Tokenizer $tokenizer=null) : array
     {
         if($tokenizer==null) {
             $tokenizer = new Tokenizer($this->mo,
@@ -126,13 +127,13 @@ class EngFraDataset
         return [$tensor, $tokenizer];
     }
 
-    protected function console($message)
+    protected function console(string $message) : void
     {
         fwrite(STDERR,$message);
     }
 
     public function loadData(
-        ?string $path=null, ?int $numExamples=null, ?int $numWords=null)
+        ?string $path=null, ?int $numExamples=null, ?int $numWords=null) : array
     {
         if($path==null) {
             $path = $this->download($this->downloadFile);
@@ -173,10 +174,10 @@ class EngFraDataset
 
 class Encoder extends AbstractModel
 {
-    protected $vocabSize;
-    protected $wordVectSize;
-    protected $units;
-    protected $embedding;
+    protected int $vocabSize;
+    protected int $wordVectSize;
+    protected int $units;
+    protected Layer $embedding;
     protected $rnn;
 
     public function __construct(
@@ -205,8 +206,8 @@ class Encoder extends AbstractModel
 
     protected function call(
         object $inputs,
-        array $initialStates=null,
-        array $options=null
+        ?array $initialStates=null,
+        ?array $options=null
         ) : array
     {
         $K = $this->backend;
@@ -263,9 +264,9 @@ class Decoder extends AbstractModel
 
     protected function call(
         object $inputs,
-        array $initialStates=null,
-        Variable $encOutputs=null,
-        bool $returnAttentionScores=null,
+        ?array $initialStates=null,
+        ?Variable $encOutputs=null,
+        ?bool $returnAttentionScores=null,
         ) : array
     {
         $K = $this->backend;
@@ -529,9 +530,9 @@ class CustomAccuracy
 }
 
 
-$numExamples=20000;#30000#50000;
+$numExamples=20000; # 4000; # 30000; # 50000;
 $numWords=1024;#null;
-$epochs = 10;
+$epochs = 10; # 5;
 $batchSize = 64;
 $wordVectSize=256;
 $units=1024;
@@ -540,8 +541,11 @@ $units=1024;
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
 $g = $nn->gradient();
-$pltConfig = [];
+$pltConfig = [
+    //'renderer.skipRunViewer'=>true
+];
 $plt = new Plot($pltConfig,$mo);
+//$nn->backend()->primaryLA()->setProfiling(true);
 
 $dataset = new EngFraDataset($mo);
 
@@ -574,6 +578,12 @@ echo "Input length: $inputLength\n";
 echo "Output length: $outputLength\n";
 
 echo "device type: ".$nn->deviceType()."\n";
+if($nn->deviceType()==='CPU') {
+    echo "number of threads: ".$nn->backend()->primaryLA()->getMath()->getNumThreads()."\n";
+    //$nn->backend()->primaryLA()->getMath()->setProfiling(true);
+}
+echo "math library: ".$nn->backend()->primaryLA()->getMath()->getConfig()."\n";
+
 $seq2seq = new Seq2seq(
     $mo,
     $nn->backend(),
@@ -662,3 +672,5 @@ foreach($choice as $idx)
     $seq2seq->plotAttention($attentionPlot,  $q, $p);
 }
 $plt->show();
+//$nn->backend()->primaryLA()->profilingReport();
+//$nn->backend()->primaryLA()->getMath()->profilingReport();

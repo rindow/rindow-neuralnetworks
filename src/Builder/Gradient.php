@@ -25,6 +25,7 @@ use Rindow\NeuralNetworks\Gradient\Func\Div;
 use Rindow\NeuralNetworks\Gradient\Func\Matmul;
 use Rindow\NeuralNetworks\Gradient\Func\ReduceMean;
 use Rindow\NeuralNetworks\Gradient\Func\ReduceSum;
+use Rindow\NeuralNetworks\Gradient\Func\ReduceMax;
 use Rindow\NeuralNetworks\Gradient\Func\ClipByValue;
 use Rindow\NeuralNetworks\Gradient\Func\Equal;
 use Rindow\NeuralNetworks\Gradient\Func\NotEqual;
@@ -44,7 +45,21 @@ use Rindow\NeuralNetworks\Gradient\Func\Greater;
 use Rindow\NeuralNetworks\Gradient\Func\Less;
 use Rindow\NeuralNetworks\Gradient\Func\Repeat;
 use Rindow\NeuralNetworks\Gradient\Func\Split;
+use Rindow\NeuralNetworks\Gradient\Func\Concat;
+use Rindow\NeuralNetworks\Gradient\Func\Softmax;
 use Rindow\NeuralNetworks\Gradient\Func\Nop;
+use Rindow\NeuralNetworks\Gradient\Func\Masking;
+use Rindow\NeuralNetworks\Gradient\Func\Gather;
+use Rindow\NeuralNetworks\Gradient\Func\ExpandDims;
+use Rindow\NeuralNetworks\Gradient\Func\Squeeze;
+use Rindow\NeuralNetworks\Gradient\Func\Minimum;
+use Rindow\NeuralNetworks\Gradient\Func\Maximum;
+use Rindow\NeuralNetworks\Gradient\Func\LogSoftmax;
+use Rindow\NeuralNetworks\Gradient\Func\RandomNormal;
+use Rindow\NeuralNetworks\Gradient\Func\RandomCategorical;
+use Rindow\NeuralNetworks\Gradient\Func\Tanh;
+use Rindow\NeuralNetworks\Gradient\Func\Log1p;
+use Rindow\NeuralNetworks\Gradient\Func\L2Norm;
 
 class Gradient
 {
@@ -57,7 +72,8 @@ class Gradient
 
     public function constant(mixed $value, ?int $dtype=null) : NDArray
     {
-        return $this->backend->array($value, dtype:$dtype);
+        $value = $this->backend->array($value, dtype:$dtype);
+        return $this->Variable($value,trainable:false,unbackpropagatable:true);
     }
 
     public function Variable(mixed $variable, mixed ...$options) : VariableIF
@@ -166,25 +182,25 @@ class Gradient
         return $func($x);
     }
 
-    public function add(NDArray $x, NDArray $y, ?string $name=null) : NDArray
+    public function add(NDArray|float $x, NDArray|float $y, ?bool $trans=null, ?string $name=null) : NDArray
     {
-        $func = new Add($this->backend, name:$name);
+        $func = new Add($this->backend, trans:$trans, name:$name);
         return $func($x,$y);
     }
 
-    public function sub(NDArray $x, NDArray $y, ?string $name=null) : NDArray
+    public function sub(NDArray|float $x, NDArray|float $y, ?string $name=null) : NDArray
     {
         $func = new Sub($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function mul(NDArray $x, NDArray $y, ?string $name=null) : NDArray
+    public function mul(NDArray|float $x, NDArray|float $y, ?string $name=null) : NDArray
     {
         $func = new Mul($this->backend, name:$name);
         return $func($x,$y);
     }
 
-    public function div(NDArray $x, NDArray $y, ?string $name=null) : NDArray
+    public function div(NDArray|float $x, NDArray|float $y, ?string $name=null) : NDArray
     {
         $func = new Div($this->backend, name:$name);
         return $func($x,$y);
@@ -230,6 +246,22 @@ class Gradient
     ) : NDArray
     {
         $func = new ReduceSum(
+            $this->backend,
+            axis:$axis,
+            keepdims:$keepdims,
+            name:$name,
+        );
+        return $func($x);
+    }
+
+    public function reduceMax(
+        NDArray $x,
+        ?int $axis=null,
+        ?bool $keepdims=null,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new ReduceMax(
             $this->backend,
             axis:$axis,
             keepdims:$keepdims,
@@ -430,6 +462,29 @@ class Gradient
         return $func($x);
     }
     
+    /**
+     * @param array<NDArray|VariableIF> $values
+     * @return NDArray|VariableIF
+     */
+    public function concat(
+        array $values,
+        ?int $axis=null,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $numOfInputs = count($values);
+        $func = new Concat($this->backend,$numOfInputs,axis:$axis, name:$name);
+        return $func(...$values);
+    }
+
+    public function softmax(
+        NDArray $x,
+    ) : NDArray
+    {
+        $func = new Softmax($this->backend);
+        return $func($x);
+    }
+
     public function nop(
         NDArray $x,
         mixed ...$options,
@@ -438,4 +493,195 @@ class Gradient
         $func = new Nop($this->backend,...$options);
         return $func($x);
     }
+
+    public function masking(
+        NDArray $mask,
+        NDArray $data,
+        ?int $batchDims=null,
+        ?int $axis=null,
+        ?float $fill=null,
+        ?int $mode=null,
+    ) : NDArray
+    {
+        $func = new Masking(
+            $this->backend,
+            batchDims:$batchDims,
+            axis:$axis,
+            fill:$fill,
+            mode:$mode,
+        );
+        return $func($mask,$data);
+    }
+
+    public function gather(
+        NDArray $params,
+        NDArray $indices,
+        ?int $axis=null,
+        ?int $batchDims=null,
+        ?int $detailDepth=null,
+        ?int $indexDepth=null,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Gather(
+            $this->backend,
+            axis:$axis,
+            batchDims:$batchDims,
+            detailDepth:$detailDepth,
+            indexDepth:$indexDepth,
+            name:$name,
+        );
+        return $func($params,$indices);
+    }
+
+    public function expandDims(
+        NDArray $inputs,
+        int $axis,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new ExpandDims(
+            $this->backend,
+            $axis,
+            name:$name,
+        );
+        return $func($inputs);
+    }
+
+    public function squeeze(
+        NDArray $inputs,
+        int $axis,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Squeeze(
+            $this->backend,
+            $axis,
+            name:$name,
+        );
+        return $func($inputs);
+    }
+
+    public function minimum(
+        NDArray $a,
+        NDArray $x,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Minimum(
+            $this->backend,
+            name:$name,
+        );
+        return $func($a,$x);
+    }
+
+    public function maximum(
+        NDArray $a,
+        NDArray $x,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Maximum(
+            $this->backend,
+            name:$name,
+        );
+        return $func($a,$x);
+    }
+
+    public function logSoftmax(
+        NDArray $x,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new LogSoftmax(
+            $this->backend,
+            name:$name,
+        );
+        return $func($x);
+    }
+   
+    /**
+     * @param array<int>|null $batchShape
+     */
+    public function randomNormal(
+        NDArray $x,
+        ?float $mean=null,
+        ?float $scale=null,
+        ?array $batchShape=null,
+        ?int $seed=null,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new RandomNormal(
+            $this->backend,
+            mean:$mean,
+            scale:$scale,
+            batchShape:$batchShape,
+            seed:$seed,
+            name:$name,
+        );
+        return $func($x);
+    }
+
+    /**
+     * @param array<int>|null $batchShape
+     */
+    public function randomCategorical(
+        NDArray $logits,
+        ?array $batchShape=null,
+        ?bool $softmax=null,
+        ?int $dtype=null,
+        ?int $seed=null,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new RandomCategorical(
+            $this->backend,
+            batchShape:$batchShape,
+            softmax:$softmax,
+            dtype:$dtype,
+            seed:$seed,
+            name:$name,
+        );
+        return $func($logits);
+    }
+
+    public function tanh(
+        NDArray $x,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Tanh(
+            $this->backend,
+            name:$name,
+        );
+        return $func($x);
+    }
+
+    public function log1p(
+        NDArray $x,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Log1p(
+            $this->backend,
+            name:$name,
+        );
+        return $func($x);
+    }
+
+    public function l2norm(
+        NDArray $x,
+        ?int $axis=null,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new L2Norm(
+            $this->backend,
+            axis:$axis,
+            name:$name,
+        );
+        return $func($x);
+    }
+
 }

@@ -43,10 +43,6 @@ class MultiHeadAttention extends AbstractAttentionLayer
     protected string $backward_combine_value_equation = 'abcd,acbe->aecd';
     protected ?Layer $dropout_layer=null;
     protected Layer $output_dense;
-    protected bool $useScale;
-    protected bool $doNotExpandMask;
-    protected NDArray $scale;
-    protected NDArray $dScale;
     /** @var array<bool> $unbackpropagatables */
     protected ?array $unbackpropagatables = null;
     protected float $mask_exp = -1e9;

@@ -8,6 +8,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\NeuralNetworks\Gradient\Scalar as ScalarInterface;
 use Rindow\NeuralNetworks\Gradient\ArrayShape as ArrayShapeInterface;
 use Rindow\NeuralNetworks\Gradient\Variable as VariableInterface;
+use Rindow\NeuralNetworks\Gradient\NullValue as NullValueInterface;
 use Rindow\NeuralNetworks\Gradient\Core\Scalar;
 
 abstract class AbstractFunction
@@ -24,7 +25,7 @@ abstract class AbstractFunction
 
     /**
     *  @param array<NDArray>  $dOutputs
-    *  @return array<NDArray|ScalarInterface>
+    *  @return array<NDArray|ScalarInterface|NullValueInterface>
     */
     abstract protected function differentiate(array $dOutputs) : array;
 
@@ -215,7 +216,7 @@ abstract class AbstractFunction
 
     /**
     *  @param array<NDArray>  $dOutputs
-    *  @return array<NDArray>
+    *  @return array<NDArray|ScalarInterface|NullValueInterface>
     */
     public function backward(array $dOutputs) : array
     {

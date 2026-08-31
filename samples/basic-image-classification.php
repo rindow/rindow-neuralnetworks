@@ -10,7 +10,11 @@ use function Rindow\Math\Matrix\R;
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
-$plt = new Plot(null,$mo);
+$config = [
+    //'renderer.skipRunViewer'=>true,
+];
+$plt = new Plot($config,$mo);
+//$nn->backend()->primaryLA()->setProfiling(true);
 
 
 $dsname='mnist';
@@ -156,6 +160,11 @@ switch($dsname) {
 
 
 echo "device type: ".$nn->deviceType()."\n";
+if($nn->deviceType()==='CPU') {
+    echo "number of threads: ".$nn->backend()->primaryLA()->getMath()->getNumThreads()."\n";
+    //$nn->backend()->primaryLA()->getMath()->setProfiling(true);
+}
+echo "math library: ".$nn->backend()->primaryLA()->getMath()->getConfig()."\n";
 $modelFilePath = __DIR__."/basic-image-classification-{$dsname}.model";
 
 if(file_exists($modelFilePath)) {
@@ -201,8 +210,9 @@ $images = $images[R(0,8)];
 $labels = $labels[R(0,8)];
 $predicts = $model->predict($images);
 // for from_logits
-$K = $nn->backend();
-$predicts = $K->ndarray($nn->backend->softmax($K->array($predicts)));
+$predicts = $nn->deviceArray($predicts);
+$predicts = $nn->la()->softmax($predicts);
+$predicts = $nn->hostArray($predicts);
 
 if($inputShape[2]==1) {
     array_pop($inputShape);
@@ -220,3 +230,5 @@ foreach ($predicts as $i => $predict) {
 }
 
 $plt->show();
+//$nn->backend()->primaryLA()->profilingReport();
+//$nn->backend()->primaryLA()->getMath()->profilingReport();

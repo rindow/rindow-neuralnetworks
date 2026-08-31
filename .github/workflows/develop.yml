@@ -1,0 +1,239 @@
+name: tests
+
+on: 
+  push:
+      branches:
+          - develop
+
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    env:
+        matlib: 1.1.0
+        testlib: 0.0.23
+        matlibrepo: ${{ github.repository_owner }}/rindow-matlib
+        workspace: workspace
+        owner: ${{ github.repository_owner }}
+  
+    strategy:
+      fail-fast: false
+      matrix:
+        #ffi: ['','ffi']
+        include:
+          - name: PHP8.1
+            os: ubuntu-latest
+            arch: 'amd64'
+            php: '8.1'
+            phpunit: '10.5'
+            ffi: 'ffi'
+          #- name: PHP8.4
+          #  os: ubuntu-latest
+          #  arch: 'amd64'
+          #  php: '8.4'
+          #  phpunit: '11.5'
+          #  ffi: 'ffi'
+          - name: PHP8.5
+            os: ubuntu-latest
+            arch: 'amd64'
+            php: '8.5'
+            phpunit: '11.5'
+            ffi: 'ffi'
+          - name: Windows
+            os: windows-latest
+            arch: 'x64'
+            php: '8.5'
+            phpunit: '11.5'
+            ffi: 'ffi'
+          - name: macOS
+            os: macos-latest
+            arch: 'arm64'
+            php: '8.5'
+            phpunit: '11.5'
+            ffi: 'ffi'
+          #- name: macOS-x86_64
+          #  os: macos-13
+          #  arch: 'x86_64'
+          #  php: '8.5'
+          #  phpunit: '11.5'
+          #  ffi: 'ffi'
+
+    steps:
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # PHP Extras
+          coverage: none
+          tools: composer, phpstan:2.1.x
+          ini-values: "memory_limit=512M"
+          extensions: pdo_sqlite, gd, ${{ matrix.ffi }}
+        env:
+          fail-fast: true
+
+      - name: Install Libs (Linux)
+        if: ${{ startsWith(matrix.os, 'ubuntu-') && matrix.ffi == 'ffi' }}
+        run: |
+          sudo apt install -y libopenblas0 liblapacke
+          wget https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib_${{ env.matlib }}-`lsb_release -sr`_amd64.deb
+          sudo apt install -y ./rindow-matlib_${{ env.matlib }}-`lsb_release -sr`_amd64.deb
+
+      - name: Install Libs (macOS)
+        if: ${{ startsWith(matrix.os, 'macos-') && matrix.ffi == 'ffi' }}
+        run: |
+          # brew install libomp
+          curl https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib-${{ env.matlib }}-Darwin-${{ matrix.arch }}.tar.gz -O -L
+          tar -xzf rindow-matlib-${{ env.matlib }}-Darwin-${{ matrix.arch }}.tar.gz
+          sudo cp -r usr/include /usr/local/
+          sudo cp -r usr/lib /usr/local/
+
+      #- name: Install Libs (Windows)
+      #  if: ${{ startsWith(matrix.os, 'windows-') && matrix.ffi == 'ffi' }}
+      #  run: |
+      #    Invoke-WebRequest -Uri https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.27/OpenBLAS-0.3.27-x64.zip -OutFile openblas.zip
+      #    Expand-Archive -Path openblas.zip
+      #    Invoke-WebRequest -Uri https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib-${{ env.matlib }}-win64.zip -OutFile matlib.zip
+      #    Expand-Archive -Path matlib.zip
+      #    $currentDir = (Get-Location).Path
+      #    dir $currentDir
+      #    $OpenBLAS_DIR = Join-Path -Path $currentDir -ChildPath 'openblas'
+      #    $env:PATH = "$OpenBLAS_DIR/bin;$env:PATH"
+      #    dir $OpenBLAS_DIR/bin
+      #    $matlibDir = Join-Path -Path $currentDir -ChildPath 'matlib'
+      #    $env:PATH = "$matlibDir/bin;$env:PATH"
+      #    dir $matlibDir/bin
+
+      - name: Checkout codes
+        uses: "actions/checkout@v4"
+
+      - name: Run Composer Update
+        run: |
+          mv composer.json composer.json.back
+          composer require --dev "phpunit/phpunit=${{ matrix.phpunit }}.*"
+          mv composer.json composer.local.json
+          mv composer.json.back composer.json
+
+      - name: Download Add-packs (Linux)
+        if: ${{ startsWith(matrix.os, 'ubuntu-') }}
+        run: |
+          wget https://github.com/${{ env.owner }}/polite-math/archive/refs/heads/main.zip
+          unzip main.zip
+          rm main.zip
+          wget https://github.com/${{ env.owner }}/rindow-math-matrix/archive/refs/heads/${{ env.workspace }}.zip
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          wget https://github.com/${{ env.owner }}/rindow-math-matrix-matlibffi/archive/refs/heads/${{ env.workspace }}.zip
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          wget https://github.com/${{ env.owner }}/rindow-math-buffer-ffi/archive/refs/heads/${{ env.workspace }}.zip
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          wget https://github.com/${{ env.owner }}/rindow-matlib-ffi/archive/refs/heads/${{ env.workspace }}.zip
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          wget https://github.com/${{ env.owner }}/rindow-openblas-ffi/archive/refs/heads/${{ env.workspace }}.zip
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          wget https://github.com/${{ env.owner }}/rindow-math-plot/archive/refs/heads/${{ env.workspace }}.zip
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+
+      - name: Download Add-packs (macOS)
+        if: ${{ startsWith(matrix.os, 'macos-') }}
+        run: |
+          curl https://github.com/${{ env.owner }}/polite-math/archive/refs/heads/main.zip -O -L
+          unzip main.zip
+          rm main.zip
+          curl https://github.com/${{ env.owner }}/rindow-math-matrix/archive/refs/heads/${{ env.workspace }}.zip -O -L
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          curl https://github.com/${{ env.owner }}/rindow-math-matrix-matlibffi/archive/refs/heads/${{ env.workspace }}.zip -O -L
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          curl https://github.com/${{ env.owner }}/rindow-math-buffer-ffi/archive/refs/heads/${{ env.workspace }}.zip -O -L
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          curl https://github.com/${{ env.owner }}/rindow-matlib-ffi/archive/refs/heads/${{ env.workspace }}.zip -O -L
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          curl https://github.com/${{ env.owner }}/rindow-openblas-ffi/archive/refs/heads/${{ env.workspace }}.zip -O -L
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+          curl https://github.com/${{ env.owner }}/rindow-math-plot/archive/refs/heads/${{ env.workspace }}.zip -O -L
+          unzip ${{ env.workspace }}.zip
+          rm ${{ env.workspace }}.zip
+  
+      - name: Download Add-packs (Windows)
+        if: ${{ startsWith(matrix.os, 'windows-') }}
+        run: |
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/polite-math/archive/refs/heads/main.zip  -OutFile main1.zip
+          Expand-Archive -Path main1.zip -DestinationPath ${{ env.workspace }}
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/rindow-math-matrix/archive/refs/heads/${{ env.workspace }}.zip  -OutFile ${{ env.workspace }}2.zip
+          Expand-Archive -Path ${{ env.workspace }}2.zip -DestinationPath ${{ env.workspace }}
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/rindow-math-matrix-matlibffi/archive/refs/heads/${{ env.workspace }}.zip  -OutFile ${{ env.workspace }}3.zip
+          Expand-Archive -Path ${{ env.workspace }}3.zip -DestinationPath ${{ env.workspace }}
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/rindow-math-buffer-ffi/archive/refs/heads/${{ env.workspace }}.zip  -OutFile ${{ env.workspace }}4.zip
+          Expand-Archive -Path ${{ env.workspace }}4.zip -DestinationPath ${{ env.workspace }}
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/rindow-matlib-ffi/archive/refs/heads/${{ env.workspace }}.zip  -OutFile ${{ env.workspace }}5.zip
+          Expand-Archive -Path ${{ env.workspace }}5.zip -DestinationPath ${{ env.workspace }}
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/rindow-openblas-ffi/archive/refs/heads/${{ env.workspace }}.zip  -OutFile ${{ env.workspace }}6.zip
+          Expand-Archive -Path ${{ env.workspace }}6.zip -DestinationPath ${{ env.workspace }}
+          Invoke-WebRequest -Uri https://github.com/${{ env.owner }}/rindow-math-plot/archive/refs/heads/${{ env.workspace }}.zip  -OutFile ${{ env.workspace }}7.zip
+          Expand-Archive -Path ${{ env.workspace }}7.zip -DestinationPath ${{ env.workspace }}
+  
+      - name: PHP Static Analysys (${{ matrix.name }}).
+        if: ${{ !startsWith(matrix.os, 'windows-') }}
+        run: |
+          WORKING_BRANCH=${{ env.workspace }}; export WORKING_BRANCH
+          ADD_PACK=`pwd`; export ADD_PACK
+          echo $WORKING_BRANCH
+          echo $ADD_PACK
+          ls -l
+          phpstan -V
+          phpstan analyse -c phpstan-develop.neon
+
+      - name: PHP Static Analysys (${{ matrix.name }}).
+        if: ${{ startsWith(matrix.os, 'windows-') }}
+        run: |
+          $env:WORKING_BRANCH = "${{ env.workspace }}"
+          $currentDir = (Get-Location).Path
+          $env:ADD_PACK = "$currentDir/${{ env.workspace }}"
+          echo $env:WORKING_BRANCH
+          echo $env:ADD_PACK
+          ls
+          phpstan -V
+          phpstan analyse -c phpstan-develop.neon
+
+      - name: PHPUnit Tests (${{ matrix.name }}).
+        if: ${{ !startsWith(matrix.os, 'windows-') }}
+        run: |
+          PLOT_RENDERER_SKIP=true;
+          export PLOT_RENDERER_SKIP;
+          BLOBDATA_TEST_SKIP=true;
+          export BLOBDATA_TEST_SKIP;
+          WORKING_BRANCH=${{ env.workspace }}; export WORKING_BRANCH
+          ADD_PACK=`pwd`; export ADD_PACK
+          vendor/bin/phpunit -c tests
+
+      - name: PHPUnit Tests (Windows)
+        if: ${{ startsWith(matrix.os, 'windows-') }}
+        run: |
+          Invoke-WebRequest -Uri https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.27/OpenBLAS-0.3.27-x64.zip -OutFile openblas.zip
+          Expand-Archive -Path openblas.zip
+          $currentDir = (Get-Location).Path
+          dir $currentDir
+          $OpenBLAS_DIR = Join-Path -Path $currentDir -ChildPath 'openblas'
+          $env:PATH = "$OpenBLAS_DIR/bin;$env:PATH"
+          dir $OpenBLAS_DIR/bin
+          Invoke-WebRequest -Uri https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib-${{ env.matlib }}-win64.zip -OutFile matlib.zip
+          Expand-Archive -Path matlib.zip
+          $currentDir = (Get-Location).Path
+          $matlibDir = Join-Path -Path $currentDir -ChildPath 'matlib'
+          $env:PATH = "$matlibDir/bin;$env:PATH"
+          dir $matlibDir/bin
+          $env:PLOT_RENDERER_SKIP = "true"
+          $env:BLOBDATA_TEST_SKIP = "true"
+          $env:WORKING_BRANCH = "${{ env.workspace }}"
+          $env:ADD_PACK = "$currentDir/${{ env.workspace }}"
+          vendor/bin/phpunit -c tests
+

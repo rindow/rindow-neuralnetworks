@@ -139,29 +139,29 @@ class GatherTest extends TestCase
         //  indices = (batches)
         //  outputs = (batches)
         //
-        $sources = $K->array([
+        $params = $K->array([
             [1,2,3],
             [4,3,2],
         ]);
-        $indexes = $K->array([
+        $indices = $K->array([
             2,
             0,
         ],dtype:NDArray::int32);
-        $copySources = $K->copy($sources);
-        $copyIndexes = $K->copy($indexes);
+        $copyParams = $K->copy($params);
+        $copyIndices = $K->copy($indices);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$sources,$indexes) {
-                $outputsVariable = $layer->forward([$sources,$indexes]);
+            function() use ($layer,$params,$indices) {
+                $outputsVariable = $layer->forward([$params,$indices]);
                 return $outputsVariable;
             }
         );
         $outputs = $K->ndarray($outputsVariable);
         //
-        $this->assertEquals([2,3],$sources->shape());
-        $this->assertEquals([2],$indexes->shape());
+        $this->assertEquals([2,3],$params->shape());
+        $this->assertEquals([2],$indices->shape());
         $this->assertEquals([2],$outputs->shape());
-        $this->assertEquals($copySources->toArray(),$sources->toArray());
-        $this->assertEquals($copyIndexes->toArray(),$indexes->toArray());
+        $this->assertEquals($copyParams->toArray(),$params->toArray());
+        $this->assertEquals($copyIndices->toArray(),$indices->toArray());
         $this->assertEquals([
             3,
             4,
@@ -181,20 +181,20 @@ class GatherTest extends TestCase
         ]);
 
         $copydOutputs = $K->copy($dOutputs);
-        [$dSources,$dIndexes] = $outputsVariable->creator()->backward([$dOutputs]);
+        [$dParams,$dIndices] = $outputsVariable->creator()->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2],$dOutputs->shape());
-        $this->assertEquals([2,3],$dSources->shape());
-        $this->assertEquals([2],$dIndexes->shape());
+        $this->assertEquals([2,3],$dParams->shape());
+        $this->assertEquals([2],$dIndices->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
         $this->assertEquals([
             [0,0,2],
             [3,0,0],
-        ],$dSources->toArray());
+        ],$dParams->toArray());
         $this->assertEquals([
             0,
             0,
-        ],$dIndexes->toArray());
+        ],$dIndices->toArray());
     }
 
     public function test2DNormalForwardAndBackward()
@@ -217,29 +217,29 @@ class GatherTest extends TestCase
         // forward
         //
         //  batch size 2
-        $sources = $K->array([
+        $params = $K->array([
             [[1,2],[3,4],[5,6]],
             [[6,5],[4,3],[2,1]],
         ]);
-        $indexes = $K->array([
+        $indices = $K->array([
             [2,2],
             [0,0],
         ],NDArray::int32);
-        $copySources = $K->copy($sources);
-        $copyIndexes = $K->copy($indexes);
+        $copyParams = $K->copy($params);
+        $copyIndices = $K->copy($indices);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$sources,$indexes) {
-                $outputsVariable = $layer->forward([$sources,$indexes]);
+            function() use ($layer,$params,$indices) {
+                $outputsVariable = $layer->forward([$params,$indices]);
                 return $outputsVariable;
             }
         );
         $outputs = $K->ndarray($outputsVariable);
         //
-        $this->assertEquals([2,3,2],$sources->shape());
-        $this->assertEquals([2,2],$indexes->shape());
+        $this->assertEquals([2,3,2],$params->shape());
+        $this->assertEquals([2,2],$indices->shape());
         $this->assertEquals([2,2],$outputs->shape());
-        $this->assertEquals($copySources->toArray(),$sources->toArray());
-        $this->assertEquals($copyIndexes->toArray(),$indexes->toArray());
+        $this->assertEquals($copyParams->toArray(),$params->toArray());
+        $this->assertEquals($copyIndices->toArray(),$indices->toArray());
         $this->assertEquals([
             [5,6],
             [6,5],
@@ -256,17 +256,17 @@ class GatherTest extends TestCase
     
         $copydOutputs = $K->copy(
             $dOutputs);
-        [$dSources,$dIndexes] = $outputsVariable->creator()->backward([$dOutputs]);
+        [$dParams,$dIndices] = $outputsVariable->creator()->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2,2],$dOutputs->shape());
-        $this->assertEquals([2,3,2],$dSources->shape());
-        $this->assertEquals([2,2],$dIndexes->shape());
+        $this->assertEquals([2,3,2],$dParams->shape());
+        $this->assertEquals([2,2],$dIndices->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
         $this->assertEquals([
             [[0,0],[0,0],[1,2]],
             [[3,4],[0,0],[0,0]],
-        ],$dSources->toArray());
-        $indexes = $K->array([
+        ],$dParams->toArray());
+        $indices = $K->array([
             [0,0],
             [0,0],
         ]);
@@ -291,29 +291,29 @@ class GatherTest extends TestCase
         // forward
         //
         //  batch size 2
-        $sources = $K->array([
+        $params = $K->array([
             [[1,2],[3,4],[5,6]],
             [[6,5],[4,3],[2,1]],
         ]);
-        $indexes = $K->array([
+        $indices = $K->array([
             [1,1,1],
             [0,0,0],
         ],NDArray::int32);
-        $copySources = $K->copy($sources);
-        $copyIndexes = $K->copy($indexes);
+        $copyParams = $K->copy($params);
+        $copyIndices = $K->copy($indices);
         $outputsVariable = $nn->with($tape=$g->GradientTape(),
-            function() use ($layer,$sources,$indexes) {
-                $outputsVariable = $layer->forward([$sources,$indexes]);
+            function() use ($layer,$params,$indices) {
+                $outputsVariable = $layer->forward([$params,$indices]);
                 return $outputsVariable;
             }
         );
         $outputs = $K->ndarray($outputsVariable);
         //
-        $this->assertEquals([2,3,2],$sources->shape());
-        $this->assertEquals([2,3],$indexes->shape());
+        $this->assertEquals([2,3,2],$params->shape());
+        $this->assertEquals([2,3],$indices->shape());
         $this->assertEquals([2,3],$outputs->shape());
-        $this->assertEquals($copySources->toArray(),$sources->toArray());
-        $this->assertEquals($copyIndexes->toArray(),$indexes->toArray());
+        $this->assertEquals($copyParams->toArray(),$params->toArray());
+        $this->assertEquals($copyIndices->toArray(),$indices->toArray());
         $this->assertEquals([
             [2,4,6],
             [6,4,2],
@@ -330,17 +330,17 @@ class GatherTest extends TestCase
     
         $copydOutputs = $K->copy(
             $dOutputs);
-        [$dSources,$dIndexes] = $outputsVariable->creator()->backward([$dOutputs]);
+        [$dParams,$dIndices] = $outputsVariable->creator()->backward([$dOutputs]);
         // 2 batch
         $this->assertEquals([2,3],$dOutputs->shape());
-        $this->assertEquals([2,3,2],$dSources->shape());
-        $this->assertEquals([2,3],$dIndexes->shape());
+        $this->assertEquals([2,3,2],$dParams->shape());
+        $this->assertEquals([2,3],$dIndices->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
         $this->assertEquals([
             [[0,1],[0,2],[0,3]],
             [[4,0],[5,0],[6,0]],
-        ],$dSources->toArray());
-        $indexes = $K->array([
+        ],$dParams->toArray());
+        $indices = $K->array([
             [0,0],
             [0,0],
         ]);

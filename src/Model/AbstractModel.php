@@ -32,10 +32,10 @@ abstract class AbstractModel implements Model
     protected object $builder;
     protected HDAFactory $hdaFactory;
     protected ?string $name;
-    protected ?Optimizer $optimizer;
+    protected ?Optimizer $optimizer=null;
     /** @var array<Metric> */
     protected array $metrics = [];
-    protected mixed $lossFunction;
+    protected mixed $lossFunction = null;
     protected bool $built = false;
     protected bool $shapeInspection = true;
     protected bool $backupShapeInspection;
@@ -982,15 +982,18 @@ abstract class AbstractModel implements Model
             }
             $modelWeights['weights'][$idx] = $mo->serializeArray($param);
         }
-        $optimizerWeights = $this->optimizer()->getWeights();
-        $modelWeights['optimizerNumWeight'] = count($optimizerWeights);
-        $modelWeights['optimizer'] = $modelWeights['optimizer'] ?? [];
-        foreach ($optimizerWeights as $idx => $weights) {
-            $weights=$K->ndarray($weights);
-            if($portable) {
-                $weights = $this->converPortableSaveMode($weights);
+        $optimizer = $this->optimizer();
+        if($optimizer) {
+            $optimizerWeights = $optimizer->getWeights();
+            $modelWeights['optimizerNumWeight'] = count($optimizerWeights);
+            $modelWeights['optimizer'] = $modelWeights['optimizer'] ?? [];
+            foreach ($optimizerWeights as $idx => $weights) {
+                $weights=$K->ndarray($weights);
+                if($portable) {
+                    $weights = $this->converPortableSaveMode($weights);
+                }
+                $modelWeights['optimizer'][$idx] = $mo->serializeArray($weights);
             }
-            $modelWeights['optimizer'][$idx] = $mo->serializeArray($weights);
         }
     }
     
@@ -998,29 +1001,42 @@ abstract class AbstractModel implements Model
     {
         $K = $this->backend;
         $mo = $K->localMatrixOperator();
+        $initialized = false;
         foreach($this->variables() as $idx => $weights) {
             $data = $mo->unserializeArray($modelWeights['weights'][$idx]);
             $data = $K->array($data);
-            $weights->assign($K->copy($data));
+            if($weights->isUndetermined()) {
+                // An unbuilt model has no destination buffer yet. This is
+                // initialization, so no compiled function can reference it.
+                $weights->_assign($K->copy($data));
+                $initialized = true;
+            } else {
+                // Preserve the buffer captured by compiled graph functions.
+                $weights->update($data);
+            }
         }
-        $stack = [$this];
-        while($module=array_pop($stack)) {
-            $module->reverseSyncWeightVariables();
-            foreach($module->submodules() as $m) {
-                array_push($stack,$m);
+        if($initialized) {
+            $stack = [$this];
+            while($module=array_pop($stack)) {
+                $module->reverseSyncWeightVariables();
+                foreach($module->submodules() as $m) {
+                    array_push($stack,$m);
+                }
             }
         }
         $optimizer = $this->optimizer();
-        //$optimizer->build($this->params());
-        $optimizerNumWeight = $modelWeights['optimizerNumWeight'];
-        $params = [];
-        for($idx=0;$idx<$optimizerNumWeight;$idx++) {
-            $data = $mo->unserializeArray($modelWeights['optimizer'][$idx]);
-            $data = $K->array($data);
-            //$K->copy($data,$weights);
-            $params[] = $data;
+        if($optimizer) {
+            //$optimizer->build($this->params());
+            $optimizerNumWeight = $modelWeights['optimizerNumWeight'];
+            $params = [];
+            for($idx=0;$idx<$optimizerNumWeight;$idx++) {
+                $data = $mo->unserializeArray($modelWeights['optimizer'][$idx]);
+                $data = $K->array($data);
+                //$K->copy($data,$weights);
+                $params[] = $data;
+            }
+            $optimizer->loadWeights($params);
         }
-        $optimizer->loadWeights($params);
     }
 
     protected function converPortableSaveMode(NDArray $ndarray) : NDArray

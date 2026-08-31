@@ -353,7 +353,7 @@ abstract class AbstractLayerBase implements Layer
         }
         foreach(array_map(null,$this->weights,$params) as [$variable,$param]) {
             if($param!==null) {
-                $variable->assign($param, reference: true);
+                $variable->_assign($param, reference: true);
             }
         }
         $this->assignedWeights = true;

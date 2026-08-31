@@ -475,15 +475,18 @@ class Backend
                 $la->axpy($y,$x);
                 return $x;
             } elseif($ndimX < $ndimY) {
+                //  broadcastable x=>y
                 $x = $la->duplicate($x,null,null,$la->alloc($y->shape(),$x->dtype()));
                 $la->axpy($y,$x);
                 return $x;
             } else {
+                //  broadcastable y=>x
                 $y = $la->duplicate($y,null,null,$la->alloc($x->shape(),$y->dtype()));
                 $la->axpy($x,$y);
                 return $y;
             }
         } else {
+            // z = (y * x^T)^T  broadcastable y=>x
             $x = $la->copy($x);
             return $la->add($y, $x, alpha:1, trans:$trans);
         }
@@ -497,19 +500,22 @@ class Backend
             $ndimY = $y->ndim();
             if($ndimX == $ndimY) {
                 $x = $la->copy($x,$la->alloc($y->shape(),$x->dtype()));
-                $la->axpy($y,$x,-1.0);
+                $la->axpy($y,$x,alpha:-1.0);
                 return $x;
             } elseif($ndimX < $ndimY) {
+                //  broadcastable x=>y
                 $x = $la->duplicate($x,null,null,$la->alloc($y->shape(),$x->dtype()));
-                $la->axpy($y,$x,-1.0);
+                $la->axpy($y,$x,alpha:-1.0);
                 return $x;
             } else {
+                //  broadcastable y=>x
                 $y = $la->duplicate($y,null,null,$la->alloc($x->shape(),$y->dtype()));
-                $la->increment($y,0,-1);
+                $la->increment($y,beta:0,alpha:-1); // scale
                 $la->axpy($x,$y);
                 return $y;
             }
         } else {
+            // z = (y * x^T)^T  broadcastable y=>x
             $x = $la->copy($x);
             return $la->add($y, $x, alpha:-1, trans:$trans);
         }
@@ -520,13 +526,16 @@ class Backend
         $la = $this->la;
         if(!$trans) {
             if($x->ndim() < $y->ndim()) {
+                //  broadcastable x=>y
                 $y = $la->copy($y);
                 return $la->multiply($x,$y);
             } else {
+                //  broadcastable y=>x
                 $x = $la->copy($x);
                 return $la->multiply($y,$x);
             }
         } else {
+            // z = (y * x^T)^T  broadcastable y=>x
             $x = $la->copy($x);
             return $la->multiply($y,$x,trans:$trans);
         }
@@ -539,12 +548,15 @@ class Backend
             $y = $la->copy($y);
             $la->reciprocal($y);
             if($x->ndim() < $y->ndim()) {
+                //  broadcastable x=>y
                 return $la->multiply($x,$y);
             } else {
+                //  broadcastable y=>x
                 $x = $la->copy($x);
                 return $la->multiply($y,$x);
             }
         } else {
+            // z = (y * x^T)^T  broadcastable y=>x
             $x = $la->copy($x);
             $y = $la->copy($y);
             $la->reciprocal($y);
@@ -554,24 +566,27 @@ class Backend
 
     public function masking(
         NDArray $mask,
-        NDArray $a,
-        ?float $fill=null,
-        ?int $mode=null,
+        NDArray $data,
         ?int $batchDims=null,
         ?int $axis=null,
+        ?float $fill=null,
+        ?int $mode=null,
         ) : NDArray
     {
         $la = $this->la;
         return $la->masking(
             $mask,
-            $la->copy($a),
-            fill:$fill,
-            mode:$mode,
+            $la->copy($data),
             batchDims:$batchDims,
             axis:$axis,
+            fill:$fill,
+            mode:$mode,
         );
     }
 
+    /**
+    *    X := 1 / (a*X + b)
+    */
     public function reciprocal(
         NDArray $x,
         ?float $beta=null,
@@ -640,32 +655,32 @@ class Backend
         );
     }
 
-    public function scale(float $a, NDArray $x) : NDArray
+    public function scale(float $alpha, NDArray $x) : NDArray
     {
         $x = $this->la->copy($x);
-        return $this->la->scal($a, $x);
+        return $this->la->scal($alpha, $x);
     }
 
-    public function update_scale(NDArray $x,float $a) : NDArray
+    public function update_scale(NDArray $x,float $alpha) : NDArray
     {
-        return $this->la->scal($a, $x);
+        return $this->la->scal($alpha, $x);
     }
 
     /**
     *    Y := a*X + b
     */
-    public function increment(NDArray $x, float $b, ?float $a=null) : NDArray
+    public function increment(NDArray $x, float $beta, ?float $alpha=null) : NDArray
     {
         $x = $this->la->copy($x);
-        return $this->la->increment($x, $b, $a);
+        return $this->la->increment($x, beta:$beta, alpha:$alpha);
     }
 
     /**
     *    X := a*X + b
     */
-    public function update_increment(NDArray $x, float $b, ?float $a=null) : NDArray
+    public function update_increment(NDArray $x, float $beta, ?float $alpha=null) : NDArray
     {
-        return $this->la->increment($x, $b, $a);
+        return $this->la->increment($x, beta:$beta, alpha:$alpha);
     }
 
     public function pow(NDArray $x, float|NDArray $y, ?bool $trans=null) : NDArray
@@ -709,40 +724,40 @@ class Backend
         return $y;
     }
 
-    public function maximum(NDArray $x, float $a) : NDArray
+    public function maximum(NDArray $a, float|NDArray $x) : NDArray
     {
-        $x = $this->la->copy($x);
-        return $this->la->maximum($x,$a);
+        $a = $this->la->copy($a);
+        return $this->la->maximum($a,$x);
     }
 
-    public function minimum(NDArray $x, float $a) : NDArray
+    public function minimum(NDArray $a, float|NDArray $x) : NDArray
     {
-        $x = $this->la->copy($x);
-        return $this->la->minimum($x,$a);
+        $a = $this->la->copy($a);
+        return $this->la->minimum($a,$x);
     }
 
-    public function greater(NDArray $x, float $a) : NDArray
+    public function greater(NDArray $a, float|NDArray $x) : NDArray
     {
-        $x = $this->la->copy($x);
-        return $this->la->greater($x,$a);
+        $a = $this->la->copy($a);
+        return $this->la->greater($a,$x);
     }
 
-    public function greaterEqual(NDArray $x, float $a) : NDArray
+    public function greaterEqual(NDArray $a, float|NDArray $x) : NDArray
     {
-        $x = $this->la->copy($x);
-        return $this->la->greaterEqual($x,$a);
+        $a = $this->la->copy($a);
+        return $this->la->greaterEqual($a,$x);
     }
 
-    public function less(NDArray $x, float $a) : NDArray
+    public function less(NDArray $a, float|NDArray $x) : NDArray
     {
-        $x = $this->la->copy($x);
-        return $this->la->less($x,$a);
+        $a = $this->la->copy($a);
+        return $this->la->less($a,$x);
     }
 
-    public function lessEqual(NDArray $x, float $a) : NDArray
+    public function lessEqual(NDArray $a, float|NDArray $x) : NDArray
     {
-        $x = $this->la->copy($x);
-        return $this->la->lessEqual($x,$a);
+        $a = $this->la->copy($a);
+        return $this->la->lessEqual($a,$x);
     }
 
     public function exp(NDArray $x) : NDArray
@@ -804,11 +819,17 @@ class Backend
         NDArray $x,
         ?int $axis=null,
         ?bool $keepdims=null,
+        ?bool $ndarray=null,
         ?NDArray $output=null
         ) : int|float|NDArray
     {
+        $ndarray ??= false;
         if($axis===null) {
-            return $this->la->sum($x);
+            $output = $this->la->sum($x);
+            if(is_scalar($output) && $ndarray) {
+                $output = $this->array($output,$x->dtype());
+            }
+            return $output;
         } else {
             return $this->la->reduceSum($x,axis:$axis,keepdims:$keepdims,output:$output);
         }
@@ -1013,7 +1034,7 @@ class Backend
 
     public function gatherb(
         NDArray $params,
-        NDarray $indices,
+        NDArray $indices,
         ?int $axis=null,
         ?int $batchDims=null,
         ?int $detailDepth=null,
@@ -1036,7 +1057,7 @@ class Backend
      * @param array<int> $shape
      */
     public function scatterb(
-        NDarray $indices,
+        NDArray $indices,
         NDArray $updates,
         array $shape,
         ?int $axis=null,
@@ -1062,7 +1083,7 @@ class Backend
      * @param array<int> $shape
      */
     public function scatterbAdd(
-        NDarray $indices,
+        NDArray $indices,
         NDArray $updates,
         array $shape,
         ?int $axis=null,
@@ -1199,6 +1220,24 @@ class Backend
     public function randomNormalVariables(array $shape, float $mean, float $scale, ?int $dtype=null, ?int $seed=null, ?NDArray $x=null) : NDArray
     {
         return $this->la->randomNormal($shape,$mean,$scale,$dtype,$seed,$x);
+    }
+
+    /**
+     * $probs : (batches,numSamples) without numSamples
+     *          or (numSamples) with numSamples
+     *          dtype:float32.
+     * $randints: (batches) dtype:int32
+     * 
+     * sum of probs must be 1.0 each row.
+     */
+    public function randomCategorical(
+        NDArray $probs,
+        ?int $numSamples=null,
+        ?int $dtype=null,
+        ?int $seed=null
+        ) : NDArray
+    {
+        return $this->la->randomCategorical($probs,numSamples:$numSamples,dtype:$dtype,seed:$seed);
     }
 
     public function relu(NDArray $x) : NDArray
@@ -2002,23 +2041,23 @@ class Backend
     public function dMeanSquaredError(
         NDArray $dLoss, NDArray $trues, NDArray $predicts,
         ?string $reduction=null,
-        ) : NDarray
+        ) : NDArray
     {
         $la = $this->la;
         // dx = 2/N * (Yk-Tk)
         if($reduction!=='none') {
             $n = $predicts->size();
-            $loss = $la->scal(2/$n,
+            $dPredicts = $la->scal(2/$n,
                 $la->axpy($trues,$la->copy($predicts),-1.0));
-            $la->multiply($dLoss,$loss);
+            $la->multiply($dLoss,$dPredicts);
         } else {
             $shape = $predicts->shape();
             $n = array_pop($shape);
-            $loss = $la->scal(2/$n,
+            $dPredicts = $la->scal(2/$n,
                 $la->axpy($trues,$la->copy($predicts),-1.0));
-            $la->multiply($dLoss,$loss,trans:true);
+            $la->multiply($dLoss,$dPredicts,trans:true);
         }
-        return $loss;
+        return $dPredicts;
     }
 
     public function sparseCategoricalCrossEntropy(
@@ -2589,6 +2628,149 @@ class Backend
     ) : NDArray
     {
         return $this->la->einsum4p1($equation, $a, $b);
+    }
+
+    /**
+     * A custom function that calculates log(1 + x) in a numerically stable manner.
+     */
+    public function log1p(
+        NDArray $x,
+    ) : NDArray
+    {
+        $la = $this->la;
+
+        // Threshold for switching calculation methods
+        // If the absolute value is smaller than this value, use the Taylor expansion.
+        // Generally, the square root of machine epsilon is used as a guideline.
+        // Since the machine epsilon for float32 is approximately 1.19e-7, its square root is approximately 3.45e-4.
+        $threshold = 3.45e-4;
+
+        // Approximate calculation using Taylor expansion (up to 5th order)
+        // x - x^2/2 + x^3/3 - x^4/4 + x^5/5
+        //$taylor_approx = $x * (1 - $x/2 + $x**2/3 - $x**3/4 + $x**4/5);
+        $taylor_approx = $la->multiply(
+            $x,
+            $la->axpy(
+                $la->scal(1/5,$la->pow($la->copy($x),4)),
+                $la->axpy(
+                    $la->scal(1/4,$la->pow($la->copy($x),3)),
+                    $la->axpy(
+                        $la->scal(1/3,$la->square($la->copy($x))),
+                        $la->increment($la->copy($x),beta:1,alpha:-1/2)
+                    ),
+                    alpha:-1
+                )
+            )
+        );
+
+        // Conditional branching using where
+        // If |x| < threshold, use the Taylor expansion result; otherwise, use the normal calculation result.
+        $result = $la->where(
+            $la->less($la->square($la->copy($x)),$threshold*$threshold),
+            $taylor_approx,
+            $la->log($la->increment($la->copy($x),beta:1)),
+            normalize:false,
+        );
+    
+        return $result;
+    }
+
+    public function  dLog1p(
+        NDArray $dOutputs,
+        NDArray $x
+        ) : NDArray
+    {
+        $la = $this->la;
+        $threshold = 3.45e-4;
+
+        // Case 2: Local gradient (Taylor derivative) when |x| < threshold
+        // $local_grad_taylor = 1 - $x + $x**2 - $x**3 + $x**4;
+        $local_grad_taylor = $la->axpy(
+            $la->pow($la->copy($x),4),
+            $la->axpy(
+                $la->pow($la->copy($x),3),
+                $la->axpy(
+                    $la->square($la->copy($x)),
+                    $la->increment($la->copy($x),beta:1,alpha:-1)
+                ),
+                alpha:-1
+            ),
+        );
+
+        // Case 1: Local gradient (true derivative) when |x| >= threshold
+        // $local_grad_direct = 1.0 / (1.0 + $x);
+        $local_grad_direct = $la->reciprocal($la->copy($x),beta:1.0);
+
+        // Determine local gradients under the same conditions as the forward pass
+        $local_grad = $la->where(
+            $la->less($la->square($la->copy($x)),$threshold*$threshold),
+            $local_grad_taylor,
+            $local_grad_direct,
+            normalize:false,
+        );
+
+        // Multiply the upstream gradient by the local gradient, based on the chain rule
+        return $la->multiply($dOutputs,$local_grad);
+    }
+
+    /**
+     * A custom function that calculates L2Norm(x) in a numerically stable manner.
+     */
+    public function l2norm(
+        NDArray $input,
+        ?int $axis=null,
+    ) : NDArray
+    {
+        $la = $this->la;
+        if($axis===null) {
+            $output = $la->nrm2($input);
+            if(is_scalar($output)) {
+                $output = $this->array($output,$input->dtype());
+            }
+            return $output;
+        }
+        $output = $la->sqrt($la->reduceSum($la->square($la->copy($input)),axis:$axis));
+        return $output;
+    }
+
+    public function dL2norm(
+        NDArray $dOutput,
+        NDArray $input,
+        NDArray $output,
+        ?int $axis=null,
+    ) : NDArray
+    {
+        $la = $this->la;
+        if($axis===null || $axis === 0) {
+            $dInput = $la->multiply(
+                $dOutput,
+                $la->multiply(
+                    $la->reciprocal($la->copy($output)),
+                    $la->copy($input)
+                )
+            );
+            return $dInput;
+        }
+        if($axis === -1 || $axis === $input->ndim()-1) {
+            $shape = $input->shape();
+            $origShape = $shape;
+            $feature = array_pop($shape);
+            $input = $input->reshape([array_product($shape),$feature]);
+            $output = $output->reshape([$output->size()]);
+            $dOutput = $dOutput->reshape([$dOutput->size()]);
+            $dInput = $la->multiply(
+                $dOutput,
+                $la->multiply(
+                    $la->reciprocal($la->copy($output)),
+                    $la->copy($input),
+                    trans:true
+                ),
+                trans:true
+            );
+            $dInput = $dInput->reshape($origShape);
+            return $dInput;
+        }
+        throw new InvalidArgumentException("Unsupported axis: {$axis}");
     }
 
     public function equalTest(mixed $a, mixed $b) : bool

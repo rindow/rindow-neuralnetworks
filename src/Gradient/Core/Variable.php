@@ -16,12 +16,12 @@ use Rindow\NeuralNetworks\Gradient\MaskedNDArray as MaskedNDArrayInterface;
 class Variable implements VariableInterface
 {
     protected object $backend;
-    protected bool $trainable;
-    protected bool $undetermined;
     protected ?string $name=null;
     protected mixed $value;
     protected ?object $creator=null;
     protected int $generation=0;
+    protected bool $trainable;
+    protected bool $undetermined;
     protected bool $unbackpropagatable;
     protected ?NDArray $mask;
 
@@ -42,11 +42,11 @@ class Variable implements VariableInterface
         $this->trainable = $trainable ?? true;
         $this->unbackpropagatable = $unbackpropagatable ?? false;
         if(!$this->undetermined) {
-            $this->assign($value, reference:$reference, mask:$mask);
+            $this->_assign($value, reference:$reference, mask:$mask);
         }
     }
 
-    public function assign(
+    public function _assign(
         mixed $value, ?bool $reference=null, ?NDArray $mask=null) : void
     {
         $K = $this->backend;
@@ -78,6 +78,45 @@ class Variable implements VariableInterface
         $this->undetermined = false;
     }
 
+    public function update(mixed $value) : void
+    {
+        $K = $this->backend;
+        if($this->undetermined) {
+            throw new LogicException("Undetermined variable:".($this->name??''));
+        }
+        if($value instanceof VariableInterface) {
+            $value = $value->value();
+        }
+        if($value instanceof MaskedNDArrayInterface) {  // if Backend is OpenCL.
+            $value = $value->value();
+        }
+        if($value instanceof NDArray) {
+            $target = $this->value;
+            if($target instanceof MaskedNDArrayInterface) {
+                $target = $target->value();
+            }
+            if($target instanceof ScalarInterface) {
+                $target->update($K->scalar($value));
+            } else {
+                $K->copy($K->array($value),$target);       // translate from NDArray to NDArrayCL
+            }
+        } elseif(is_bool($value)) {
+            $this->value = $value;
+        } elseif(is_array($value)||is_numeric($value)) {
+            $this->value = $K->array($value);
+        } elseif($value instanceof ArrayShapeInterface) {
+            $this->value = $value;
+        } elseif($value instanceof ScalarInterface) {
+            if($this->value instanceof NDArray) {
+                $K->copy($K->array($value->value()),$this->value);
+            } else {
+                $this->value->update($value->value());
+            }
+        } else {
+            throw new InvalidArgumentException('Invalid vaule type:'.gettype($value));
+        }
+    }
+
     public function isTrainable() : bool
     {
         return $this->trainable;
@@ -96,7 +135,7 @@ class Variable implements VariableInterface
     public function value() : mixed
     {
         if($this->undetermined) {
-            throw new LogicException("Undetermined variable:".$this->name??'');
+            throw new LogicException("Undetermined variable:".($this->name??''));
         }
         return $this->value;
     }

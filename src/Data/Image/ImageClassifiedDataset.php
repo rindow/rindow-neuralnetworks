@@ -123,7 +123,8 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
                 $copyWidth, $copyHeight, $imWidth, $imHeight);
             $imHeight = $height;
             $imWidth = $width;
-            imagedestroy($image);
+            // deprecated
+            // imagedestroy($image);
             $image = $fitImage;
         }
         $offsety = (int)floor(($imHeight-$height)/2);
@@ -141,7 +142,8 @@ class ImageClassifiedDataset extends ClassifiedDirectoryDataset
                 }
             }
         }
-        imagedestroy($image);
+        // deprecated
+        // imagedestroy($image);
         return $array;
     }
 

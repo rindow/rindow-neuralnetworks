@@ -119,10 +119,10 @@ class ModelLoaderTest extends TestCase
 
         $REVERSE = True;
         $WORD_VECTOR = 16;
-        if($mo->isAdvanced()) {
-            $UNITS = 128;
-        } else {
+        if(!$mo->isAdvanced() || getenv('BLOBDATA_TEST_SKIP')) {
             $UNITS = 16;
+        } else {
+            $UNITS = 128;
         }
         $question = $mo->array([
             [1,2,3,4,5,6],

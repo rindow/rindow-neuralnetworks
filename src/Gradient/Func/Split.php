@@ -11,6 +11,7 @@ use Interop\Polite\Math\Matrix\NDArray;
 class Split extends AbstractFunction
 {
     protected int $numOfInputs = 1;
+    protected int $numOfOutputs = 1;
 
     /** @var array<int> $sizeSplits */
     protected array $sizeSplits;
@@ -32,6 +33,10 @@ class Split extends AbstractFunction
                 throw new InvalidArgumentException('sizeSplits must be array of integer.');
             }
         }
+        if(count($sizeSplits) == 0) {
+            throw new InvalidArgumentException('sizeSplits must not be empty.');
+        }
+        $this->numOfOutputs = count($sizeSplits);
         $this->sizeSplits = $sizeSplits;
         $this->axis = $axis;
     }

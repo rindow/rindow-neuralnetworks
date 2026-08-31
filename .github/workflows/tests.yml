@@ -2,30 +2,48 @@ name: tests
 
 on: 
   push:
-      branches:
-          - master
+      branches: [  "main", "master" ]
 
 jobs:
-  no_ext_tests:
+  tests:
     runs-on: ${{ matrix.os }}
+    env:
+      matlib: 1.1.1
+      testlib: 1.1.1
+      matlibrepo: rindow/rindow-matlib
 
     strategy:
       fail-fast: true
       matrix:
         include:
-          - name: PHP8.1
-            os: ubuntu-latest
+          - os: ubuntu-latest
+            arch: 'amd64'
             php: '8.1'
             phpunit: '10.5'
-          - name: PHP8.3
-            os: ubuntu-latest
-            php: '8.3'
-            phpunit: '11.5'
-          - name: PHP8.4
-            os: ubuntu-latest
+            ffi: 'ffi'
+          - os: ubuntu-latest
+            arch: 'amd64'
             php: '8.4'
             phpunit: '11.5'
+            ffi: 'ffi'
+          - os: ubuntu-latest
+            arch: 'amd64'
+            php: '8.5'
+            phpunit: '11.5'
+            ffi: 'ffi'
+          - os: windows-latest
+            arch: 'x64'
+            php: '8.5'
+            phpunit: '11.5'
+            ffi: 'ffi'
+          - os: macos-latest
+            arch: 'arm64'
+            php: '8.5'
+            phpunit: '11.5'
+            ffi: 'ffi'
   
+    name: PHP ${{ matrix.php }} on ${{ matrix.os }}
+
     steps:
       - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
@@ -33,40 +51,66 @@ jobs:
           php-version: ${{ matrix.php }}
           # PHP Extras
           coverage: none
-          tools: composer, phpunit:${{ matrix.phpunit }}, phpstan
+          tools: composer, phpstan:2.1.x
           # ini-values: "memory_limit=512M"
-          extensions: pdo_sqlite gd # ${{ matrix.ffi }}
+          extensions: pdo_sqlite, gd, ${{ matrix.ffi }}
+        env:
+          fail-fast: true
+
+      - name: Install Libs (Linux)
+        if: ${{ startsWith(matrix.os, 'ubuntu-') && matrix.ffi == 'ffi' }}
+        run: |
+          sudo apt install -y libopenblas0 liblapacke
+          wget https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib_${{ env.matlib }}-`lsb_release -sr`_amd64.deb
+          sudo apt install -y ./rindow-matlib_${{ env.matlib }}-`lsb_release -sr`_amd64.deb
+
+      - name: Install Libs (macOS)
+        if: ${{ startsWith(matrix.os, 'macos-') && matrix.ffi == 'ffi' }}
+        run: |
+          # brew install libomp
+          curl https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib-${{ env.matlib }}-Darwin-${{ matrix.arch }}.tar.gz -O -L
+          tar -xzf rindow-matlib-${{ env.matlib }}-Darwin-${{ matrix.arch }}.tar.gz
+          sudo cp -r usr/include /usr/local/
+          sudo cp -r usr/lib /usr/local/
 
       - name: Checkout codes
         uses: "actions/checkout@v4"
 
-      #- name: Composer
-      #  uses: php-actions/composer@v6
-      #  with:
-      #    php_version: ${{ matrix.php }}
-
       - name: Composer
-        run: composer update
-
-      #- name: PHP Static Analysys
-      #  uses: php-actions/phpstan@v3
-      #  with:
-      #    php_version: ${{ matrix.php }}
-      #    path: src/
+        run: |
+          composer update
+          composer require rindow/rindow-math-matrix-matlibffi
+          composer require --dev "phpunit/phpunit=${{ matrix.phpunit }}.*"
 
       - name: PHP Static Analysys
         run: phpstan
 
-      #- name: PHPUnit Tests
-      #  uses: php-actions/phpunit@v3
-      #  with:
-      #    configuration: tests/phpunit.xml
-      #    version: ${{ matrix.phpunit }}
-      #    php_version: ${{ matrix.php }}
-      #    php_extensions: pdo_sqlite gd
-      #  env:
-      #    PLOT_RENDERER_SKIP: true
+      - name: PHPUnit Tests
+        if: ${{ !startsWith(matrix.os, 'windows-') }}
+        run: |
+          PLOT_RENDERER_SKIP=true;
+          export PLOT_RENDERER_SKIP;
+          BLOBDATA_TEST_SKIP=true;
+          export BLOBDATA_TEST_SKIP;
+          vendor/bin/rindow-math-matrix -v
+          vendor/bin/phpunit -c tests
 
       - name: PHPUnit Tests
-        run: PLOT_RENDERER_SKIP=true; export PLOT_RENDERER_SKIP; phpunit -c tests
-
+        if: ${{ startsWith(matrix.os, 'windows-') }}
+        run: |
+          Invoke-WebRequest -Uri https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.27/OpenBLAS-0.3.27-x64.zip -OutFile openblas.zip
+          Expand-Archive -Path openblas.zip
+          $currentDir = (Get-Location).Path
+          $OpenBLAS_DIR = Join-Path -Path $currentDir -ChildPath 'openblas'
+          $env:PATH = "$OpenBLAS_DIR/bin;$env:PATH"
+          dir $OpenBLAS_DIR/bin
+          Invoke-WebRequest -Uri https://github.com/${{ env.matlibrepo }}/releases/download/${{ env.testlib }}/rindow-matlib-${{ env.matlib }}-win64.zip -OutFile matlib.zip
+          Expand-Archive -Path matlib.zip
+          $currentDir = (Get-Location).Path
+          $matlibDir = Join-Path -Path $currentDir -ChildPath 'matlib'
+          $env:PATH = "$matlibDir/bin;$env:PATH"
+          $env:PLOT_RENDERER_SKIP = "true";
+          $env:BLOBDATA_TEST_SKIP = "true";
+          vendor/bin/rindow-math-matrix -v
+          vendor/bin/phpunit -c tests
+  

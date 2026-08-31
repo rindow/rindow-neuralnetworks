@@ -8,8 +8,6 @@ parameters:
 		- src
 	ignoreErrors:
 		-
-			message: "#Call to an undefined method Rindow\\\\NeuralNetworks\\\\Gradient\\\\Variable::value\\(\\)#"
-		-
 			message: "#^Method Rindow\\\\NeuralNetworks\\\\Model\\\\Sequential::call\\(\\)#"
 			path: src/Model/Sequential.php
 		-
@@ -37,10 +35,6 @@ parameters:
 			message: "#^Call to an undefined method Rindow\\\\NeuralNetworks\\\\Layer\\\\AbstractAttentionLayer::forward\\(\\)#"
 			count: 1
 			path: src/Layer/AbstractAttentionLayer.php
-		-
-			message: "#^Expression on left side of \\?\\? is not nullable#"
-			count: 1
-			path: src/Gradient/Core/Variable.php
 		-
 			message: "#^Call to an undefined method Interop\\\\Polite\\\\Math\\\\Matrix\\\\NDArray::#"
 			count: 3

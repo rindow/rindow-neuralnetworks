@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Interop\Polite\Math\Matrix\NDArray;
 use Rindow\Math\Matrix\MatrixOperator;
 use Rindow\NeuralNetworks\Builder\NeuralNetworks;
+use Rindow\NeuralNetworks\Layer\Layer;
 use Rindow\NeuralNetworks\Model\AbstractModel;
 use Rindow\Math\Plot\Plot;
 
@@ -921,5 +922,32 @@ class ModelTest extends TestCase
             'fit1',
             'predict',
         ],$model->getLog());
+    }
+
+    public function testBuildModel()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $g = $nn->gradient();
+
+        $model = new class ($nn) extends AbstractModel {
+            protected Layer $dense;
+            public function __construct($nn)
+            {
+                parent::__construct($nn);
+                $this->dense = $nn->layers->Dense(4);
+            }
+            protected function call($x)
+            {
+                return $this->dense->forward($x);
+            }
+        };
+
+        $inputSpec = $g->ArraySpec([2,6]);
+        $model->build($inputSpec);
+        $variables = $model->trainableVariables();
+        $this->assertCount(2,$variables);
+        $this->assertEquals([6,4],$variables[0]->shape());
+        $this->assertEquals([4],$variables[1]->shape());
     }
 }

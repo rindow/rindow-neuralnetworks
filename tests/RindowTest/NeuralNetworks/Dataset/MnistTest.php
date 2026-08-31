@@ -21,13 +21,12 @@ class MnistTest extends TestCase
     public function setUp() : void
     {
         parent::setUp();
-        $this->plot = true;
-        $this->pickleFile = $this->getDatasetDir().$this->pickleFilename;
-        $mo = new MatrixOperator();
-        if(!$mo->isAdvanced()) {
+        if(getenv('BLOBDATA_TEST_SKIP')) {
             $this->markTestSkipped("The service is not Advanced.");
             return;
         }
+        $this->plot = true;
+        $this->pickleFile = $this->getDatasetDir().$this->pickleFilename;
     }
 
     protected function getRindowDatesetDir() : string

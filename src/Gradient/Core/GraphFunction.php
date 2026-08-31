@@ -218,7 +218,7 @@ class GraphFunction implements GraphFunctionInterface
                 if($name==null && is_object($this->func)) {
                     $name = get_class($this->func);
                 }
-                if($name==null && !is_object($this->func)) {
+                if($name==null) {
                     $name = 'function';
                 }
                 if(is_object($o)) {

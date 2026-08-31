@@ -9,7 +9,11 @@ use function Rindow\Math\Matrix\R;
 
 $mo = new MatrixOperator();
 $nn = new NeuralNetworks($mo);
-$plt = new Plot(null,$mo);
+$config = [
+    //'renderer.skipRunViewer'=>true,
+];
+$plt = new Plot($config,$mo);
+//$nn->backend()->primaryLA()->setProfiling(true);
 
 $dataDir = getenv('RINDOW_NEURALNETWORKS_DATASETS');
 if(!$dataDir) {
@@ -91,6 +95,11 @@ $train_inputs = $train_inputs[R(0,$train_size)];
 $train_labels = $train_labels[R(0,$train_size)];
 
 echo "device type: ".$nn->deviceType()."\n";
+if($nn->deviceType()==='CPU') {
+    echo "number of threads: ".$nn->backend()->primaryLA()->getMath()->getNumThreads()."\n";
+    //$nn->backend()->primaryLA()->getMath()->setProfiling(true);
+}
+echo "math library: ".$nn->backend()->primaryLA()->getMath()->getConfig()."\n";
 $modelFilePath = __DIR__."/basic-text-classification.model";
 
 if(file_exists($modelFilePath)) {
@@ -132,3 +141,5 @@ if(file_exists($modelFilePath)) {
 $model->evaluate($test_inputs,$test_labels,
     batch_size:64,verbose:1,
 );
+//$nn->backend()->primaryLA()->profilingReport();
+//$nn->backend()->primaryLA()->getMath()->profilingReport();
