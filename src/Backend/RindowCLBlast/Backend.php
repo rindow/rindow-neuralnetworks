@@ -561,6 +561,17 @@ class Backend
         );
     }
 
+    public function where(
+        NDArray $condition,
+        NDArray $x,
+        NDArray $y,
+        ?bool $normalize=null,
+        ) : NDArray
+    {
+        $la = $this->la;
+        return $la->where($condition, $x, $y, normalize:$normalize);
+    }
+
     public function reciprocal(
         NDArray $x,
         ?float $beta=null,
@@ -678,8 +689,7 @@ class Backend
     public function abs(NDArray $x) : NDArray
     {
         $la = $this->la;
-        $minus = $la->less($la->copy($x),0);
-        $y = $la->axpy($la->multiply($x,$minus),$la->copy($x),-2);
+        $y = $la->abs($la->copy($x));
         return $y;
     }
 

@@ -60,6 +60,10 @@ use Rindow\NeuralNetworks\Gradient\Func\RandomCategorical;
 use Rindow\NeuralNetworks\Gradient\Func\Tanh;
 use Rindow\NeuralNetworks\Gradient\Func\Log1p;
 use Rindow\NeuralNetworks\Gradient\Func\L2Norm;
+use Rindow\NeuralNetworks\Gradient\Func\Abs;
+use Rindow\NeuralNetworks\Gradient\Func\Relu;
+use Rindow\NeuralNetworks\Gradient\Func\Sigmoid;
+use Rindow\NeuralNetworks\Gradient\Func\Where;
 
 class Gradient
 {
@@ -684,4 +688,49 @@ class Gradient
         return $func($x);
     }
 
+    public function abs(
+        NDArray $x,
+    ) : NDArray
+    {
+        $func = new Abs(
+            $this->backend,
+        );
+        return $func($x);
+    }
+
+    public function relu(
+        NDArray $x,
+    ) : NDArray
+    {
+        $func = new Relu(
+            $this->backend,
+        );
+        return $func($x);
+    }
+
+    public function sigmoid(
+        NDArray $x,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Sigmoid(
+            $this->backend,
+            name:$name,
+        );
+        return $func($x);
+    }
+
+    public function where(
+        NDArray $condition,
+        NDArray $x,
+        NDArray $y,
+        ?string $name=null,
+    ) : NDArray
+    {
+        $func = new Where(
+            $this->backend,
+            name:$name,
+        );
+        return $func($condition,$x,$y);
+    }
 }
