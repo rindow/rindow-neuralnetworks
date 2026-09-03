@@ -178,4 +178,82 @@ class Conv2DTest extends TestCase
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
     }
 
+    public function testPaddingSameForwardAndBackward()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+
+        $layer = new Conv2D(
+            $K,
+            filters:2,
+            kernel_size:2,
+            padding:'same',
+            input_shape:[3,3,1]);
+
+        //  batch size 2
+        $inputs = $K->array([
+            [[[0.0],[0.0],[6.0]],
+             [[0.0],[0.0],[6.0]],
+             [[0.0],[0.0],[6.0]]],
+            [[[0.0],[0.0],[6.0]],
+             [[0.0],[0.0],[6.0]],
+             [[0.0],[0.0],[6.0]]],
+         ]);
+ 
+        /*
+        $kernel = $mo->array([
+               [[[0.1, 0.2]],
+                [[0.1, 0.1]]],
+               [[[0.2, 0.2]],
+                [[0.2, 0.1]]]
+            ]); // kernel
+        $bias = $mo->array(
+                [0.5,0.1]
+            );  // bias
+        $layer->build(null,
+            sampleWeights:[$kernel,$bias]);
+        */
+        $layer->build($g->Variable($inputs));
+        [$kernel,$bias]=$layer->getParams();
+        $this->assertEquals(
+            [2,2,1,2],
+            $kernel->shape());
+        $this->assertEquals(
+            [2],
+            $bias->shape());
+
+        //
+        // forward
+        //
+        $this->assertEquals(
+            [2,3,3,1],
+            $inputs->shape());
+        $copyInputs = $K->copy($inputs);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs);
+                return $outputsVariable;
+            }
+        );
+        $outputs = $K->ndarray($outputsVariable);
+        //
+        $this->assertEquals(
+            [2,3,3,2],$outputs->shape());
+        $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
+
+        //
+        // backward
+        //
+        // 2 batch
+        $dOutputs = $K->ones([2,3,3,2]);
+        $copydOutputs = $K->copy(
+            $dOutputs);
+        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
+        // 2 batch
+        $this->assertEquals([2,3,3,1],$dInputs->shape());
+        $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
+    }
+
 }

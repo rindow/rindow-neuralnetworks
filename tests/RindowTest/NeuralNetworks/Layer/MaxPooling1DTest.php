@@ -121,4 +121,53 @@ class MaxPooling1DTest extends TestCase
         $this->assertEquals([2,4,3],$dInputs->shape());
         $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
     }
+
+    public function testPaddingSameForwardAndBackward()
+    {
+        $mo = $this->newMatrixOperator();
+        $nn = $this->newNeuralNetworks($mo);
+        $K = $nn->backend();
+        $g = $nn->gradient();
+        $fn = $K;
+
+        $layer = new MaxPooling1D(
+            $K,
+            padding:'same',
+            input_shape:[4,3]);
+
+        //$layer->build();
+
+        //
+        // forward
+        //
+        //  batch size 2
+        $inputs = $K->ones([2,4,3]);
+        $copyInputs = $K->copy($inputs);
+        $outputsVariable = $nn->with($tape=$g->GradientTape(),
+            function() use ($layer,$inputs) {
+                $outputsVariable = $layer->forward($inputs);
+                return $outputsVariable;
+            }
+        );
+        $outputs = $K->ndarray($outputsVariable);
+        //
+        $this->assertEquals(
+            [2,4,3],$outputs->shape());
+        $this->assertEquals($copyInputs->toArray(),$inputs->toArray());
+
+        //
+        // backward
+        //
+        // 2 batch
+        $dOutputs = $K->scale(
+            0.1,
+            $K->ones([2,4,3]));
+
+        $copydOutputs = $K->copy(
+            $dOutputs);
+        [$dInputs] = $outputsVariable->creator()->backward([$dOutputs]);
+        // 2 batch
+        $this->assertEquals([2,4,3],$dInputs->shape());
+        $this->assertEquals($copydOutputs->toArray(),$dOutputs->toArray());
+    }
 }

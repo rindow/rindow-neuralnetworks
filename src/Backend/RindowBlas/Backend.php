@@ -1984,7 +1984,9 @@ class Backend
         ) : array
     {
         if($padding=='same') {
-            return $inputShape;
+            $outputShape = $inputShape;
+            array_pop($outputShape);
+            return $outputShape;
         }
         if($data_format==null||
             $data_format=='channels_last') {
